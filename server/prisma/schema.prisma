@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SYSTEM_ADMIN
+  ORG_ADMIN
+  PROJECT_MANAGER
+  PERMANENT_WORKER
+  TEMPORARY_WORKER
+}
+
+enum TaskStatus {
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  UNAVAILABLE
+  ON_LEAVE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+  EXPIRED
+}
+
+enum AssignmentType {
+  MANUAL
+  AUTO
+}
+
+model Organisation {
+  id             Int            @id @default(autoincrement())
+  name           String         @db.VarChar(150)
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  users          User[]
+  departments    Department[]
+  subscriptions  Subscription[]
+  skillTags      SkillTag[]
+}
+
+model User {
+  id             Int          @id @default(autoincrement())
+  organisationId Int?
+  role           Role
+  fullName       String       @db.VarChar(100)
+  email          String       @unique @db.VarChar(150)
+  passwordHash   String       @db.VarChar(255)
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  lastLogin      DateTime?
+
+  organisation   Organisation?    @relation(fields: [organisationId], references: [id])
+  tasks          Task[]           @relation("CreatedTasks")
+  assignments    TaskAssignment[] @relation("AssignedTo")
+  availability   Availability[]
+  attendance     Attendance[]
+  notifications  Notification[]
+  skills         UserSkill[]
+}
+
+model Department {
+  id             Int          @id @default(autoincrement())
+  organisationId Int
+  name           String       @db.VarChar(100)
+  headUserId     Int?
+
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+}
+
+model Task {
+  id               Int          @id @default(autoincrement())
+  organisationId   Int
+  createdById      Int
+  title            String       @db.VarChar(200)
+  description      String?
+  status           TaskStatus   @default(PENDING)
+  requiredSkillId  Int?
+  startDatetime    DateTime
+  endDatetime      DateTime
+  createdAt        DateTime     @default(now())
+
+  createdBy        User         @relation("CreatedTasks", fields: [createdById], references: [id])
+  assignments      TaskAssignment[]
+  requiredSkill    SkillTag?    @relation(fields: [requiredSkillId], references: [id])
+}
+
+model TaskAssignment {
+  id              Int            @id @default(autoincrement())
+  taskId          Int
+  assignedToId    Int
+  assignedById    Int
+  assignmentType  AssignmentType
+  assignedAt      DateTime       @default(now())
+
+  task            Task           @relation(fields: [taskId], references: [id])
+  assignedTo      User           @relation("AssignedTo", fields: [assignedToId], references: [id])
+}
+
+model Availability {
+  id            Int                @id @default(autoincrement())
+  userId        Int
+  startDatetime DateTime
+  endDatetime   DateTime
+  status        AvailabilityStatus
+
+  user          User               @relation(fields: [userId], references: [id])
+}
+
+model Attendance {
+  id           Int       @id @default(autoincrement())
+  userId       Int
+  clockIn      DateTime
+  clockOut     DateTime?
+  workingHours Decimal?  @db.Decimal(5, 2)
+
+  user         User      @relation(fields: [userId], references: [id])
+}
+
+model Subscription {
+  id             Int                @id @default(autoincrement())
+  organisationId Int
+  planName       String             @db.VarChar(100)
+  startDate      DateTime
+  endDate        DateTime
+  status         SubscriptionStatus @default(ACTIVE)
+
+  organisation   Organisation       @relation(fields: [organisationId], references: [id])
+}
+
+model SkillTag {
+  id             Int          @id @default(autoincrement())
+  organisationId Int
+  skillName      String       @db.VarChar(100)
+
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  userSkills     UserSkill[]
+  tasks          Task[]
+}
+
+model UserSkill {
+  id       Int      @id @default(autoincrement())
+  userId   Int
+  skillId  Int
+
+  user     User     @relation(fields: [userId], references: [id])
+  skill    SkillTag @relation(fields: [skillId], references: [id])
+}
+
+model Notification {
+  id          Int      @id @default(autoincrement())
+  recipientId Int
+  type        String   @db.VarChar(50)
+  message     String
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  recipient   User     @relation(fields: [recipientId], references: [id])
+}
