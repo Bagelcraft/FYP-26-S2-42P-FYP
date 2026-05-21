@@ -7,7 +7,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
+// ─── Enums ───────────────────────────────────────────────────
+
+enum UserType {
   SYSTEM_ADMIN
   ORG_ADMIN
   PROJECT_MANAGER
@@ -41,132 +43,350 @@ enum AssignmentType {
   AUTO
 }
 
+enum LeaveType {
+  ANNUAL
+  MEDICAL
+  UNPAID
+  OTHER
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum BillingStatus {
+  PAID
+  UNPAID
+  REFUNDED
+}
+
+enum FeedbackStatus {
+  OPEN
+  RESOLVED
+}
+
+enum ShiftChangeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ─── Subscription Plans ──────────────────────────────────────
+
+model SubscriptionPlan {
+  plan_id        Int    @id @default(autoincrement())
+  plan_name      String @db.VarChar(100)
+  price          Decimal @db.Decimal(10, 2)
+  billing_period String @db.VarChar(50)
+  description    String? @db.Text
+  cta_text       String? @db.VarChar(100)
+
+  features      PlanFeature[]
+  subscriptions Subscription[]
+}
+
+model PlanFeature {
+  plan_feature_id Int    @id @default(autoincrement())
+  plan_id         Int
+  feature_text    String @db.VarChar(255)
+
+  plan            SubscriptionPlan @relation(fields: [plan_id], references: [plan_id])
+}
+
+// ─── Organisation & Subscription ─────────────────────────────
+
 model Organisation {
-  id             Int            @id @default(autoincrement())
-  name           String         @db.VarChar(150)
-  isActive       Boolean        @default(true)
-  createdAt      DateTime       @default(now())
-  users          User[]
-  departments    Department[]
-  subscriptions  Subscription[]
-  skillTags      SkillTag[]
-}
+  organisation_id        Int      @id @default(autoincrement())
+  active_subscription_id Int?     @unique
+  name                   String   @db.VarChar(150)
+  isActive               Boolean  @default(true)
+  createdAt              DateTime @default(now())
 
-model User {
-  id             Int          @id @default(autoincrement())
-  organisationId Int?
-  role           Role
-  fullName       String       @db.VarChar(100)
-  email          String       @unique @db.VarChar(150)
-  passwordHash   String       @db.VarChar(255)
-  isActive       Boolean      @default(true)
-  createdAt      DateTime     @default(now())
-  lastLogin      DateTime?
-
-  organisation   Organisation?    @relation(fields: [organisationId], references: [id])
-  tasks          Task[]           @relation("CreatedTasks")
-  assignments    TaskAssignment[] @relation("AssignedTo")
-  availability   Availability[]
-  attendance     Attendance[]
-  notifications  Notification[]
-  skills         UserSkill[]
-}
-
-model Department {
-  id             Int          @id @default(autoincrement())
-  organisationId Int
-  name           String       @db.VarChar(100)
-  headUserId     Int?
-
-  organisation   Organisation @relation(fields: [organisationId], references: [id])
-}
-
-model Task {
-  id               Int          @id @default(autoincrement())
-  organisationId   Int
-  createdById      Int
-  title            String       @db.VarChar(200)
-  description      String?
-  status           TaskStatus   @default(PENDING)
-  requiredSkillId  Int?
-  startDatetime    DateTime
-  endDatetime      DateTime
-  createdAt        DateTime     @default(now())
-
-  createdBy        User         @relation("CreatedTasks", fields: [createdById], references: [id])
-  assignments      TaskAssignment[]
-  requiredSkill    SkillTag?    @relation(fields: [requiredSkillId], references: [id])
-}
-
-model TaskAssignment {
-  id              Int            @id @default(autoincrement())
-  taskId          Int
-  assignedToId    Int
-  assignedById    Int
-  assignmentType  AssignmentType
-  assignedAt      DateTime       @default(now())
-
-  task            Task           @relation(fields: [taskId], references: [id])
-  assignedTo      User           @relation("AssignedTo", fields: [assignedToId], references: [id])
-}
-
-model Availability {
-  id            Int                @id @default(autoincrement())
-  userId        Int
-  startDatetime DateTime
-  endDatetime   DateTime
-  status        AvailabilityStatus
-
-  user          User               @relation(fields: [userId], references: [id])
-}
-
-model Attendance {
-  id           Int       @id @default(autoincrement())
-  userId       Int
-  clockIn      DateTime
-  clockOut     DateTime?
-  workingHours Decimal?  @db.Decimal(5, 2)
-
-  user         User      @relation(fields: [userId], references: [id])
+  activeSubscription Subscription?  @relation("ActiveSubscription", fields: [active_subscription_id], references: [subscription_id])
+  subscriptions      Subscription[] @relation("OrgSubscriptions")
+  users              User[]
+  departments        Department[]
+  skills             Skill[]
+  tasks              Task[]
+  staffRoles         StaffRole[]
+  unregisteredUsers  UnregisteredUser[]
 }
 
 model Subscription {
-  id             Int                @id @default(autoincrement())
-  organisationId Int
-  planName       String             @db.VarChar(100)
-  startDate      DateTime
-  endDate        DateTime
-  status         SubscriptionStatus @default(ACTIVE)
+  subscription_id Int                @id @default(autoincrement())
+  organisation_id Int
+  plan_id         Int
+  start_date      DateTime           @db.Date
+  end_date        DateTime           @db.Date
+  status          SubscriptionStatus @default(ACTIVE)
 
-  organisation   Organisation       @relation(fields: [organisationId], references: [id])
+  organisation          Organisation     @relation("OrgSubscriptions", fields: [organisation_id], references: [organisation_id])
+  activeForOrganisation Organisation?    @relation("ActiveSubscription")
+  plan                  SubscriptionPlan @relation(fields: [plan_id], references: [plan_id])
+  billingRecords        BillingRecord[]
 }
 
-model SkillTag {
-  id             Int          @id @default(autoincrement())
-  organisationId Int
-  skillName      String       @db.VarChar(100)
+model BillingRecord {
+  billing_id      Int           @id @default(autoincrement())
+  subscription_id Int
+  amount          Decimal       @db.Decimal(10, 2)
+  billing_date    DateTime      @db.Date
+  receipt_url     String?       @db.VarChar(500)
+  status          BillingStatus @default(UNPAID)
 
-  organisation   Organisation @relation(fields: [organisationId], references: [id])
-  userSkills     UserSkill[]
-  tasks          Task[]
+  subscription    Subscription  @relation(fields: [subscription_id], references: [subscription_id])
+}
+
+// ─── Staff Roles ──────────────────────────────────────────────
+
+model StaffRole {
+  role_id           Int    @id @default(autoincrement())
+  organisation_id   Int
+  role_name         String @db.VarChar(100)
+  max_working_hours Int?
+
+  organisation      Organisation @relation(fields: [organisation_id], references: [organisation_id])
+  users             User[]
+}
+
+// ─── Users ───────────────────────────────────────────────────
+
+model User {
+  userId         Int       @id @default(autoincrement())
+  organisationId Int?
+  role_id        Int?
+  full_name      String    @db.VarChar(100)
+  email          String    @unique @db.VarChar(150)
+  password_hash  String    @db.VarChar(255)
+  user_type      UserType
+  is_active      Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  lastLogin      DateTime?
+
+  organisation       Organisation?        @relation(fields: [organisationId], references: [organisation_id])
+  staffRole          StaffRole?           @relation(fields: [role_id], references: [role_id])
+  skills             UserSkill[]
+  attendance         Attendance[]
+  availability       Availability[]
+  createdTasks       Task[]               @relation("CreatedTasks")
+  assignedTasks      TaskAssignment[]     @relation("AssignedTo")
+  taskAssignedBy     TaskAssignment[]     @relation("AssignedBy")
+  leaveRequests      LeaveRequest[]       @relation("UserLeave")
+  approvedLeave      LeaveRequest[]       @relation("ApprovedLeave")
+  leaveBalance       LeaveBalance[]
+  shiftRequests      ShiftChangeRequest[] @relation("UserShiftChange")
+  reviewedShifts     ShiftChangeRequest[] @relation("ReviewedShiftChange")
+  allocationHistory  AllocationHistory[]  @relation("UserAllocation")
+  changedAllocations AllocationHistory[]  @relation("ChangedByAllocation")
+  feedback           Feedback[]
+  testimonials       Testimonial[]
+  headOfDepts        Department[]         @relation("DeptHead")
+  notifications      Notification[]
+}
+
+// ─── Department ───────────────────────────────────────────────
+
+model Department {
+  department_id   Int    @id @default(autoincrement())
+  organisation_id Int
+  head_user_id    Int?
+  name            String @db.VarChar(100)
+
+  organisation    Organisation @relation(fields: [organisation_id], references: [organisation_id])
+  head            User?        @relation("DeptHead", fields: [head_user_id], references: [userId])
+  tasks           Task[]
+}
+
+// ─── Skills ───────────────────────────────────────────────────
+
+model Skill {
+  skill_id        Int     @id @default(autoincrement())
+  organisation_id Int
+  skill_name      String  @db.VarChar(100)
+  cert_required   Boolean @default(false)
+
+  organisation    Organisation @relation(fields: [organisation_id], references: [organisation_id])
+  userSkills      UserSkill[]
+  tasks           Task[]
 }
 
 model UserSkill {
-  id       Int      @id @default(autoincrement())
-  userId   Int
-  skillId  Int
+  user_skill_id     Int     @id @default(autoincrement())
+  user_id           Int
+  skill_id          Int
+  certification_url String? @db.VarChar(500)
 
-  user     User     @relation(fields: [userId], references: [id])
-  skill    SkillTag @relation(fields: [skillId], references: [id])
+  user              User  @relation(fields: [user_id], references: [userId])
+  skill             Skill @relation(fields: [skill_id], references: [skill_id])
+}
+
+// ─── Attendance & Availability ────────────────────────────────
+
+model Attendance {
+  attendance_id Int       @id @default(autoincrement())
+  user_id       Int
+  clock_in      DateTime
+  clock_out     DateTime?
+  working_hours Decimal?  @db.Decimal(5, 2)
+
+  user          User      @relation(fields: [user_id], references: [userId])
+}
+
+model Availability {
+  availability_id Int                @id @default(autoincrement())
+  user_id         Int
+  start_datetime  DateTime
+  end_datetime    DateTime
+  status          AvailabilityStatus
+
+  user            User               @relation(fields: [user_id], references: [userId])
+}
+
+// ─── Leave ───────────────────────────────────────────────────
+
+model LeaveRequest {
+  leave_id    Int         @id @default(autoincrement())
+  user_id     Int
+  approved_by Int?
+  leave_type  LeaveType
+  start_date  DateTime    @db.Date
+  end_date    DateTime    @db.Date
+  status      LeaveStatus @default(PENDING)
+
+  user        User        @relation("UserLeave", fields: [user_id], references: [userId])
+  approver    User?       @relation("ApprovedLeave", fields: [approved_by], references: [userId])
+}
+
+model LeaveBalance {
+  balance_id    Int       @id @default(autoincrement())
+  user_id       Int
+  leave_type    LeaveType
+  entitled_days Int
+  used_days     Int       @default(0)
+  year          Int
+
+  user          User      @relation(fields: [user_id], references: [userId])
+}
+
+// ─── Tasks & Allocation ───────────────────────────────────────
+
+model Task {
+  task_id           Int        @id @default(autoincrement())
+  organisation_id   Int
+  department_id     Int?
+  created_by        Int
+  required_skill_id Int?
+  title             String     @db.VarChar(200)
+  description       String?    @db.Text
+  status            TaskStatus @default(PENDING)
+  start_datetime    DateTime
+  end_datetime      DateTime
+  createdAt         DateTime   @default(now())
+
+  organisation      Organisation     @relation(fields: [organisation_id], references: [organisation_id])
+  department        Department?      @relation(fields: [department_id], references: [department_id])
+  createdBy         User             @relation("CreatedTasks", fields: [created_by], references: [userId])
+  requiredSkill     Skill?           @relation(fields: [required_skill_id], references: [skill_id])
+  assignments       TaskAssignment[]
+  allocationHistory AllocationHistory[]
+}
+
+model TaskAssignment {
+  assignment_id   Int            @id @default(autoincrement())
+  task_id         Int
+  assigned_to     Int
+  assigned_by     Int
+  assignment_type AssignmentType
+  assigned_at     DateTime       @default(now())
+
+  task       Task @relation(fields: [task_id], references: [task_id])
+  assignedTo User @relation("AssignedTo", fields: [assigned_to], references: [userId])
+  assignedBy User @relation("AssignedBy", fields: [assigned_by], references: [userId])
+}
+
+model AllocationHistory {
+  history_id Int      @id @default(autoincrement())
+  task_id    Int
+  user_id    Int
+  changed_by Int
+  action     String   @db.VarChar(100)
+  timestamp  DateTime @default(now())
+
+  task      Task @relation(fields: [task_id], references: [task_id])
+  user      User @relation("UserAllocation", fields: [user_id], references: [userId])
+  changedBy User @relation("ChangedByAllocation", fields: [changed_by], references: [userId])
+}
+
+// ─── Shift Change ─────────────────────────────────────────────
+
+model ShiftChangeRequest {
+  request_id      Int               @id @default(autoincrement())
+  user_id         Int
+  reviewed_by     Int?
+  original_shift  DateTime
+  requested_shift DateTime
+  status          ShiftChangeStatus @default(PENDING)
+  created_at      DateTime          @default(now())
+
+  user     User  @relation("UserShiftChange", fields: [user_id], references: [userId])
+  reviewer User? @relation("ReviewedShiftChange", fields: [reviewed_by], references: [userId])
+}
+
+// ─── Public / Unregistered ────────────────────────────────────
+
+model UnregisteredUser {
+  marketing_user_id Int      @id @default(autoincrement())
+  organisation_id   Int?
+  email             String   @db.VarChar(150)
+  password          String   @db.VarChar(255)
+  role              String?  @db.VarChar(50)
+  company_name      String?  @db.VarChar(150)
+  position          String?  @db.VarChar(100)
+  created_at        DateTime @default(now())
+
+  organisation      Organisation? @relation(fields: [organisation_id], references: [organisation_id])
+}
+
+model ContactEnquiry {
+  enquiry_id Int      @id @default(autoincrement())
+  user_id    Int?
+  subject    String   @db.VarChar(200)
+  message    String   @db.Text
+  created_at DateTime @default(now())
+}
+
+model Testimonial {
+  testimonial_id Int      @id @default(autoincrement())
+  user_id        Int
+  rating         Int
+  review_text    String   @db.Text
+  profile_image  String?  @db.VarChar(500)
+  created_at     DateTime @default(now())
+
+  user           User     @relation(fields: [user_id], references: [userId])
+}
+
+// ─── Feedback & Notifications ────────────────────────────────
+
+model Feedback {
+  feedback_id  Int            @id @default(autoincrement())
+  user_id      Int
+  message      String         @db.Text
+  status       FeedbackStatus @default(OPEN)
+  submitted_at DateTime       @default(now())
+
+  user         User           @relation(fields: [user_id], references: [userId])
 }
 
 model Notification {
   id          Int      @id @default(autoincrement())
   recipientId Int
   type        String   @db.VarChar(50)
-  message     String
+  message     String   @db.Text
   isRead      Boolean  @default(false)
   createdAt   DateTime @default(now())
 
-  recipient   User     @relation(fields: [recipientId], references: [id])
+  recipient   User     @relation(fields: [recipientId], references: [userId])
 }
