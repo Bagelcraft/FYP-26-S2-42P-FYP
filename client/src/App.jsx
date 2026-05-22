@@ -1,25 +1,33 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
 
-// Placeholder pages — to be replaced in Sprint 4
-const Placeholder = ({ name }) => (
-  <div className="flex items-center justify-center h-screen">
-    <h1 className="text-2xl font-bold text-gray-600">{name} — Coming Soon</h1>
-  </div>
-);
+import Home from './pages/public/Home';
+import Login from './pages/Login';
+import Unauthorized from './pages/Unauthorized';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import OrgAdminDashboard from './pages/org-admin/OrgAdminDashboard';
+import PMDashboard from './pages/pm/PMDashboard';
+import WorkerDashboard from './pages/worker/WorkerDashboard';
+import TempWorkerDashboard from './pages/temp-worker/TempWorkerDashboard';
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Placeholder name="Public Home" />} />
-        <Route path="/login" element={<Placeholder name="Login" />} />
-        <Route path="/unauthorized" element={<Placeholder name="Unauthorized" />} />
-        <Route path="/admin/*" element={<Placeholder name="System Admin Dashboard" />} />
-        <Route path="/org-admin/*" element={<Placeholder name="Org Admin Dashboard" />} />
-        <Route path="/pm/*" element={<Placeholder name="Project Manager Dashboard" />} />
-        <Route path="/worker/*" element={<Placeholder name="Permanent Worker Dashboard" />} />
-        <Route path="/temp-worker/*" element={<Placeholder name="Temporary Worker Dashboard" />} />
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Public */}
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/unauthorized" element={<Unauthorized />} />
+
+          {/* Role dashboards */}
+          <Route path="/admin/*" element={<AdminDashboard />} />
+          <Route path="/org-admin/*" element={<OrgAdminDashboard />} />
+          <Route path="/pm/*" element={<PMDashboard />} />
+          <Route path="/worker/*" element={<WorkerDashboard />} />
+          <Route path="/temp-worker/*" element={<TempWorkerDashboard />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
