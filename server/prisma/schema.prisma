@@ -73,28 +73,6 @@ enum ShiftChangeStatus {
   REJECTED
 }
 
-// ─── Subscription Plans ──────────────────────────────────────
-
-model SubscriptionPlan {
-  plan_id        Int    @id @default(autoincrement())
-  plan_name      String @db.VarChar(100)
-  price          Decimal @db.Decimal(10, 2)
-  billing_period String @db.VarChar(50)
-  description    String? @db.Text
-  cta_text       String? @db.VarChar(100)
-
-  features      PlanFeature[]
-  subscriptions Subscription[]
-}
-
-model PlanFeature {
-  plan_feature_id Int    @id @default(autoincrement())
-  plan_id         Int
-  feature_text    String @db.VarChar(255)
-
-  plan            SubscriptionPlan @relation(fields: [plan_id], references: [plan_id])
-}
-
 // ─── Organisation & Subscription ─────────────────────────────
 
 model Organisation {
@@ -117,14 +95,13 @@ model Organisation {
 model Subscription {
   subscription_id Int                @id @default(autoincrement())
   organisation_id Int
-  plan_id         Int
+  amount          Decimal            @db.Decimal(10, 2)
   start_date      DateTime           @db.Date
   end_date        DateTime           @db.Date
   status          SubscriptionStatus @default(ACTIVE)
 
-  organisation          Organisation     @relation("OrgSubscriptions", fields: [organisation_id], references: [organisation_id])
-  activeForOrganisation Organisation?    @relation("ActiveSubscription")
-  plan                  SubscriptionPlan @relation(fields: [plan_id], references: [plan_id])
+  organisation          Organisation @relation("OrgSubscriptions", fields: [organisation_id], references: [organisation_id])
+  activeForOrganisation Organisation? @relation("ActiveSubscription")
   billingRecords        BillingRecord[]
 }
 
