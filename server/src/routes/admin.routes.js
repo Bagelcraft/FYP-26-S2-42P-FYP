@@ -1,5 +1,12 @@
 const express = require('express');
 const router = express.Router();
+const {
+  createEnquiry,
+  getAllEnquiries,
+  getEnquiryById,
+  respondToEnquiry,
+  deleteEnquiry
+} = require("../controllers/enquiryController");
 
 // GET /api/v1/admin/health
 router.get('/health', (req, res) => {
@@ -25,5 +32,31 @@ router.put('/organisations/:id/suspend', (req, res) => {
 router.get('/logs', (req, res) => {
   res.json({ message: 'Get audit logs — to be implemented by Daniel' });
 });
+
+
+/*
+|--------------------------------------------------------------------------
+| Contact Enquiry Routes
+|--------------------------------------------------------------------------
+*/
+
+router.post("/enquiries", createEnquiry);
+
+router.get("/enquiries", getAllEnquiries);
+
+router.get(
+  "/enquiries/:id",
+  getEnquiryById
+);
+
+router.put(
+  "/enquiries/:id/respond",
+  respondToEnquiry
+);
+
+router.delete(
+  "/enquiries/:id",
+  deleteEnquiry
+);
 
 module.exports = router;

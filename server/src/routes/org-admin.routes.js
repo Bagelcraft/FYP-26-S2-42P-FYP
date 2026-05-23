@@ -1,54 +1,81 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 
-// GET /api/v1/org-admin/departments
-router.get('/departments', (req, res) => {
-  res.json({ message: 'Get departments — to be implemented by Alson' });
-});
+const {
+  updateOrganisationProfile,
 
-// POST /api/v1/org-admin/departments
-router.post('/departments', (req, res) => {
-  res.json({ message: 'Create department — to be implemented by Alson' });
-});
+  getDepartments,
+  createDepartment,
+  updateDepartment,
+  deleteDepartment,
+  assignStaffToDepartment,
 
-// PUT /api/v1/org-admin/departments/:id
-router.put('/departments/:id', (req, res) => {
-  res.json({ message: 'Update department — to be implemented by Alson' });
-});
+  getAllStaff,
+  createStaffAccount,
+  removeStaffAccount,
+  updateStaffDetails,
+  viewStaffWorkingHours,
 
-// DELETE /api/v1/org-admin/departments/:id
-router.delete('/departments/:id', (req, res) => {
-  res.json({ message: 'Delete department — to be implemented by Alson' });
-});
+  createRole,
+  updateRole,
+  removeRole,
 
-// GET /api/v1/org-admin/staff
-router.get('/staff', (req, res) => {
-  res.json({ message: 'Get all staff — to be implemented by Alson' });
-});
+  getSkills,
+  createSkill,
+  updateSkill,
+  deleteSkill,
+  assignSkillToUser,
+} = require("../controllers/orgAdminController");
 
-// POST /api/v1/org-admin/staff/permanent
-router.post('/staff/permanent', (req, res) => {
-  res.json({ message: 'Register permanent staff — to be implemented by Alson' });
-});
+/*
+|--------------------------------------------------------------------------
+| Organisation Profile
+|--------------------------------------------------------------------------
+*/
+router.put("/organisation/:id", updateOrganisationProfile);
 
-// POST /api/v1/org-admin/staff/temporary
-router.post('/staff/temporary', (req, res) => {
-  res.json({ message: 'Register temporary staff — to be implemented by Alson' });
-});
+/*
+|--------------------------------------------------------------------------
+| Department Management
+|--------------------------------------------------------------------------
+*/
+router.get("/departments", getDepartments);
+router.post("/departments", createDepartment);
+router.put("/departments/:id", updateDepartment);
+router.delete("/departments/:id", deleteDepartment);
+router.put("/departments/:id/assign-staff", assignStaffToDepartment);
 
-// GET /api/v1/org-admin/skills
-router.get('/skills', (req, res) => {
-  res.json({ message: 'Get skill tags — to be implemented by Alson' });
-});
+/*
+|--------------------------------------------------------------------------
+| Employee Management
+|--------------------------------------------------------------------------
+*/
+router.get("/staff", getAllStaff);
+router.post("/staff", createStaffAccount);
+router.post("/staff/permanent", createStaffAccount);
+router.post("/staff/temporary", createStaffAccount);
+router.delete("/staff/:id", removeStaffAccount);
+router.put("/staff/:id", updateStaffDetails);
+router.get("/staff/:id/working-hours", viewStaffWorkingHours);
 
-// POST /api/v1/org-admin/skills
-router.post('/skills', (req, res) => {
-  res.json({ message: 'Create skill tag — to be implemented by Alson' });
-});
+/*
+|--------------------------------------------------------------------------
+| Role Management
+|--------------------------------------------------------------------------
+*/
+router.post("/roles", createRole);
+router.put("/roles/:id", updateRole);
+router.delete("/roles/:id", removeRole);
 
-// POST /api/v1/org-admin/staff/:id/skills
-router.post('/staff/:id/skills', (req, res) => {
-  res.json({ message: 'Assign skill to user — to be implemented by Alson' });
-});
+/*
+|--------------------------------------------------------------------------
+| Skill Management
+|--------------------------------------------------------------------------
+*/
+router.get("/skills", getSkills);
+router.post("/skills", createSkill);
+router.put("/skills/:id", updateSkill);
+router.delete("/skills/:id", deleteSkill);
+router.post("/staff/:id/skills", assignSkillToUser);
 
 module.exports = router;
