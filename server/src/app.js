@@ -10,6 +10,8 @@ const permanentWorkerRoutes = require('./routes/permanent-worker.routes');
 const temporaryWorkerRoutes = require('./routes/temporary-worker.routes');
 const publicRoutes = require('./routes/public.routes');
 const errorMiddleware = require('./middleware/error.middleware');
+const contentRoutes = require("./routes/content.routes");
+
 
 const app = express();
 
@@ -28,6 +30,7 @@ app.use('/api/v1/pm', pmRoutes);
 app.use('/api/v1/worker', permanentWorkerRoutes);
 app.use('/api/v1/temp-worker', temporaryWorkerRoutes);
 app.use('/api/v1/public', publicRoutes);
+app.use("/api/v1/admin/content", contentRoutes);
 
 app.use(errorMiddleware);
 
