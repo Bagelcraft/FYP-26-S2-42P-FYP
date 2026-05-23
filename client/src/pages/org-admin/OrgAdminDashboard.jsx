@@ -1,14 +1,7 @@
 import DashboardLayout from '../../components/DashboardLayout';
 import StatCard from '../../components/StatCard';
 import Badge from '../../components/Badge';
-
-const NAV = [
-  { path: '/org-admin', icon: '🏠', label: 'Dashboard' },
-  { path: '/org-admin/staff', icon: '👥', label: 'Staff' },
-  { path: '/org-admin/departments', icon: '🏢', label: 'Departments' },
-  { path: '/org-admin/skills', icon: '🎯', label: 'Skills' },
-  { path: '/org-admin/notifications', icon: '🔔', label: 'Notifications' },
-];
+import { ORG_ADMIN_NAV } from './nav';
 
 const mockStaff = [
   { id: 1, name: 'Weishi Tan', role: 'Software Developer', type: 'PERMANENT_WORKER', dept: 'Engineering' },
@@ -31,7 +24,7 @@ const typeLabel = {
 
 export default function OrgAdminDashboard() {
   return (
-    <DashboardLayout navItems={NAV} roleLabel="Organisation Admin">
+    <DashboardLayout navItems={ORG_ADMIN_NAV} roleLabel="Organisation Admin">
       <div className="space-y-6">
         <div className="flex items-start justify-between">
           <div>

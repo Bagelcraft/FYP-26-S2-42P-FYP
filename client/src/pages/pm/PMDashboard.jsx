@@ -1,14 +1,7 @@
 import DashboardLayout from '../../components/DashboardLayout';
 import StatCard from '../../components/StatCard';
 import Badge from '../../components/Badge';
-
-const NAV = [
-  { path: '/pm', icon: '🏠', label: 'Dashboard' },
-  { path: '/pm/tasks', icon: '📋', label: 'Tasks' },
-  { path: '/pm/allocate', icon: '🤖', label: 'Allocate' },
-  { path: '/pm/reports', icon: '📊', label: 'Reports' },
-  { path: '/pm/notifications', icon: '🔔', label: 'Notifications' },
-];
+import { PM_NAV } from './nav';
 
 const mockTasks = [
   { id: 1, title: 'Build Login API', assignee: 'Weishi Tan', skill: 'JavaScript', status: 'ASSIGNED', due: '26 May' },
@@ -18,7 +11,7 @@ const mockTasks = [
 
 export default function PMDashboard() {
   return (
-    <DashboardLayout navItems={NAV} roleLabel="Project Manager">
+    <DashboardLayout navItems={PM_NAV} roleLabel="Project Manager">
       <div className="space-y-6">
         <div className="flex items-start justify-between">
           <div>

@@ -1,13 +1,7 @@
 import DashboardLayout from '../../components/DashboardLayout';
 import StatCard from '../../components/StatCard';
 import Badge from '../../components/Badge';
-
-const NAV = [
-  { path: '/admin', icon: '🏠', label: 'Dashboard' },
-  { path: '/admin/organisations', icon: '🏢', label: 'Organisations' },
-  { path: '/admin/logs', icon: '📋', label: 'Audit Logs' },
-  { path: '/admin/notifications', icon: '🔔', label: 'Notifications' },
-];
+import { ADMIN_NAV } from './nav';
 
 const mockOrgs = [
   { id: 1, name: 'TechCorp Pte Ltd', status: 'ACTIVE', staff: 12, created: '2026-01-15' },
@@ -24,7 +18,7 @@ const mockLogs = [
 
 export default function AdminDashboard() {
   return (
-    <DashboardLayout navItems={NAV} roleLabel="System Admin">
+    <DashboardLayout navItems={ADMIN_NAV} roleLabel="System Admin">
       <div className="space-y-6">
         <div>
           <h2 className="text-xl font-bold text-gray-800">System Overview</h2>

@@ -2,14 +2,7 @@ import { useState } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import StatCard from '../../components/StatCard';
 import Badge from '../../components/Badge';
-
-const NAV = [
-  { path: '/temp-worker', icon: '🏠', label: 'Dashboard' },
-  { path: '/temp-worker/tasks', icon: '📋', label: 'My Tasks' },
-  { path: '/temp-worker/availability', icon: '📅', label: 'Availability' },
-  { path: '/temp-worker/attendance', icon: '🕐', label: 'Attendance' },
-  { path: '/temp-worker/profile', icon: '👤', label: 'Profile' },
-];
+import { TEMP_NAV } from './nav';
 
 const mockTasks = [
   { id: 3, title: 'Database Performance Review', dept: 'Operations', status: 'IN_PROGRESS', due: '22 May' },
@@ -23,7 +16,7 @@ export default function TempWorkerDashboard() {
   const [clockedIn, setClockedIn] = useState(false);
 
   return (
-    <DashboardLayout navItems={NAV} roleLabel="Temporary Worker">
+    <DashboardLayout navItems={TEMP_NAV} roleLabel="Temporary Worker">
       <div className="space-y-6">
         <div>
           <h2 className="text-xl font-bold text-gray-800">My Dashboard</h2>

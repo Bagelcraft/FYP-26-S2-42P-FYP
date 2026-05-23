@@ -2,15 +2,7 @@ import { useState } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import StatCard from '../../components/StatCard';
 import Badge from '../../components/Badge';
-
-const NAV = [
-  { path: '/worker', icon: '🏠', label: 'Dashboard' },
-  { path: '/worker/tasks', icon: '📋', label: 'My Tasks' },
-  { path: '/worker/availability', icon: '📅', label: 'Availability' },
-  { path: '/worker/leave', icon: '🌴', label: 'Leave' },
-  { path: '/worker/attendance', icon: '🕐', label: 'Attendance' },
-  { path: '/worker/profile', icon: '👤', label: 'Profile' },
-];
+import { WORKER_NAV } from './nav';
 
 const mockTasks = [
   { id: 1, title: 'Build Login API', dept: 'Engineering', status: 'ASSIGNED', start: '26 May 09:00', end: '26 May 18:00' },
@@ -20,7 +12,7 @@ export default function WorkerDashboard() {
   const [clockedIn, setClockedIn] = useState(false);
 
   return (
-    <DashboardLayout navItems={NAV} roleLabel="Permanent Worker">
+    <DashboardLayout navItems={WORKER_NAV} roleLabel="Permanent Worker">
       <div className="space-y-6">
         <div>
           <h2 className="text-xl font-bold text-gray-800">My Dashboard</h2>
