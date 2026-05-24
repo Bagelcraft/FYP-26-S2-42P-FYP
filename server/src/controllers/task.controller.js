@@ -12,7 +12,11 @@ function sendValidationError(req, res) {
 
 const list = async (req, res, next) => {
   try {
-    const tasks = await taskService.listTasks(req.user.organisationId);
+    const tasks = await taskService.listTasks(req.user.organisationId, {
+      status:        req.query.status,
+      department_id: req.query.department_id,
+      date:          req.query.date,
+    });
     res.json({ success: true, data: tasks });
   } catch (err) {
     next(err);

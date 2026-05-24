@@ -18,6 +18,20 @@ export default function Login() {
     TEMPORARY_WORKER: '/temp-worker',
   };
 
+  // DEV ONLY — remove before production
+  const DEV_USERS = [
+    { label: 'System Admin',    icon: '🛡️', user_type: 'SYSTEM_ADMIN',     email: 'admin@system.com',       full_name: 'Daniel Tan',   userId: 1, organisationId: null },
+    { label: 'Org Admin',       icon: '🏢', user_type: 'ORG_ADMIN',         email: 'orgadmin@techcorp.com',  full_name: 'Alson Lim',    userId: 2, organisationId: 1 },
+    { label: 'Project Manager', icon: '📋', user_type: 'PROJECT_MANAGER',   email: 'pm@techcorp.com',        full_name: 'Basil Hia',    userId: 3, organisationId: 1 },
+    { label: 'Perm Worker',     icon: '👷', user_type: 'PERMANENT_WORKER',  email: 'worker@techcorp.com',    full_name: 'Weishi Tan',   userId: 5, organisationId: 1 },
+    { label: 'Temp Worker',     icon: '🔧', user_type: 'TEMPORARY_WORKER',  email: 'tempworker@techcorp.com',full_name: 'Rachel Ng',    userId: 6, organisationId: 1 },
+  ];
+
+  const quickLogin = (devUser) => {
+    login({ userId: devUser.userId, full_name: devUser.full_name, email: devUser.email, user_type: devUser.user_type, organisationId: devUser.organisationId }, 'dev-token');
+    navigate(roleRedirects[devUser.user_type]);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -94,6 +108,30 @@ export default function Login() {
             </Link>
           </p>
         </div>
+
+        {/* DEV ONLY — quick role login shortcuts */}
+        <div className="mt-4 rounded-xl border border-dashed border-yellow-300 bg-yellow-50 p-4">
+          <p className="text-xs font-semibold text-yellow-700 uppercase tracking-wide mb-3">
+            Dev shortcuts — remove before production
+          </p>
+          <div className="grid grid-cols-1 gap-2">
+            {DEV_USERS.map((u) => (
+              <button
+                key={u.user_type}
+                onClick={() => quickLogin(u)}
+                className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg bg-white border border-yellow-200 hover:border-yellow-400 hover:bg-yellow-50 transition-colors text-left"
+              >
+                <span className="text-lg">{u.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800">{u.label}</p>
+                  <p className="text-xs text-gray-400 truncate">{u.email}</p>
+                </div>
+                <span className="text-xs text-yellow-600 font-medium">Enter →</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
       </div>
     </div>
   );
