@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-export default function DashboardLayout({ children, navItems, roleLabel }) {
+export default function DashboardLayout({ children, navItems, roleLabel, topbarRight }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -71,6 +71,7 @@ export default function DashboardLayout({ children, navItems, roleLabel }) {
         <header className="bg-white border-b border-gray-200 px-6 h-14 flex items-center justify-between flex-shrink-0">
           <h1 className="text-gray-800 font-semibold">{currentPage?.label ?? 'Dashboard'}</h1>
           <div className="flex items-center gap-4">
+            {topbarRight}
             <Link to={`${navItems[0].path.split('/').slice(0, 2).join('/')}/notifications`} className="relative text-gray-400 hover:text-gray-600 text-lg">
               🔔
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">

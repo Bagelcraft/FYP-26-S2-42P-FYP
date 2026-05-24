@@ -1,8 +1,13 @@
 import { useState } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
-import StatCard from '../../components/StatCard';
 import Badge from '../../components/Badge';
 import { TEMP_NAV } from './nav';
+
+const mockShifts = [
+  { id: 1, date: 'Mon 26 May', time: '09:00 – 18:00', dept: 'Engineering', task: 'Build Dashboard UI' },
+  { id: 2, date: 'Wed 28 May', time: '09:00 – 13:00', dept: 'Operations', task: 'Inventory Audit' },
+  { id: 3, date: 'Fri 30 May', time: '14:00 – 18:00', dept: 'Engineering', task: 'Code Review Session' },
+];
 
 const mockTasks = [
   { id: 3, title: 'Database Performance Review', dept: 'Operations', status: 'IN_PROGRESS', due: '22 May' },
@@ -14,110 +19,220 @@ const mockAvailable = [
 
 export default function TempWorkerDashboard() {
   const [clockedIn, setClockedIn] = useState(false);
+  const [swapModal, setSwapModal] = useState(null);
+  const [swapForm, setSwapForm] = useState({ reason: '', alternative: '' });
+
+  const clockInButton = (
+    <div className="flex items-center gap-2">
+      {clockedIn && (
+        <span className="text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full tracking-wide">
+          CLOCKED IN
+        </span>
+      )}
+      <button
+        onClick={() => setClockedIn(!clockedIn)}
+        className={`text-sm font-medium px-4 py-1.5 rounded-lg transition-colors ${
+          clockedIn
+            ? 'bg-red-500 hover:bg-red-600 text-white'
+            : 'bg-green-500 hover:bg-green-600 text-white'
+        }`}
+      >
+        {clockedIn ? 'Clock Out' : 'Clock In'}
+      </button>
+    </div>
+  );
 
   return (
-    <DashboardLayout navItems={TEMP_NAV} roleLabel="Temporary Worker">
+    <DashboardLayout navItems={TEMP_NAV} roleLabel="Temporary Worker" topbarRight={clockInButton}>
       <div className="space-y-6">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">My Dashboard</h2>
+          <h2 className="text-xl font-bold text-gray-800">My Day</h2>
           <p className="text-gray-500 text-sm mt-0.5">Track your assigned tasks and manage your schedule.</p>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-          <StatCard label="Assigned Tasks" value="1" icon="📋" color="blue" />
-          <StatCard label="Available Tasks" value="1" sub="You may be allocated" icon="📬" color="yellow" />
-          <StatCard label="Hours This Week" value={clockedIn ? 'Active' : '0h'} icon="🕐" color="green" />
+        <div className="grid grid-cols-3 gap-4">
+          {[
+            { label: 'ASSIGNED TASKS', value: '1', delta: 'Active', color: 'text-blue-600' },
+            { label: 'UPCOMING SHIFTS', value: '3', delta: 'This week', color: 'text-yellow-600' },
+            { label: 'HOURS THIS WEEK', value: clockedIn ? 'Active' : '0h', delta: clockedIn ? 'Currently clocked in' : 'Not clocked in', color: clockedIn ? 'text-green-600' : 'text-gray-400' },
+          ].map((s) => (
+            <div key={s.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{s.label}</p>
+              <p className="text-3xl font-bold text-gray-800 mt-1">{s.value}</p>
+              <p className={`text-xs mt-1 ${s.color}`}>{s.delta}</p>
+            </div>
+          ))}
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Clock in/out */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 flex flex-col items-center text-center gap-4">
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl ${clockedIn ? 'bg-green-100' : 'bg-gray-100'}`}>
-              🕐
-            </div>
-            <div>
-              <p className="font-semibold text-gray-800">{clockedIn ? 'Clocked In' : 'Not Clocked In'}</p>
-              <p className="text-gray-400 text-sm mt-0.5">
-                {clockedIn ? 'Remember to clock out at end of shift.' : 'Clock in to begin your shift.'}
-              </p>
-            </div>
-            <button
-              onClick={() => setClockedIn(!clockedIn)}
-              className={`w-full font-medium py-2.5 rounded-lg text-sm transition-colors ${
-                clockedIn
-                  ? 'bg-red-500 hover:bg-red-600 text-white'
-                  : 'bg-green-500 hover:bg-green-600 text-white'
-              }`}
-            >
-              {clockedIn ? 'Clock Out' : 'Clock In'}
-            </button>
-          </div>
-
-          {/* Assigned tasks */}
-          <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm">
-            <div className="px-5 py-4 border-b border-gray-100">
-              <h3 className="font-semibold text-gray-800">Assigned Tasks</h3>
-            </div>
-            {mockTasks.length === 0 ? (
-              <div className="px-5 py-10 text-center text-gray-400 text-sm">No tasks assigned.</div>
-            ) : (
-              <div className="divide-y divide-gray-50">
-                {mockTasks.map((t) => (
-                  <div key={t.id} className="px-5 py-4 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">{t.title}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{t.dept} · Due {t.due}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge status={t.status} />
-                      <button className="text-xs bg-primary-50 text-primary-600 hover:bg-primary-100 px-3 py-1.5 rounded-lg">
-                        Update
+          {/* Upcoming shifts */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h3 className="font-semibold text-gray-800">Upcoming Shifts</h3>
+              </div>
+              {mockShifts.length === 0 ? (
+                <div className="px-5 py-8 text-center text-gray-400 text-sm">No upcoming shifts.</div>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {mockShifts.map((s) => (
+                    <div key={s.id} className="px-5 py-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">{s.date}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{s.time} · {s.dept} · {s.task}</p>
+                      </div>
+                      <button
+                        onClick={() => { setSwapModal(s); setSwapForm({ reason: '', alternative: '' }); }}
+                        className="text-xs bg-yellow-50 text-yellow-700 hover:bg-yellow-100 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+                      >
+                        Request Swap
                       </button>
                     </div>
-                  </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Assigned tasks */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h3 className="font-semibold text-gray-800">Assigned Tasks</h3>
+              </div>
+              {mockTasks.length === 0 ? (
+                <div className="px-5 py-8 text-center text-gray-400 text-sm">No tasks assigned.</div>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {mockTasks.map((t) => (
+                    <div key={t.id} className="px-5 py-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">{t.title}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{t.dept} · Due {t.due}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge status={t.status} />
+                        <button className="text-xs bg-primary-50 text-primary-600 hover:bg-primary-100 px-3 py-1.5 rounded-lg transition-colors">
+                          Update
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Available task pool */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h3 className="font-semibold text-gray-800">Available Task Pool</h3>
+                <p className="text-gray-400 text-xs mt-0.5">Tasks you may be allocated to based on your skills.</p>
+              </div>
+              {mockAvailable.length === 0 ? (
+                <div className="px-5 py-8 text-center text-gray-400 text-sm">No available tasks at this time.</div>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {mockAvailable.map((t) => (
+                    <div key={t.id} className="px-5 py-3 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">{t.title}</p>
+                        <p className="text-xs text-gray-400">{t.dept} · Requires: {t.skill} · Due {t.due}</p>
+                      </div>
+                      <Badge status="PENDING" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Skills */}
+          <div className="space-y-4">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-gray-800">My Skills</h3>
+                <button className="text-primary-600 text-sm hover:underline">Edit</button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {['JavaScript', 'SQL'].map((s) => (
+                  <span key={s} className="bg-primary-50 text-primary-700 text-xs font-medium px-3 py-1 rounded-full">{s}</span>
                 ))}
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Available tasks pool */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h3 className="font-semibold text-gray-800">Available Task Pool</h3>
-            <p className="text-gray-400 text-xs mt-0.5">Tasks you may be allocated to based on your skills and availability.</p>
-          </div>
-          {mockAvailable.length === 0 ? (
-            <div className="px-5 py-8 text-center text-gray-400 text-sm">No available tasks at this time.</div>
-          ) : (
-            <div className="divide-y divide-gray-50">
-              {mockAvailable.map((t) => (
-                <div key={t.id} className="px-5 py-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{t.title}</p>
-                    <p className="text-xs text-gray-400">{t.dept} · Requires: {t.skill} · Due {t.due}</p>
-                  </div>
-                  <Badge status="PENDING" />
-                </div>
-              ))}
             </div>
-          )}
-        </div>
 
-        {/* Skills */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-gray-800">My Skills</h3>
-            <button className="text-primary-600 text-sm hover:underline">Edit</button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {['JavaScript', 'SQL'].map((s) => (
-              <span key={s} className="bg-primary-50 text-primary-700 text-xs font-medium px-3 py-1 rounded-full">{s}</span>
-            ))}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+              <h3 className="font-semibold text-gray-800 text-sm mb-3">Quick Actions</h3>
+              <div className="space-y-2">
+                {[
+                  { label: 'Update Availability', icon: '📅', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100' },
+                  { label: 'View Attendance', icon: '🕐', color: 'bg-purple-50 text-purple-700 hover:bg-purple-100' },
+                ].map((a) => (
+                  <button key={a.label} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${a.color}`}>
+                    <span>{a.icon}</span>
+                    {a.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Shift Swap Modal */}
+      {swapModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="px-6 py-5 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-800">Request Shift Swap</h3>
+              <p className="text-xs text-gray-400 mt-0.5">{swapModal.date} · {swapModal.time}</p>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Shift</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={`${swapModal.date} · ${swapModal.time}`}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
+                <textarea
+                  rows={3}
+                  placeholder="Briefly explain why you need to swap this shift..."
+                  value={swapForm.reason}
+                  onChange={(e) => setSwapForm((f) => ({ ...f, reason: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Alternative (optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 29 May morning shift"
+                  value={swapForm.alternative}
+                  onChange={(e) => setSwapForm((f) => ({ ...f, alternative: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+              <button
+                onClick={() => setSwapModal(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => setSwapModal(null)}
+                className="px-4 py-2 text-sm font-medium bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+              >
+                Submit Request
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }
