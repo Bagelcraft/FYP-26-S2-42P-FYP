@@ -27,9 +27,16 @@ export default function Login() {
     { label: 'Temp Worker',     icon: '🔧', user_type: 'TEMPORARY_WORKER',  email: 'tempworker@techcorp.com',full_name: 'Rachel Ng',    userId: 6, organisationId: 1 },
   ];
 
-  const quickLogin = (devUser) => {
-    login({ userId: devUser.userId, full_name: devUser.full_name, email: devUser.email, user_type: devUser.user_type, organisationId: devUser.organisationId }, 'dev-token');
-    navigate(roleRedirects[devUser.user_type]);
+  const quickLogin = async (devUser) => {
+    try {
+      const { data } = await api.post('/auth/dev-login', { email: devUser.email });
+      login(data.user, data.token);
+      navigate(roleRedirects[data.user.user_type]);
+    } catch {
+      // Fallback: use a mock token if server is down (won't reach protected API routes)
+      login({ userId: devUser.userId, full_name: devUser.full_name, email: devUser.email, user_type: devUser.user_type, organisationId: devUser.organisationId }, 'dev-token');
+      navigate(roleRedirects[devUser.user_type]);
+    }
   };
 
   const handleSubmit = async (e) => {

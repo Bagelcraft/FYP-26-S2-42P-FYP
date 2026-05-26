@@ -42,7 +42,7 @@ async function getEligibleStaff(taskId, organisationId) {
 
   // Build skill filter only when the task requires one
   const skillFilter = task.required_skill_id
-    ? { userSkills: { some: { skill_id: task.required_skill_id } } }
+    ? { skills: { some: { skill_id: task.required_skill_id } } }
     : {};
 
   const { monday, sunday } = currentWeekBounds();
@@ -56,7 +56,7 @@ async function getEligibleStaff(taskId, organisationId) {
     },
     include: {
       staffRole:  true,
-      userSkills: { include: { skill: { select: { skill_name: true } } } },
+      skills: { include: { skill: { select: { skill_name: true } } } },
       // Availability slots that overlap the task window
       availability: {
         where: {
@@ -88,7 +88,7 @@ async function getEligibleStaff(taskId, organisationId) {
       email:          u.email,
       user_type:      u.user_type,
       staffRole:      u.staffRole?.role_name ?? null,
-      skills:         u.userSkills.map((us) => us.skill.skill_name),
+      skills:         u.skills.map((us) => us.skill.skill_name),
       weeklyHours:    Math.round(weeklyHours * 100) / 100,
       maxHours,
       remainingHours: remainingHours !== null ? Math.round(remainingHours * 100) / 100 : null,

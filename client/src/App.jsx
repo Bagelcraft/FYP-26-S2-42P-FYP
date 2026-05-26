@@ -10,6 +10,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import Organisations from './pages/admin/Organisations';
 import AuditLogs from './pages/admin/AuditLogs';
 import AdminNotifications from './pages/admin/AdminNotifications';
+import SubscriptionPlans from './pages/admin/SubscriptionPlans';
 
 // Org Admin
 import OrgAdminDashboard from './pages/org-admin/OrgAdminDashboard';
@@ -53,6 +54,7 @@ export default function App() {
           {/* System Admin */}
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/organisations" element={<Organisations />} />
+          <Route path="/admin/plans" element={<SubscriptionPlans />} />
           <Route path="/admin/logs" element={<AuditLogs />} />
           <Route path="/admin/notifications" element={<AdminNotifications />} />
 
