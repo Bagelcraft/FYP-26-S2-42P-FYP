@@ -1,54 +1,42 @@
 const express = require('express');
+const { verifyToken } = require('../middleware/auth.middleware');
+const { requireRole } = require('../middleware/rbac.middleware');
+const c = require('../controllers/org-admin.controller');
+
 const router = express.Router();
 
-// GET /api/v1/org-admin/departments
-router.get('/departments', (req, res) => {
-  res.json({ message: 'Get departments — to be implemented by Alson' });
-});
+router.use(verifyToken, requireRole(['ORG_ADMIN']));
 
-// POST /api/v1/org-admin/departments
-router.post('/departments', (req, res) => {
-  res.json({ message: 'Create department — to be implemented by Alson' });
-});
+// ─── Departments ──────────────────────────────────────────────
 
-// PUT /api/v1/org-admin/departments/:id
-router.put('/departments/:id', (req, res) => {
-  res.json({ message: 'Update department — to be implemented by Alson' });
-});
+router.get('/departments',         c.listDepts);
+router.post('/departments',        c.deptRules,       c.validate, c.createDept);
+router.patch('/departments/:id',   c.deptUpdateRules, c.validate, c.updateDept);
+router.delete('/departments/:id',  c.deleteDept);
 
-// DELETE /api/v1/org-admin/departments/:id
-router.delete('/departments/:id', (req, res) => {
-  res.json({ message: 'Delete department — to be implemented by Alson' });
-});
+// ─── Staff Roles ──────────────────────────────────────────────
 
-// GET /api/v1/org-admin/staff
-router.get('/staff', (req, res) => {
-  res.json({ message: 'Get all staff — to be implemented by Alson' });
-});
+router.get('/roles',         c.listRoles);
+router.post('/roles',        c.roleRules,       c.validate, c.createRole);
+router.patch('/roles/:id',   c.roleUpdateRules, c.validate, c.updateRole);
+router.delete('/roles/:id',  c.deleteRole);
 
-// POST /api/v1/org-admin/staff/permanent
-router.post('/staff/permanent', (req, res) => {
-  res.json({ message: 'Register permanent staff — to be implemented by Alson' });
-});
+// ─── Skills ───────────────────────────────────────────────────
 
-// POST /api/v1/org-admin/staff/temporary
-router.post('/staff/temporary', (req, res) => {
-  res.json({ message: 'Register temporary staff — to be implemented by Alson' });
-});
+router.get('/skills',         c.listSkills);
+router.post('/skills',        c.skillRules,       c.validate, c.createSkill);
+router.patch('/skills/:id',   c.skillUpdateRules, c.validate, c.updateSkill);
+router.delete('/skills/:id',  c.deleteSkill);
 
-// GET /api/v1/org-admin/skills
-router.get('/skills', (req, res) => {
-  res.json({ message: 'Get skill tags — to be implemented by Alson' });
-});
+// ─── Staff ────────────────────────────────────────────────────
 
-// POST /api/v1/org-admin/skills
-router.post('/skills', (req, res) => {
-  res.json({ message: 'Create skill tag — to be implemented by Alson' });
-});
+router.get('/staff',                  c.staffQueryRules, c.validate, c.listStaff);
+router.post('/staff',                 c.staffRules,      c.validate, c.registerStaff);
+router.patch('/staff/:id/deactivate', c.deactivateStaff);
 
-// POST /api/v1/org-admin/staff/:id/skills
-router.post('/staff/:id/skills', (req, res) => {
-  res.json({ message: 'Assign skill to user — to be implemented by Alson' });
-});
+// ─── User Skills ──────────────────────────────────────────────
+
+router.post('/staff/:id/skills',              c.assignSkillRules, c.validate, c.assignSkill);
+router.delete('/staff/:id/skills/:skillId',   c.removeSkill);
 
 module.exports = router;

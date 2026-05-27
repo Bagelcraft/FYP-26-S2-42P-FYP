@@ -18,6 +18,7 @@ import Staff from './pages/org-admin/Staff';
 import Departments from './pages/org-admin/Departments';
 import Skills from './pages/org-admin/Skills';
 import OrgAdminNotifications from './pages/org-admin/OrgAdminNotifications';
+import StaffRoles from './pages/org-admin/StaffRoles';
 
 // Project Manager
 import PMDashboard from './pages/pm/PMDashboard';
@@ -63,6 +64,7 @@ export default function App() {
           <Route path="/org-admin/staff" element={<Staff />} />
           <Route path="/org-admin/departments" element={<Departments />} />
           <Route path="/org-admin/skills" element={<Skills />} />
+          <Route path="/org-admin/roles" element={<StaffRoles />} />
           <Route path="/org-admin/notifications" element={<OrgAdminNotifications />} />
 
           {/* Project Manager */}
