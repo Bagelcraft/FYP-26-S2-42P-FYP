@@ -1,72 +1,101 @@
 const express = require('express');
-const bcrypt = require('bcrypt');
+const { body, validationResult } = require('express-validator');
 const jwt = require('jsonwebtoken');
+const { PrismaClient } = require('@prisma/client');
+const authService = require('../services/auth.service');
+const { verifyToken } = require('../middleware/auth.middleware');
+
 const router = express.Router();
-const prisma = require('../config/prisma');
+const prisma = new PrismaClient();
+
+function validate(req, res, next) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
+  next();
+}
 
 // POST /api/v1/auth/login
-router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ message: 'Email and password are required.' });
-  }
-
-  try {
-    const user = await prisma.user.findUnique({
-      where: { email },
-      select: {
-        userId: true,
-        full_name: true,
-        email: true,
-        password_hash: true,
-        user_type: true,
-        organisationId: true,
-        is_active: true,
-      },
-    });
-
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid email or password.' });
+router.post(
+  '/login',
+  [
+    body('email').isEmail().withMessage('Valid email required').normalizeEmail(),
+    body('password').notEmpty().withMessage('Password required'),
+  ],
+  validate,
+  async (req, res, next) => {
+    try {
+      const result = await authService.login(req.body.email, req.body.password);
+      res.json({ success: true, ...result });
+    } catch (err) {
+      next(err);
     }
+  },
+);
 
-    if (!user.is_active) {
-      return res.status(403).json({ message: 'Your account has been deactivated. Contact your administrator.' });
-    }
+// POST /api/v1/auth/logout  (JWT is stateless; client drops the token)
+router.post('/logout', (req, res) => {
+  res.json({ success: true, message: 'Logged out successfully' });
+});
 
-    const passwordMatch = await bcrypt.compare(password, user.password_hash);
-    if (!passwordMatch) {
-      return res.status(401).json({ message: 'Invalid email or password.' });
+// POST /api/v1/auth/change-password  (authenticated)
+router.post(
+  '/change-password',
+  verifyToken,
+  [
+    body('currentPassword').notEmpty().withMessage('currentPassword is required'),
+    body('newPassword')
+      .isLength({ min: 8 }).withMessage('newPassword must be at least 8 characters')
+      .matches(/[A-Z]/).withMessage('newPassword must contain an uppercase letter')
+      .matches(/[0-9]/).withMessage('newPassword must contain a number'),
+  ],
+  validate,
+  async (req, res, next) => {
+    try {
+      await authService.changePassword(req.user.userId, req.body.currentPassword, req.body.newPassword);
+      res.json({ success: true, message: 'Password changed successfully' });
+    } catch (err) {
+      next(err);
     }
+  },
+);
+
+// POST /api/v1/auth/reset-password  (simplified — no email flow yet)
+router.post(
+  '/reset-password',
+  [
+    body('email').isEmail().withMessage('Valid email required').normalizeEmail(),
+    body('newPassword')
+      .isLength({ min: 8 }).withMessage('newPassword must be at least 8 characters'),
+  ],
+  validate,
+  async (req, res, next) => {
+    try {
+      await authService.resetPassword(req.body.email, req.body.newPassword);
+      res.json({ success: true, message: 'Password reset successfully' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// POST /api/v1/auth/dev-login  (DEV ONLY — removed in production)
+if (process.env.NODE_ENV !== 'production') {
+  router.post('/dev-login', async (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: 'email is required' });
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
     const token = jwt.sign(
-      {
-        userId: user.userId,
-        email: user.email,
-        user_type: user.user_type,
-        organisation_id: user.organisation_id,
-      },
+      { userId: user.userId, organisationId: user.organisationId, role: user.user_type },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '30m' }
+      { expiresIn: '8h' },
     );
 
     const { password_hash, ...safeUser } = user;
-
-    res.json({ user: safeUser, token });
-  } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ message: 'Internal server error.' });
-  }
-});
-
-// POST /api/v1/auth/logout
-router.post('/logout', (req, res) => {
-  res.json({ message: 'Logged out successfully.' });
-});
-
-// POST /api/v1/auth/reset-password
-router.post('/reset-password', (req, res) => {
-  res.json({ message: 'Reset password — to be implemented' });
-});
+    res.json({ token, user: safeUser });
+  });
+}
 
 module.exports = router;

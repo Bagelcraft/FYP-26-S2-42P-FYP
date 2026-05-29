@@ -1,79 +1,66 @@
 const express = require('express');
+const { verifyToken } = require('../middleware/auth.middleware');
+const { requireRole } = require('../middleware/rbac.middleware');
+const workerController = require('../controllers/worker.controller');
+
 const router = express.Router();
 
-// GET /api/v1/worker/tasks
-router.get('/tasks', (req, res) => {
-  res.json({ message: 'Get assigned tasks — to be implemented by Weishi' });
-});
+router.use(verifyToken, requireRole(['PERMANENT_WORKER']));
 
-// GET /api/v1/worker/tasks/history
-router.get('/tasks/history', (req, res) => {
-  res.json({ message: 'Get task history — to be implemented by Weishi' });
-});
+// ─── Task views (5 — worker read-only) ───────────────────────────────────
 
-// GET /api/v1/worker/tasks/:id
-router.get('/tasks/:id', (req, res) => {
-  res.json({ message: 'Get task by ID — to be implemented by Weishi' });
-});
+// GET  /worker/tasks?status=ASSIGNED
+router.get('/tasks', workerController.listMyTasks);
 
-// PUT /api/v1/worker/tasks/:id/acknowledge
-router.put('/tasks/:id/acknowledge', (req, res) => {
-  res.json({ message: 'Acknowledge task — to be implemented by Weishi' });
-});
+// GET  /worker/tasks/:id
+router.get('/tasks/:id', workerController.getMyTask);
 
-// PUT /api/v1/worker/tasks/:id/progress
-router.put('/tasks/:id/progress', (req, res) => {
-  res.json({ message: 'Update task progress — to be implemented by Weishi' });
-});
+// PATCH /worker/tasks/:id/acknowledge  → sets status to IN_PROGRESS
+router.patch('/tasks/:id/acknowledge', workerController.acknowledge);
 
-// GET /api/v1/worker/profile
+// PATCH /worker/tasks/:id/progress     → body: { status: "IN_PROGRESS"|"COMPLETED" }
+router.patch('/tasks/:id/progress', workerController.progressRules, workerController.updateProgress);
+
+// ─── Stubs (to be implemented) ────────────────────────────────────────────
+
 router.get('/profile', (req, res) => {
-  res.json({ message: 'Get profile — to be implemented by Weishi' });
+  res.json({ message: 'Get profile — to be implemented' });
 });
 
-// PUT /api/v1/worker/profile
 router.put('/profile', (req, res) => {
-  res.json({ message: 'Update profile — to be implemented by Weishi' });
+  res.json({ message: 'Update profile — to be implemented' });
 });
 
-// GET /api/v1/worker/skills
 router.get('/skills', (req, res) => {
-  res.json({ message: 'Get skills — to be implemented by Weishi' });
+  res.json({ message: 'Get skills — to be implemented' });
 });
 
-// GET /api/v1/worker/availability
 router.get('/availability', (req, res) => {
-  res.json({ message: 'Get availability — to be implemented by Weishi' });
+  res.json({ message: 'Get availability — to be implemented' });
 });
 
-// POST /api/v1/worker/availability
 router.post('/availability', (req, res) => {
-  res.json({ message: 'Set availability — to be implemented by Weishi' });
+  res.json({ message: 'Set availability — to be implemented' });
 });
 
-// PUT /api/v1/worker/availability/:id
 router.put('/availability/:id', (req, res) => {
-  res.json({ message: 'Update availability — to be implemented by Weishi' });
+  res.json({ message: 'Update availability — to be implemented' });
 });
 
-// POST /api/v1/worker/leave
 router.post('/leave', (req, res) => {
-  res.json({ message: 'Apply for leave — to be implemented by Weishi' });
+  res.json({ message: 'Apply for leave — to be implemented' });
 });
 
-// POST /api/v1/worker/attendance/clock-in
 router.post('/attendance/clock-in', (req, res) => {
-  res.json({ message: 'Clock in — to be implemented by Weishi' });
+  res.json({ message: 'Clock in — to be implemented' });
 });
 
-// PUT /api/v1/worker/attendance/clock-out
 router.put('/attendance/clock-out', (req, res) => {
-  res.json({ message: 'Clock out — to be implemented by Weishi' });
+  res.json({ message: 'Clock out — to be implemented' });
 });
 
-// GET /api/v1/worker/attendance
 router.get('/attendance', (req, res) => {
-  res.json({ message: 'Get attendance history — to be implemented by Weishi' });
+  res.json({ message: 'Get attendance history — to be implemented' });
 });
 
 module.exports = router;
