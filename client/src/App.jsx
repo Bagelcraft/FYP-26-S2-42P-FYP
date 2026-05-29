@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext';
 
 import Home from './pages/public/Home';
 import Login from './pages/Login';
+import Register from './pages/Register';
 import Unauthorized from './pages/Unauthorized';
 
 // Admin
@@ -48,6 +49,7 @@ export default function App() {
           {/* Public */}
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
 
           {/* System Admin */}
