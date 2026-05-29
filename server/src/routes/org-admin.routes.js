@@ -1,81 +1,42 @@
-const express = require("express");
+const express = require('express');
+const { verifyToken } = require('../middleware/auth.middleware');
+const { requireRole } = require('../middleware/rbac.middleware');
+const c = require('../controllers/org-admin.controller');
+
 const router = express.Router();
 
-const {
-  updateOrganisationProfile,
+router.use(verifyToken, requireRole(['ORG_ADMIN']));
 
-  getDepartments,
-  createDepartment,
-  updateDepartment,
-  deleteDepartment,
-  assignStaffToDepartment,
+// ─── Departments ──────────────────────────────────────────────
 
-  getAllStaff,
-  createStaffAccount,
-  removeStaffAccount,
-  updateStaffDetails,
-  viewStaffWorkingHours,
+router.get('/departments',         c.listDepts);
+router.post('/departments',        c.deptRules,       c.validate, c.createDept);
+router.patch('/departments/:id',   c.deptUpdateRules, c.validate, c.updateDept);
+router.delete('/departments/:id',  c.deleteDept);
 
-  createRole,
-  updateRole,
-  removeRole,
+// ─── Staff Roles ──────────────────────────────────────────────
 
-  getSkills,
-  createSkill,
-  updateSkill,
-  deleteSkill,
-  assignSkillToUser,
-} = require("../controllers/orgAdminController");
+router.get('/roles',         c.listRoles);
+router.post('/roles',        c.roleRules,       c.validate, c.createRole);
+router.patch('/roles/:id',   c.roleUpdateRules, c.validate, c.updateRole);
+router.delete('/roles/:id',  c.deleteRole);
 
-/*
-|--------------------------------------------------------------------------
-| Organisation Profile
-|--------------------------------------------------------------------------
-*/
-router.put("/organisation/:id", updateOrganisationProfile);
+// ─── Skills ───────────────────────────────────────────────────
 
-/*
-|--------------------------------------------------------------------------
-| Department Management
-|--------------------------------------------------------------------------
-*/
-router.get("/departments", getDepartments);
-router.post("/departments", createDepartment);
-router.put("/departments/:id", updateDepartment);
-router.delete("/departments/:id", deleteDepartment);
-router.put("/departments/:id/assign-staff", assignStaffToDepartment);
+router.get('/skills',         c.listSkills);
+router.post('/skills',        c.skillRules,       c.validate, c.createSkill);
+router.patch('/skills/:id',   c.skillUpdateRules, c.validate, c.updateSkill);
+router.delete('/skills/:id',  c.deleteSkill);
 
-/*
-|--------------------------------------------------------------------------
-| Employee Management
-|--------------------------------------------------------------------------
-*/
-router.get("/staff", getAllStaff);
-router.post("/staff", createStaffAccount);
-router.post("/staff/permanent", createStaffAccount);
-router.post("/staff/temporary", createStaffAccount);
-router.delete("/staff/:id", removeStaffAccount);
-router.put("/staff/:id", updateStaffDetails);
-router.get("/staff/:id/working-hours", viewStaffWorkingHours);
+// ─── Staff ────────────────────────────────────────────────────
 
-/*
-|--------------------------------------------------------------------------
-| Role Management
-|--------------------------------------------------------------------------
-*/
-router.post("/roles", createRole);
-router.put("/roles/:id", updateRole);
-router.delete("/roles/:id", removeRole);
+router.get('/staff',                  c.staffQueryRules, c.validate, c.listStaff);
+router.post('/staff',                 c.staffRules,      c.validate, c.registerStaff);
+router.patch('/staff/:id/deactivate', c.deactivateStaff);
 
-/*
-|--------------------------------------------------------------------------
-| Skill Management
-|--------------------------------------------------------------------------
-*/
-router.get("/skills", getSkills);
-router.post("/skills", createSkill);
-router.put("/skills/:id", updateSkill);
-router.delete("/skills/:id", deleteSkill);
-router.post("/staff/:id/skills", assignSkillToUser);
+// ─── User Skills ──────────────────────────────────────────────
+
+router.post('/staff/:id/skills',              c.assignSkillRules, c.validate, c.assignSkill);
+router.delete('/staff/:id/skills/:skillId',   c.removeSkill);
 
 module.exports = router;

@@ -1,15 +1,75 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
+import api from '../../utils/api';
 import { ORG_ADMIN_NAV } from './nav';
 
-const mockDepts = [
-  { id: 1, name: 'Engineering', head: 'Basil Hia', staff: 8, description: 'Software development and infrastructure.' },
-  { id: 2, name: 'Operations', head: 'Alson Lim', staff: 4, description: 'Day-to-day business operations and logistics.' },
-];
-
 export default function Departments() {
+  const [depts, setDepts]       = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState('');
   const [showForm, setShowForm] = useState(false);
-  const [newDept, setNewDept] = useState({ name: '', head: '', description: '' });
+  const [editDept, setEditDept] = useState(null); // null = creating new
+  const [form, setForm]         = useState({ name: '', head_user_id: '' });
+  const [saving, setSaving]     = useState(false);
+  const [formError, setFormError] = useState('');
+
+  function load() {
+    setLoading(true);
+    api.get('/org-admin/departments')
+      .then((r) => setDepts(r.data.data))
+      .catch((e) => setError(e.response?.data?.message || e.message))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => { load(); }, []);
+
+  function openCreate() {
+    setEditDept(null);
+    setForm({ name: '', head_user_id: '' });
+    setFormError('');
+    setShowForm(true);
+  }
+
+  function openEdit(d) {
+    setEditDept(d);
+    setForm({ name: d.name, head_user_id: d.head_user_id ?? '' });
+    setFormError('');
+    setShowForm(true);
+  }
+
+  async function handleSave(e) {
+    e.preventDefault();
+    setSaving(true);
+    setFormError('');
+    const body = {
+      name:         form.name.trim(),
+      head_user_id: form.head_user_id !== '' ? Number(form.head_user_id) : null,
+    };
+    try {
+      if (editDept) {
+        const r = await api.patch(`/org-admin/departments/${editDept.department_id}`, body);
+        setDepts((prev) => prev.map((d) => d.department_id === editDept.department_id ? r.data.data : d));
+      } else {
+        const r = await api.post('/org-admin/departments', body);
+        setDepts((prev) => [...prev, r.data.data]);
+      }
+      setShowForm(false);
+    } catch (e) {
+      setFormError(e.response?.data?.message || e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(dept) {
+    if (!confirm(`Delete department "${dept.name}"? This cannot be undone.`)) return;
+    try {
+      await api.delete(`/org-admin/departments/${dept.department_id}`);
+      setDepts((prev) => prev.filter((d) => d.department_id !== dept.department_id));
+    } catch (e) {
+      alert(e.response?.data?.message || e.message);
+    }
+  }
 
   return (
     <DashboardLayout navItems={ORG_ADMIN_NAV} roleLabel="Organisation Admin">
@@ -19,84 +79,73 @@ export default function Departments() {
             <h2 className="text-xl font-bold text-gray-800">Departments</h2>
             <p className="text-gray-500 text-sm mt-0.5">Organise your staff into departments.</p>
           </div>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
+          <button onClick={openCreate}
+            className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
             + Add Department
           </button>
         </div>
 
-        {/* Add form */}
+        {error && <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-600">{error}</div>}
+
+        {/* Create / Edit form */}
         {showForm && (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
-            <h3 className="font-semibold text-gray-800">New Department</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <h3 className="font-semibold text-gray-800">{editDept ? 'Edit Department' : 'New Department'}</h3>
+            {formError && <p className="text-red-500 text-sm">{formError}</p>}
+            <form onSubmit={handleSave} className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Department Name</label>
-                <input
-                  type="text"
-                  value={newDept.name}
-                  onChange={(e) => setNewDept({ ...newDept, name: e.target.value })}
+                <label className="block text-xs text-gray-500 mb-1">Department Name *</label>
+                <input required value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  placeholder="e.g. Marketing"
-                />
+                  placeholder="e.g. Marketing" />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Department Head</label>
-                <input
-                  type="text"
-                  value={newDept.head}
-                  onChange={(e) => setNewDept({ ...newDept, head: e.target.value })}
+                <label className="block text-xs text-gray-500 mb-1">Head User ID (optional)</label>
+                <input type="number" value={form.head_user_id}
+                  onChange={(e) => setForm({ ...form, head_user_id: e.target.value })}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  placeholder="e.g. Jane Doe"
-                />
+                  placeholder="User ID" />
               </div>
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Description</label>
-              <input
-                type="text"
-                value={newDept.description}
-                onChange={(e) => setNewDept({ ...newDept, description: e.target.value })}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                placeholder="Brief description"
-              />
-            </div>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setShowForm(false)} className="text-sm text-gray-500 hover:underline px-4 py-2">Cancel</button>
-              <button className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg">Save</button>
-            </div>
+              <div className="col-span-2 flex gap-2 justify-end">
+                <button type="button" onClick={() => setShowForm(false)}
+                  className="text-sm text-gray-500 hover:underline px-4 py-2">Cancel</button>
+                <button type="submit" disabled={saving}
+                  className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg">
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </form>
           </div>
         )}
 
-        {/* Department cards */}
-        <div className="grid lg:grid-cols-2 gap-4">
-          {mockDepts.map((d) => (
-            <div key={d.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-semibold text-gray-800 text-base">{d.name}</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">{d.description}</p>
+        {loading ? (
+          <p className="text-gray-400 text-sm py-8 text-center">Loading…</p>
+        ) : (
+          <div className="grid lg:grid-cols-2 gap-4">
+            {depts.map((d) => (
+              <div key={d.department_id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-semibold text-gray-800 text-base">{d.name}</h3>
+                    {d.head && <p className="text-xs text-gray-400 mt-0.5">Head: {d.head.full_name}</p>}
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => openEdit(d)} className="text-xs text-primary-600 hover:underline">Edit</button>
+                    <button onClick={() => handleDelete(d)} className="text-xs text-red-500 hover:underline">Delete</button>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button className="text-xs text-primary-600 hover:underline">Edit</button>
-                  <button className="text-xs text-red-500 hover:underline">Delete</button>
-                </div>
-              </div>
-              <div className="mt-4 flex gap-6 text-sm">
-                <div>
-                  <p className="text-xs text-gray-400">Head</p>
-                  <p className="font-medium text-gray-700 mt-0.5">{d.head}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400">Staff Count</p>
-                  <p className="font-medium text-gray-700 mt-0.5">{d.staff}</p>
+                <div className="mt-4 text-sm">
+                  <p className="text-xs text-gray-400">Tasks</p>
+                  <p className="font-medium text-gray-700 mt-0.5">{d._count?.tasks ?? 0}</p>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+            {depts.length === 0 && (
+              <p className="text-gray-400 text-sm col-span-2 py-8 text-center">No departments yet.</p>
+            )}
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

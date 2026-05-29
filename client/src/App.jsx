@@ -10,6 +10,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import Organisations from './pages/admin/Organisations';
 import AuditLogs from './pages/admin/AuditLogs';
 import AdminNotifications from './pages/admin/AdminNotifications';
+import SubscriptionPlans from './pages/admin/SubscriptionPlans';
 
 // Org Admin
 import OrgAdminDashboard from './pages/org-admin/OrgAdminDashboard';
@@ -17,6 +18,7 @@ import Staff from './pages/org-admin/Staff';
 import Departments from './pages/org-admin/Departments';
 import Skills from './pages/org-admin/Skills';
 import OrgAdminNotifications from './pages/org-admin/OrgAdminNotifications';
+import StaffRoles from './pages/org-admin/StaffRoles';
 
 // Project Manager
 import PMDashboard from './pages/pm/PMDashboard';
@@ -53,6 +55,7 @@ export default function App() {
           {/* System Admin */}
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/organisations" element={<Organisations />} />
+          <Route path="/admin/plans" element={<SubscriptionPlans />} />
           <Route path="/admin/logs" element={<AuditLogs />} />
           <Route path="/admin/notifications" element={<AdminNotifications />} />
 
@@ -61,6 +64,7 @@ export default function App() {
           <Route path="/org-admin/staff" element={<Staff />} />
           <Route path="/org-admin/departments" element={<Departments />} />
           <Route path="/org-admin/skills" element={<Skills />} />
+          <Route path="/org-admin/roles" element={<StaffRoles />} />
           <Route path="/org-admin/notifications" element={<OrgAdminNotifications />} />
 
           {/* Project Manager */}
