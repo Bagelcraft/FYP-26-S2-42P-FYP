@@ -11,9 +11,11 @@ export default function DashboardLayout({ children, navItems, roleLabel, topbarR
     navigate('/login');
   };
 
-  const currentPage = navItems.find(
-    (item) => location.pathname === item.path || location.pathname.startsWith(item.path + '/')
-  );
+  const currentPage = navItems.reduce((best, item) => {
+    const matches = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+    if (!matches) return best;
+    return !best || item.path.length > best.path.length ? item : best;
+  }, null);
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
@@ -26,9 +28,7 @@ export default function DashboardLayout({ children, navItems, roleLabel, topbarR
 
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => {
-            const isActive =
-              location.pathname === item.path ||
-              location.pathname.startsWith(item.path + '/');
+            const isActive = item === currentPage;
             return (
               <Link
                 key={item.path}

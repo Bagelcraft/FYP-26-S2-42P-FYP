@@ -65,10 +65,10 @@ export default function OrgAdminDashboard() {
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'DEPARTMENTS', value: '2', delta: 'Active', color: 'text-purple-600' },
-            { label: 'EMPLOYEES', value: '12', delta: '3 temporary', color: 'text-blue-600' },
-            { label: 'ROLES', value: '4', delta: 'Defined', color: 'text-orange-600' },
-            { label: 'SKILLS TRACKED', value: '5', delta: 'Organisation-wide', color: 'text-green-600' },
+            { label: 'DEPARTMENTS', value: '2', color: 'text-purple-600' },
+            { label: 'EMPLOYEES', value: '12', color: 'text-blue-600' },
+            { label: 'ROLES', value: '4', color: 'text-orange-600' },
+            { label: 'SKILLS TRACKED', value: '5', color: 'text-green-600' },
           ].map((s) => (
             <div key={s.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{s.label}</p>
@@ -129,7 +129,7 @@ export default function OrgAdminDashboard() {
           {/* Recent Activity */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
             <div className="px-5 py-4 border-b border-gray-100">
-              <h3 className="font-semibold text-gray-800">Recent Activity</h3>
+              <h3 className="font-semibold text-gray-800">Do we need this? - Recent Activity</h3>
             </div>
             <div className="divide-y divide-gray-50">
               {mockActivity.map((a, i) => (
