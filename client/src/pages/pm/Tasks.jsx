@@ -22,7 +22,7 @@ export default function Tasks() {
   });
 
   return (
-    <DashboardLayout navItems={PM_NAV} roleLabel="Project Manager">
+    <DashboardLayout navItems={PM_NAV} roleLabel="Manager">
       <div className="space-y-6">
         <div className="flex items-start justify-between">
           <div>

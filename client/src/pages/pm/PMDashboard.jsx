@@ -14,7 +14,7 @@ const needsAttention = mockTasks.filter((t) => t.overdue || t.status === 'PENDIN
 
 export default function PMDashboard() {
   return (
-    <DashboardLayout navItems={PM_NAV} roleLabel="Project Manager">
+    <DashboardLayout navItems={PM_NAV} roleLabel="Manager">
       <div className="space-y-6">
         <div className="flex items-start justify-between">
           <div>
@@ -29,10 +29,10 @@ export default function PMDashboard() {
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'TOTAL TASKS', value: '5', delta: 'This sprint', color: 'text-blue-600' },
-            { label: 'PENDING', value: '2', delta: 'Awaiting allocation', color: 'text-yellow-600' },
-            { label: 'IN PROGRESS', value: '2', delta: 'Active now', color: 'text-purple-600' },
-            { label: 'COMPLETED', value: '0', delta: 'This week', color: 'text-green-600' },
+            { label: 'TOTAL TASKS', value: '5', color: 'text-blue-600' },
+            { label: 'PENDING', value: '2', color: 'text-yellow-600' },
+            { label: 'IN PROGRESS', value: '2', color: 'text-purple-600' },
+            { label: 'COMPLETED', value: '0', color: 'text-green-600' },
           ].map((s) => (
             <div key={s.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{s.label}</p>

@@ -6,7 +6,7 @@ import { ORG_ADMIN_NAV } from './nav';
 const TYPE_BADGE = {
   PERMANENT_WORKER: { label: 'Permanent',       color: 'bg-blue-100 text-blue-700' },
   TEMPORARY_WORKER: { label: 'Temporary',       color: 'bg-orange-100 text-orange-700' },
-  PROJECT_MANAGER:  { label: 'Project Manager', color: 'bg-purple-100 text-purple-700' },
+  PROJECT_MANAGER:  { label: 'Manager', color: 'bg-purple-100 text-purple-700' },
   ORG_ADMIN:        { label: 'Org Admin',       color: 'bg-green-100 text-green-700' },
 };
 
@@ -108,7 +108,7 @@ export default function Staff() {
             <option value="ALL">All Types</option>
             <option value="PERMANENT_WORKER">Permanent</option>
             <option value="TEMPORARY_WORKER">Temporary</option>
-            <option value="PROJECT_MANAGER">Project Manager</option>
+            <option value="PROJECT_MANAGER">Manager</option>
             <option value="ORG_ADMIN">Org Admin</option>
           </select>
         </div>
@@ -201,7 +201,7 @@ export default function Staff() {
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
                     <option value="PERMANENT_WORKER">Permanent Worker</option>
                     <option value="TEMPORARY_WORKER">Temporary Worker</option>
-                    <option value="PROJECT_MANAGER">Project Manager</option>
+                    <option value="PROJECT_MANAGER">Manager</option>
                     <option value="ORG_ADMIN">Org Admin</option>
                   </select>
                 </div>

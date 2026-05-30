@@ -10,7 +10,7 @@ const staffHours = [
 
 export default function Reports() {
   return (
-    <DashboardLayout navItems={PM_NAV} roleLabel="Project Manager">
+    <DashboardLayout navItems={PM_NAV} roleLabel="Manager">
       <div className="space-y-6">
         <div>
           <h2 className="text-xl font-bold text-gray-800">Reports</h2>

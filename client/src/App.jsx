@@ -21,7 +21,7 @@ import Skills from './pages/org-admin/Skills';
 import OrgAdminNotifications from './pages/org-admin/OrgAdminNotifications';
 import StaffRoles from './pages/org-admin/StaffRoles';
 
-// Project Manager
+// Manager
 import PMDashboard from './pages/pm/PMDashboard';
 import Tasks from './pages/pm/Tasks';
 import Allocate from './pages/pm/Allocate';
@@ -69,7 +69,7 @@ export default function App() {
           <Route path="/org-admin/roles" element={<StaffRoles />} />
           <Route path="/org-admin/notifications" element={<OrgAdminNotifications />} />
 
-          {/* Project Manager */}
+          {/* Manager */}
           <Route path="/pm" element={<PMDashboard />} />
           <Route path="/pm/tasks" element={<Tasks />} />
           <Route path="/pm/allocate" element={<Allocate />} />
