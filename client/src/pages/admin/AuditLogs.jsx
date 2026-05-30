@@ -36,7 +36,7 @@ export default function AuditLogs() {
     <DashboardLayout navItems={ADMIN_NAV} roleLabel="System Admin">
       <div className="space-y-6">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">Audit Logs</h2>
+          <h2 className="text-xl font-bold text-gray-800">SUGGESTION TO REMOVE AS NOT PART OF STORYBOARD - Audit Logs </h2>
           <p className="text-gray-500 text-sm mt-0.5">Full audit trail of all platform activity.</p>
         </div>
 

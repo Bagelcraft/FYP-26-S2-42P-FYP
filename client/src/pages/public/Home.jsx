@@ -54,19 +54,20 @@ export default function Home() {
       {/* Hero — split dark/light */}
       <section className="flex min-h-[calc(100vh-64px)]">
         {/* Left — dark */}
-        <div className="flex-1 bg-slate-950 flex items-center px-10 lg:px-20 py-20">
+        <div className="flex-1 bg-slate-950 flex items-center px-10 lg:px-20 py-14">
           <div className="max-w-lg">
-            <span className="inline-block text-primary-400 text-xs font-semibold uppercase tracking-widest mb-4">
+            <span className="inline-block text-primary-400 text-xs font-semibold uppercase tracking-widest mb-3">
               Workforce Management Platform
             </span>
             <h1 className="text-4xl lg:text-5xl font-bold text-white leading-tight">
-              Smart Workforce &<br />Task Allocation
+              Smart Task Allocation
             </h1>
-            <p className="text-slate-400 mt-5 text-base leading-relaxed">
-              Manage your workforce. Assign tasks automatically.<br />
-              Track progress in real time — all from one platform.
+            <p className="text-slate-400 mt-4 text-base leading-relaxed">
+              Your workforce, intelligently managed. Tasks assigned automatically. <br />
+              Progress tracked in real time.
+            
             </p>
-            <div className="flex items-center gap-3 mt-10">
+            <div className="flex items-center gap-3 mt-7">
               <Link
                 to="/register"
                 className="bg-primary-600 hover:bg-primary-500 text-white font-medium px-6 py-3 rounded-lg text-sm transition-colors"
@@ -80,7 +81,7 @@ export default function Home() {
                 ▶ Watch Demo
               </a>
             </div>
-            <div className="flex items-center gap-6 mt-10 text-slate-500 text-xs">
+            <div className="flex items-center gap-6 mt-6 text-slate-500 text-xs">
               <span>✓ No credit card required</span>
               <span>✓ Free setup</span>
               <span>✓ Cancel anytime</span>
@@ -89,7 +90,7 @@ export default function Home() {
         </div>
 
         {/* Right — light */}
-        <div className="flex-1 bg-gray-50 hidden md:flex items-center justify-center px-10 lg:px-16 py-20">
+        <div className="flex-1 bg-gray-50 hidden md:flex items-center justify-center px-10 lg:px-16 py-14">
           <div className="w-full max-w-md bg-white rounded-2xl border border-gray-200 shadow-xl p-6 space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-gray-700">SmartTask Dashboard</span>
@@ -138,21 +139,23 @@ export default function Home() {
       </section>
 
       {/* Features */}
-      <section id="features" className="bg-white py-24">
+      <section id="features" className="bg-white py-14">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-14">
+          <div className="text-center mb-8">
             <span className="text-primary-600 text-xs font-semibold uppercase tracking-widest">Features</span>
             <h2 className="text-3xl font-bold text-gray-900 mt-2">Everything your team needs</h2>
-            <p className="text-gray-500 mt-3 max-w-xl mx-auto text-sm">
+            <p className="text-gray-500 mt-2 max-w-xl mx-auto text-sm">
               One platform built for every role — admins, project managers, and workers alike.
             </p>
           </div>
-          <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {features.map((f) => (
-              <div key={f.title} className="bg-gray-50 rounded-2xl border border-gray-100 p-6 hover:shadow-md transition-shadow">
-                <span className="text-2xl">{f.icon}</span>
-                <h3 className="font-semibold text-gray-800 mt-4 text-sm">{f.title}</h3>
-                <p className="text-gray-500 text-xs mt-2 leading-relaxed">{f.desc}</p>
+              <div key={f.title} className="bg-gray-50 rounded-2xl border border-gray-100 p-6 hover:shadow-md transition-shadow flex gap-4 items-start">
+                <span className="text-2xl mt-1">{f.icon}</span>
+                <div>
+                  <h3 className="font-semibold text-gray-800 text-base">{f.title}</h3>
+                  <p className="text-gray-500 text-sm mt-1 leading-relaxed">{f.desc}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -160,14 +163,13 @@ export default function Home() {
       </section>
 
       {/* Demo */}
-      <section id="demo" className="bg-slate-950 py-24">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center gap-14">
+      <section id="demo" className="bg-slate-950 py-14">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center gap-10">
           <div className="flex-1">
             <span className="text-primary-400 text-xs font-semibold uppercase tracking-widest">See it in action</span>
-            <h2 className="text-3xl font-bold text-white mt-3">See how our platform works</h2>
-            <p className="text-slate-400 mt-4 text-sm leading-relaxed">
-              Watch how SmartTask helps organisations manage staff, automate task allocation,
-              and track real-time progress — all from one unified platform.
+            <h2 className="text-3xl font-bold text-white mt-2">Meet SmartTask — your all-in-one task management solution</h2>
+            <p className="text-slate-400 mt-3 text-sm leading-relaxed">
+              How SmartTask helps organisations manage staff, automate task allocation, and track real-time progress — all from one unified platform.
             </p>
           </div>
           <div className="flex-1 bg-slate-800 rounded-2xl aspect-video flex items-center justify-center border border-slate-700">
@@ -179,26 +181,26 @@ export default function Home() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="bg-white py-24">
+      <section id="pricing" className="bg-white py-14">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-14">
+          <div className="text-center mb-8">
             <span className="text-primary-600 text-xs font-semibold uppercase tracking-widest">Pricing</span>
             <h2 className="text-3xl font-bold text-gray-900 mt-2">Simple, transparent pricing</h2>
-            <p className="text-gray-500 mt-3 text-sm">One plan. Full access. Cancel anytime.</p>
+            <p className="text-gray-500 mt-2 text-sm">One plan. Full access. Cancel anytime.</p>
           </div>
-          <div className="max-w-2xl mx-auto bg-slate-950 rounded-2xl border border-slate-800 p-10 flex flex-col md:flex-row items-center gap-10">
+          <div className="max-w-2xl mx-auto bg-slate-950 rounded-2xl border border-slate-800 p-8 flex flex-col md:flex-row items-center gap-8">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-yellow-400 text-lg">⭐</span>
                 <span className="font-bold text-white">Standard Plan</span>
               </div>
-              <div className="flex items-end gap-1 mt-3">
+              <div className="flex items-end gap-1 mt-2">
                 <span className="text-5xl font-bold text-white">$9</span>
                 <span className="text-slate-400 mb-1.5">/month</span>
               </div>
-              <p className="text-slate-400 text-sm mt-2">Perfect for small teams and growing organisations.</p>
+              <p className="text-slate-400 text-sm mt-1">Perfect for small teams and growing organisations.</p>
             </div>
-            <div className="flex-1 space-y-2.5">
+            <div className="flex-1 space-y-2">
               {['Up to 50 Users', 'Task Management', 'Workforce Scheduling', 'Real-time Monitoring', 'Reports & Analytics', 'Priority Support'].map((f) => (
                 <div key={f} className="flex items-center gap-2.5 text-sm text-slate-300">
                   <span className="text-green-400 font-bold">✓</span> {f}
@@ -219,23 +221,25 @@ export default function Home() {
       </section>
 
       {/* Testimonials */}
-      <section id="testimonials" className="bg-gray-50 py-24">
+      <section id="testimonials" className="bg-gray-50 py-14">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-14">
+          <div className="text-center mb-8">
             <span className="text-primary-600 text-xs font-semibold uppercase tracking-widest">Testimonials</span>
             <h2 className="text-3xl font-bold text-gray-900 mt-2">What our customers say</h2>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {testimonials.map((t) => (
-              <div key={t.name} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-7">
-                <div className="flex gap-0.5 mb-4">
-                  {Array.from({ length: t.rating }).map((_, i) => (
-                    <span key={i} className="text-yellow-400 text-sm">★</span>
-                  ))}
+              <div key={t.name} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-7 flex flex-col justify-between">
+                <div>
+                  <div className="flex gap-1 mb-4">
+                    {Array.from({ length: t.rating }).map((_, i) => (
+                      <span key={i} className="text-yellow-400 text-lg">★</span>
+                    ))}
+                  </div>
+                  <p className="text-gray-700 text-base leading-relaxed mb-5">"{t.text}"</p>
                 </div>
-                <p className="text-gray-700 text-sm leading-relaxed mb-5">"{t.text}"</p>
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold text-sm">
+                  <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold text-base">
                     {t.name[0]}
                   </div>
                   <div>
@@ -250,7 +254,7 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-slate-950 border-t border-slate-800 py-8">
+      <footer className="bg-slate-950 border-t border-slate-800 py-6">
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between text-sm text-slate-500">
           <span className="text-primary-400 font-bold">SmartTask</span>
           <span>© 2026 SmartTask. FYP-26-S2-42P.</span>

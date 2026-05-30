@@ -32,10 +32,10 @@ export default function AdminDashboard() {
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'ACTIVE ORGS', value: '3', delta: '+1 this month', color: 'text-blue-600' },
-            { label: 'OPEN ENQUIRIES', value: '1', delta: 'Awaiting reply', color: 'text-yellow-600' },
-            { label: 'ACTIVE SUBSCRIPTIONS', value: '2', delta: '1 suspended', color: 'text-green-600' },
-            { label: 'TOTAL USERS', value: '25', delta: 'Across all orgs', color: 'text-purple-600' },
+            { label: 'ACTIVE ORGS', value: '3', color: 'text-blue-600' },
+            { label: 'OPEN ENQUIRIES', value: '1', color: 'text-yellow-600' },
+            { label: 'ACTIVE SUBSCRIPTIONS', value: '2',color: 'text-green-600' },
+
           ].map((s) => (
             <div key={s.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{s.label}</p>
@@ -102,7 +102,7 @@ export default function AdminDashboard() {
           {/* System Logs */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-semibold text-gray-800">System Logs</h3>
+              <h3 className="font-semibold text-gray-800">Suggest to remove as not part of storyboard - System Logs</h3>
               <button className="text-primary-600 text-sm hover:underline">View all</button>
             </div>
             <div className="divide-y divide-gray-50">
@@ -119,25 +119,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* System Health */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-            <h3 className="font-semibold text-gray-800 mb-4">System Health</h3>
-            <div className="space-y-3">
-              {[
-                { service: 'API Server', status: 'Operational', ok: true },
-                { service: 'Database', status: 'Operational', ok: true },
-                { service: 'Email Service', status: 'Not configured', ok: false },
-                { service: 'Task Scheduler', status: 'Operational', ok: true },
-              ].map((s) => (
-                <div key={s.service} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className={`w-2 h-2 rounded-full ${s.ok ? 'bg-green-500' : 'bg-yellow-400'}`} />
-                    <p className="text-sm text-gray-700">{s.service}</p>
-                  </div>
-                  <p className={`text-xs font-medium ${s.ok ? 'text-green-600' : 'text-yellow-600'}`}>{s.status}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+        
         </div>
       </div>
     </DashboardLayout>
