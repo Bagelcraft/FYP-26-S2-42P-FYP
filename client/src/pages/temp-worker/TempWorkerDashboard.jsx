@@ -53,9 +53,9 @@ export default function TempWorkerDashboard() {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: 'ASSIGNED TASKS', value: '1', delta: 'Active', color: 'text-blue-600' },
-            { label: 'UPCOMING SHIFTS', value: '3', delta: 'This week', color: 'text-yellow-600' },
-            { label: 'HOURS THIS WEEK', value: clockedIn ? 'Active' : '0h', delta: clockedIn ? 'Currently clocked in' : 'Not clocked in', color: clockedIn ? 'text-green-600' : 'text-gray-400' },
+            { label: 'ASSIGNED TASKS', value: '1', color: 'text-blue-600' },
+            { label: 'UPCOMING SHIFTS', value: '3', color: 'text-yellow-600' },
+            { label: 'HOURS THIS WEEK', value: clockedIn ? 'Active' : '0h', 'text-green-600' : 'text-gray-400' },
           ].map((s) => (
             <div key={s.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{s.label}</p>
@@ -163,8 +163,8 @@ export default function TempWorkerDashboard() {
               <h3 className="font-semibold text-gray-800 text-sm mb-3">Quick Actions</h3>
               <div className="space-y-2">
                 {[
-                  { label: 'Update Availability', icon: '📅', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100' },
-                  { label: 'View Attendance', icon: '🕐', color: 'bg-purple-50 text-purple-700 hover:bg-purple-100' },
+                  { label: 'Update Availability', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100' },
+                  { label: 'View Attendance', color: 'bg-purple-50 text-purple-700 hover:bg-purple-100' },
                 ].map((a) => (
                   <button key={a.label} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${a.color}`}>
                     <span>{a.icon}</span>

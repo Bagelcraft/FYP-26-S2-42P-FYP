@@ -31,9 +31,9 @@ export default function Leave() {
         {/* Leave balance */}
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: 'Annual Leave', used: 0, total: 14, color: 'bg-green-500' },
+            { label: 'Annual Leave', used: 0, total: 14, color: 'bg-blue-500' },
             { label: 'Medical Leave', used: 1, total: 14, color: 'bg-blue-500' },
-            { label: 'Hospitalisation', used: 0, total: 60, color: 'bg-purple-500' },
+            { label: 'Hospitalisation', used: 0, total: 60, color: 'bg-blue-500' },
           ].map((b) => (
             <div key={b.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <p className="text-xs text-gray-500 font-medium">{b.label}</p>
