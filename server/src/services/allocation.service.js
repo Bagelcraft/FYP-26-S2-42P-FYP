@@ -203,4 +203,23 @@ async function autoAllocate(taskId, organisationId, allocatedBy) {
   return assignTask(taskId, organisationId, top.userId, allocatedBy, 'AUTO');
 }
 
-module.exports = { getEligibleStaff, assignTask, autoAllocate };
+
+
+// --- Allocation history for a task -------------------------------------------
+
+async function getAllocationHistory(taskId, organisationId) {
+  const task = await prisma.task.findFirst({
+    where: { task_id: taskId, organisation_id: organisationId },
+  });
+  if (!task) throw makeError('Task not found', 404);
+
+  return prisma.allocationHistory.findMany({
+    where: { task_id: taskId },
+    include: {
+      user:      { select: { userId: true, full_name: true, email: true } },
+      changedBy: { select: { userId: true, full_name: true } },
+    },
+    orderBy: { timestamp: 'desc' },
+  });
+}
+module.exports = { getEligibleStaff, assignTask, autoAllocate, getAllocationHistory };

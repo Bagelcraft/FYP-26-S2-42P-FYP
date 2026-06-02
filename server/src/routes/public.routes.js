@@ -2,15 +2,19 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const router = express.Router();
 const prisma = require('../config/prisma');
+const planService = require('../services/plan.service');
 
 // GET /api/v1/public/features
 router.get('/features', (req, res) => {
   res.json({ message: 'Get platform features — to be implemented by Rachel' });
 });
 
-// GET /api/v1/public/pricing
-router.get('/pricing', (req, res) => {
-  res.json({ message: 'Get pricing plans — to be implemented by Rachel' });
+// GET /api/v1/public/pricing  — no auth required
+router.get('/pricing', async (req, res, next) => {
+  try {
+    const plans = await planService.listPlans(false);
+    res.json({ success: true, data: plans });
+  } catch (err) { next(err); }
 });
 
 // POST /api/v1/public/enquiry

@@ -72,9 +72,22 @@ const autoAllocate = async (req, res, next) => {
   }
 };
 
+// GET /pm/tasks/:id/allocation-history
+const getHistory = async (req, res, next) => {
+  try {
+    const data = await allocationService.getAllocationHistory(
+      parseInt(req.params.id, 10),
+      req.user.organisationId,
+    );
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
 const assignBodyRules = [
   body('assigned_to')
     .isInt({ min: 1 }).withMessage('assigned_to must be a valid user ID'),
 ];
 
-module.exports = { getEligibleStaff, manualAssign, reallocate, autoAllocate, assignBodyRules };
+module.exports = { getEligibleStaff, manualAssign, reallocate, autoAllocate, getHistory, assignBodyRules };

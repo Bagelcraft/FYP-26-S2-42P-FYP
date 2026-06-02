@@ -78,4 +78,7 @@ router.post('/tasks/:id/reallocate',  allocationController.assignBodyRules, allo
 // 3d: auto-allocate (engine picks the best candidate)
 router.post('/tasks/:id/auto-allocate', allocationController.autoAllocate);
 
+// Allocation history
+router.get('/tasks/:id/allocation-history', allocationController.getHistory);
+
 module.exports = router;

@@ -39,6 +39,14 @@ async function deleteDept(req, res, next) {
   try { await svc.deleteDepartment(orgId(req), id(req)); res.status(204).end(); } catch (e) { next(e); }
 }
 
+const assignStaffRules = [
+  body('user_id').isInt({ min: 1 }).withMessage('user_id is required'),
+];
+
+async function assignStaffToDept(req, res, next) {
+  try { ok(res, await svc.assignStaffToDept(orgId(req), id(req), req.body.user_id)); } catch (e) { next(e); }
+}
+
 // ─── Staff Roles ──────────────────────────────────────────────
 
 const roleRules = [
@@ -136,7 +144,7 @@ async function removeSkill(req, res, next) {
 
 module.exports = {
   validate,
-  deptRules, deptUpdateRules, listDepts, createDept, updateDept, deleteDept,
+  deptRules, deptUpdateRules, listDepts, createDept, updateDept, deleteDept, assignStaffRules, assignStaffToDept,
   roleRules, roleUpdateRules, listRoles, createRole, updateRole, deleteRole,
   skillRules, skillUpdateRules, listSkills, createSkill, updateSkill, deleteSkill,
   staffRules, staffQueryRules, listStaff, registerStaff, deactivateStaff,

@@ -93,4 +93,10 @@ async function removeFeature(planId, featureId) {
   await prisma.planFeature.delete({ where: { feature_id: featureId } });
 }
 
-module.exports = { listPlans, getPlan, createPlan, updatePlan, deactivatePlan, reactivatePlan, addFeature, removeFeature };
+async function deletePlan(planId) {
+  await getPlan(planId); // throws 404 if not found
+  await prisma.planFeature.deleteMany({ where: { plan_id: planId } });
+  await prisma.subscriptionPlan.delete({ where: { plan_id: planId } });
+}
+
+module.exports = { listPlans, getPlan, createPlan, updatePlan, deactivatePlan, reactivatePlan, addFeature, removeFeature, deletePlan };

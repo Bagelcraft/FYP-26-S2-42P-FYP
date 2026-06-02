@@ -52,6 +52,20 @@ async function deleteDepartment(organisationId, deptId) {
   await prisma.department.delete({ where: { department_id: deptId } });
 }
 
+async function assignStaffToDept(organisationId, deptId, userId) {
+  const dept = await prisma.department.findFirst({ where: { department_id: deptId, organisation_id: organisationId } });
+  if (!dept) throw makeError('Department not found', 404);
+
+  const user = await prisma.user.findFirst({ where: { userId, organisationId, is_active: true } });
+  if (!user) throw makeError('Staff member not found in this organisation', 404);
+
+  return prisma.department.update({
+    where: { department_id: deptId },
+    data:  { head_user_id: userId },
+    include: { head: { select: { userId: true, full_name: true } } },
+  });
+}
+
 // ─── Staff Roles ──────────────────────────────────────────────
 
 async function listRoles(organisationId) {
@@ -224,7 +238,7 @@ async function removeSkillFromStaff(organisationId, userId, skillId) {
 }
 
 module.exports = {
-  listDepartments, createDepartment, updateDepartment, deleteDepartment,
+  listDepartments, createDepartment, updateDepartment, deleteDepartment, assignStaffToDept,
   listRoles, createRole, updateRole, deleteRole,
   listSkills, createSkill, updateSkill, deleteSkill,
   listStaff, registerStaff, deactivateStaff,

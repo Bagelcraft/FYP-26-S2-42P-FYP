@@ -47,5 +47,6 @@ router.post('/plans/:id/features',
   planController.addFeature,
 );
 router.delete('/plans/:id/features/:featureId', planController.removeFeature);
+router.delete('/plans/:id', planController.deletePlan);
 
 module.exports = router;

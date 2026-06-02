@@ -96,11 +96,19 @@ async function removeFeature(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function deletePlan(req, res, next) {
+  try {
+    await planService.deletePlan(Number(req.params.id));
+    res.status(204).end();
+  } catch (err) { next(err); }
+}
+
 module.exports = {
   list, getOne,
   createRules, create,
   updateRules, update,
   deactivate, reactivate,
   featureRules, addFeature, removeFeature,
+  deletePlan,
   validate,
 };
