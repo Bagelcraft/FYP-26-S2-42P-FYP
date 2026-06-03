@@ -1,7 +1,10 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-export default function DashboardLayout({ children, navItems, roleLabel, topbarRight }) {
+// `secondaryNav` (optional) renders a subordinate "Account" group at the
+// bottom of the sidebar — used by the PM portal for Subscription / Testimonials
+// so they sit below the core operational features.
+export default function DashboardLayout({ children, navItems, secondaryNav = [], roleLabel, topbarRight }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -11,11 +14,26 @@ export default function DashboardLayout({ children, navItems, roleLabel, topbarR
     navigate('/login');
   };
 
-  const currentPage = navItems.reduce((best, item) => {
+  const allItems = [...navItems, ...secondaryNav];
+  const currentPage = allItems.reduce((best, item) => {
     const matches = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
     if (!matches) return best;
     return !best || item.path.length > best.path.length ? item : best;
   }, null);
+
+  const renderLink = (item, { secondary } = {}) => {
+    const isActive = item === currentPage;
+    const base = 'flex items-center gap-3 rounded-lg font-medium transition-colors';
+    const cls = secondary
+      ? `${base} px-3 py-2 text-[13px] ${isActive ? 'bg-gray-800 text-white' : 'text-gray-500 hover:bg-gray-800/60 hover:text-gray-300'}`
+      : `${base} px-3 py-2.5 text-sm ${isActive ? 'bg-primary-600 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`;
+    return (
+      <Link key={item.path} to={item.path} className={cls}>
+        <span className={`w-5 text-center ${secondary ? 'text-sm opacity-80' : ''}`}>{item.icon}</span>
+        {item.label}
+      </Link>
+    );
+  };
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
@@ -27,23 +45,14 @@ export default function DashboardLayout({ children, navItems, roleLabel, topbarR
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          {navItems.map((item) => {
-            const isActive = item === currentPage;
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-primary-600 text-white'
-                    : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-                }`}
-              >
-                <span>{item.icon}</span>
-                {item.label}
-              </Link>
-            );
-          })}
+          {navItems.map((item) => renderLink(item))}
+
+          {secondaryNav.length > 0 && (
+            <div className="pt-4 mt-3 border-t border-gray-700/60">
+              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-600">Account</p>
+              {secondaryNav.map((item) => renderLink(item, { secondary: true }))}
+            </div>
+          )}
         </nav>
 
         <div className="px-3 py-4 border-t border-gray-700">
@@ -67,7 +76,6 @@ export default function DashboardLayout({ children, navItems, roleLabel, topbarR
 
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Topbar */}
         <header className="bg-white border-b border-gray-200 px-6 h-14 flex items-center justify-between flex-shrink-0">
           <h1 className="text-gray-800 font-semibold">{currentPage?.label ?? 'Dashboard'}</h1>
           <div className="flex items-center gap-4">

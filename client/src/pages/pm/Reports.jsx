@@ -1,6 +1,6 @@
 import DashboardLayout from '../../components/DashboardLayout';
 import StatCard from '../../components/StatCard';
-import { PM_NAV } from './nav';
+import { PM_NAV, PM_SECONDARY } from './nav';
 
 const staffHours = [
   { name: 'Weishi Tan', dept: 'Engineering', hoursThisWeek: 38, tasksCompleted: 2, type: 'Permanent' },
@@ -10,7 +10,7 @@ const staffHours = [
 
 export default function Reports() {
   return (
-    <DashboardLayout navItems={PM_NAV} roleLabel="Manager">
+    <DashboardLayout navItems={PM_NAV} secondaryNav={PM_SECONDARY} roleLabel="Manager">
       <div className="space-y-6">
         <div>
           <h2 className="text-xl font-bold text-gray-800">Reports</h2>

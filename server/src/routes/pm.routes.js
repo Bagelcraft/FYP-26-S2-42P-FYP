@@ -4,6 +4,7 @@ const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
 const taskController = require('../controllers/task.controller');
 const allocationController = require('../controllers/allocation.controller');
+const managerController = require('../controllers/manager.controller'); // NEW
 
 const router = express.Router();
 
@@ -58,6 +59,10 @@ const listQueryRules = [
   query('date').optional().isISO8601().withMessage('date must be a valid ISO 8601 date'),
 ];
 
+const leaveDecisionRules = [
+  body('status').isIn(['APPROVED', 'REJECTED']).withMessage('status must be APPROVED or REJECTED'),
+];
+
 // ─── Task CRUD (5 — manager view with filters) ────────────────────────────
 
 router.get('/tasks',        listQueryRules, taskController.list);
@@ -68,14 +73,28 @@ router.delete('/tasks/:id',                taskController.remove);
 
 // ─── Allocation engine (3 + 4) ────────────────────────────────────────────
 
-// 3a-3c: ranked eligible staff list for a task
 router.get('/tasks/:id/eligible-staff', allocationController.getEligibleStaff);
-
-// 3d + 4: manual assign / reallocate
 router.post('/tasks/:id/assign',      allocationController.assignBodyRules, allocationController.manualAssign);
 router.post('/tasks/:id/reallocate',  allocationController.assignBodyRules, allocationController.reallocate);
-
-// 3d: auto-allocate (engine picks the best candidate)
 router.post('/tasks/:id/auto-allocate', allocationController.autoAllocate);
+
+// ─── Manager portal (NEW — Weishi) ────────────────────────────────────────
+
+// Team — view all members with skills, weekly capacity, availability
+router.get('/team', managerController.getTeam);
+
+// Leave — track, approve/reject, adjust balances
+router.get('/leave',                         managerController.listLeave);
+router.patch('/leave/:id',  leaveDecisionRules, managerController.decideLeave);
+router.get('/leave-balance',                 managerController.listLeaveBalances);
+router.patch('/leave-balance/:userId',       managerController.updateLeaveBalance);
+
+// Subscription — current plan + billing history
+router.get('/subscription', managerController.getSubscription);
+router.get('/billing',      managerController.listBilling);
+
+// Lookups for Create/Edit Task dropdowns (manager-accessible, read-only)
+router.get('/departments', managerController.getDepartments);
+router.get('/skills',      managerController.getSkills);
 
 module.exports = router;
