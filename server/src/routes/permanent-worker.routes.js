@@ -2,6 +2,7 @@ const express = require('express');
 const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
 const workerController = require('../controllers/worker.controller');
+const updateRequestController = require('../controllers/task-update-request.controller');
 
 const router = express.Router();
 
@@ -20,6 +21,14 @@ router.patch('/tasks/:id/acknowledge', workerController.acknowledge);
 
 // PATCH /worker/tasks/:id/progress     → body: { status: "IN_PROGRESS"|"COMPLETED" }
 router.patch('/tasks/:id/progress', workerController.progressRules, workerController.updateProgress);
+
+// ─── Update requests ──────────────────────────────────────────────────────────
+
+// GET  /worker/tasks/:id/update-requests  — view all requests for this task
+router.get('/tasks/:id/update-requests', updateRequestController.listWorker);
+
+// PATCH /worker/tasks/:id/update-requests/:requestId/respond
+router.patch('/tasks/:id/update-requests/:requestId/respond', updateRequestController.respondRules, updateRequestController.respond);
 
 // ─── Stubs (to be implemented) ────────────────────────────────────────────
 

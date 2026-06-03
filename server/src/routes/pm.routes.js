@@ -4,6 +4,7 @@ const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
 const taskController = require('../controllers/task.controller');
 const allocationController = require('../controllers/allocation.controller');
+const updateRequestController = require('../controllers/task-update-request.controller');
 
 const router = express.Router();
 
@@ -80,5 +81,13 @@ router.post('/tasks/:id/auto-allocate', allocationController.autoAllocate);
 
 // Allocation history
 router.get('/tasks/:id/allocation-history', allocationController.getHistory);
+
+// ─── Update requests (request for update) ────────────────────────────────────
+
+// PM sends an update request to the assigned worker
+router.post('/tasks/:id/request-update', updateRequestController.createRules, updateRequestController.create);
+
+// PM views all update requests for a task
+router.get('/tasks/:id/update-requests', updateRequestController.list);
 
 module.exports = router;

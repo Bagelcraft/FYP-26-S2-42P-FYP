@@ -73,6 +73,11 @@ enum ShiftChangeStatus {
   REJECTED
 }
 
+enum UpdateRequestStatus {
+  PENDING
+  RESPONDED
+}
+
 // ─── Organisation & Subscription ─────────────────────────────
 
 model Organisation {
@@ -157,6 +162,7 @@ model User {
   reviewedShifts     ShiftChangeRequest[] @relation("ReviewedShiftChange")
   allocationHistory  AllocationHistory[]  @relation("UserAllocation")
   changedAllocations AllocationHistory[]  @relation("ChangedByAllocation")
+  sentUpdateRequests TaskUpdateRequest[]  @relation("UpdateRequestedBy")
   feedback           Feedback[]
   testimonials       Testimonial[]
   headOfDepts        Department[]         @relation("DeptHead")
@@ -268,6 +274,7 @@ model Task {
   requiredSkill     Skill?           @relation(fields: [required_skill_id], references: [skill_id])
   assignments       TaskAssignment[]
   allocationHistory AllocationHistory[]
+  updateRequests    TaskUpdateRequest[]
 }
 
 model TaskAssignment {
@@ -294,6 +301,20 @@ model AllocationHistory {
   task      Task @relation(fields: [task_id], references: [task_id])
   user      User @relation("UserAllocation", fields: [user_id], references: [userId])
   changedBy User @relation("ChangedByAllocation", fields: [changed_by], references: [userId])
+}
+
+model TaskUpdateRequest {
+  request_id   Int                 @id @default(autoincrement())
+  task_id      Int
+  requested_by Int
+  message      String?             @db.Text
+  status       UpdateRequestStatus @default(PENDING)
+  response     String?             @db.Text
+  responded_at DateTime?
+  created_at   DateTime            @default(now())
+
+  task      Task @relation(fields: [task_id], references: [task_id])
+  requester User @relation("UpdateRequestedBy", fields: [requested_by], references: [userId])
 }
 
 // ─── Shift Change ─────────────────────────────────────────────

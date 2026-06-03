@@ -65,19 +65,33 @@ async function getEligibleStaff(taskId, organisationId) {
           end_datetime:   { gte: task.start_datetime },
         },
       },
-      // Attendance records in the current week (to compute hours used)
+      // Attendance records in the current week (actual clocked hours)
       attendance: {
         where: {
           clock_in:      { gte: monday, lte: sunday },
           working_hours: { not: null },
         },
       },
+      // Already-assigned tasks this week (committed hours not yet worked)
+      assignedTasks: {
+        where: { task: { status: { in: ['ASSIGNED', 'IN_PROGRESS'] } } },
+        include: { task: { select: { start_datetime: true, end_datetime: true } } },
+      },
     },
   });
 
   const result = candidates.map((u) => {
-    const isAvailable    = u.availability.length > 0;
-    const weeklyHours    = u.attendance.reduce((sum, a) => sum + Number(a.working_hours ?? 0), 0);
+    const isAvailable       = u.availability.length > 0;
+    const attendanceHours   = u.attendance.reduce((sum, a) => sum + Number(a.working_hours ?? 0), 0);
+    const committedHours    = u.assignedTasks.reduce((sum, ta) => {
+      const start = new Date(ta.task.start_datetime);
+      const end   = new Date(ta.task.end_datetime);
+      if (start <= sunday && end >= monday) {
+        return sum + (end - start) / (1000 * 60 * 60);
+      }
+      return sum;
+    }, 0);
+    const weeklyHours    = attendanceHours + committedHours;
     const maxHours       = u.staffRole?.max_working_hours ?? null;
     const withinHours    = maxHours === null || weeklyHours < maxHours;
     const remainingHours = maxHours !== null ? Math.max(maxHours - weeklyHours, 0) : null;
