@@ -1,5 +1,5 @@
 import DashboardLayout from '../../components/DashboardLayout';
-import { PM_NAV } from './nav';
+import { PM_NAV, PM_SECONDARY } from './nav';
 
 const mockNotifications = [
   { id: 1, title: 'Task acknowledged', body: 'Weishi Tan acknowledged "Build Login API".', time: '10 min ago', read: false },
@@ -10,7 +10,7 @@ const mockNotifications = [
 
 export default function PMNotifications() {
   return (
-    <DashboardLayout navItems={PM_NAV} roleLabel="Manager">
+    <DashboardLayout navItems={PM_NAV} secondaryNav={PM_SECONDARY} roleLabel="Manager">
       <div className="space-y-6">
         <div className="flex items-start justify-between">
           <div>

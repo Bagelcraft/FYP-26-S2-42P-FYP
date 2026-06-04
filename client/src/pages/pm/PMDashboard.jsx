@@ -1,6 +1,6 @@
 import DashboardLayout from '../../components/DashboardLayout';
 import Badge from '../../components/Badge';
-import { PM_NAV } from './nav';
+import { PM_NAV, PM_SECONDARY } from './nav';
 
 const mockTasks = [
   { id: 1, title: 'Build Login API', assignee: 'Weishi Tan', skill: 'JavaScript', status: 'ASSIGNED', due: '26 May', overdue: false },
@@ -14,7 +14,7 @@ const needsAttention = mockTasks.filter((t) => t.overdue || t.status === 'PENDIN
 
 export default function PMDashboard() {
   return (
-    <DashboardLayout navItems={PM_NAV} roleLabel="Manager">
+    <DashboardLayout navItems={PM_NAV} secondaryNav={PM_SECONDARY} roleLabel="Manager">
       <div className="space-y-6">
         <div className="flex items-start justify-between">
           <div>
