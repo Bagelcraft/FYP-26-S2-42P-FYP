@@ -4,6 +4,170 @@ import Badge from '../../components/Badge';
 import api from '../../utils/api';
 import { PM_NAV, PM_SECONDARY } from './nav';
 
+const fmtTs = (iso) => {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('en-SG', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
+// ── Allocation History modal ───────────────────────────────────────────────
+function AllocationHistoryModal({ task, onClose }) {
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get(`/pm/tasks/${task.task_id}/allocation-history`)
+      .then((r) => setHistory(r.data.data))
+      .catch(() => setHistory([]))
+      .finally(() => setLoading(false));
+  }, [task.task_id]);
+
+  const actionColor = (action) => {
+    if (action === 'ALLOCATED') return 'bg-green-50 text-green-700';
+    if (action === 'REALLOCATED') return 'bg-blue-50 text-blue-700';
+    if (action === 'UNASSIGNED') return 'bg-red-50 text-red-600';
+    return 'bg-gray-100 text-gray-600';
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold text-gray-800">Allocation History</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{task.title}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+        </div>
+        <div className="overflow-y-auto flex-1 px-6 py-4">
+          {loading && <p className="text-sm text-gray-400 text-center py-6">Loading…</p>}
+          {!loading && history.length === 0 && (
+            <p className="text-sm text-gray-400 text-center py-6">No allocation history for this task.</p>
+          )}
+          {!loading && history.length > 0 && (
+            <div className="relative">
+              <div className="absolute left-3 top-0 bottom-0 w-px bg-gray-100" />
+              <div className="space-y-4 pl-8">
+                {history.map((h) => (
+                  <div key={h.history_id} className="relative">
+                    <div className="absolute -left-5 top-1 w-2.5 h-2.5 rounded-full bg-gray-300 border-2 border-white" />
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${actionColor(h.action)}`}>{h.action}</span>
+                        <p className="text-sm text-gray-800 mt-1 font-medium">{h.user?.full_name}</p>
+                        <p className="text-xs text-gray-400">By {h.changedBy?.full_name} · {fmtTs(h.timestamp)}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Request Update modal ───────────────────────────────────────────────────
+function RequestUpdateModal({ task, onClose, onSent }) {
+  const [message, setMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  async function submit(e) {
+    e.preventDefault();
+    setSubmitting(true); setError('');
+    try {
+      await api.post(`/pm/tasks/${task.task_id}/request-update`, { message: message.trim() || null });
+      onSent();
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
+      <form onSubmit={submit} className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="font-semibold text-gray-800">Request Update</h2>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-600">{error}</div>}
+          <p className="text-sm text-gray-600">Requesting update for: <span className="font-medium text-gray-800">{task.title}</span></p>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Message (optional)</label>
+            <textarea rows={3} value={message} onChange={(e) => setMessage(e.target.value)}
+              placeholder="e.g. Please provide a status update on the current progress…"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
+          </div>
+          <p className="text-xs text-gray-400">The assigned worker will see this request in their task view and can respond directly.</p>
+          <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
+            <button type="submit" disabled={submitting} className="px-5 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">{submitting ? 'Sending…' : 'Send Request'}</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ── Update Requests view modal (PM reads worker responses) ─────────────────
+function UpdateRequestsViewModal({ task, onClose }) {
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get(`/pm/tasks/${task.task_id}/update-requests`)
+      .then((r) => setRequests(r.data.data))
+      .catch(() => setRequests([]))
+      .finally(() => setLoading(false));
+  }, [task.task_id]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold text-gray-800">Update Request Log</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{task.title}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+        </div>
+        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
+          {loading && <p className="text-sm text-gray-400 text-center py-6">Loading…</p>}
+          {!loading && requests.length === 0 && (
+            <p className="text-sm text-gray-400 text-center py-6">No update requests sent yet.</p>
+          )}
+          {requests.map((r) => (
+            <div key={r.request_id} className="border border-gray-100 rounded-xl p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-gray-400">Sent by <span className="font-medium text-gray-600">{r.requester?.full_name}</span> · {fmtTs(r.created_at)}</p>
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${r.status === 'RESPONDED' ? 'bg-green-50 text-green-600' : 'bg-amber-50 text-amber-600'}`}>
+                  {r.status}
+                </span>
+              </div>
+              {r.message && <p className="text-sm text-gray-700 bg-gray-50 rounded-lg px-3 py-2">"{r.message}"</p>}
+              {r.status === 'RESPONDED' && (
+                <div className="bg-blue-50 rounded-lg px-3 py-2">
+                  <p className="text-xs text-blue-400 mb-0.5">Worker response · {fmtTs(r.responded_at)}</p>
+                  <p className="text-sm text-blue-800">{r.response}</p>
+                </div>
+              )}
+              {r.status === 'PENDING' && (
+                <p className="text-xs text-amber-500 italic">Awaiting worker response…</p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── helpers ────────────────────────────────────────────────────────────────
 const fmtDue = (iso) => {
   if (!iso) return '—';
@@ -130,6 +294,9 @@ export default function Tasks() {
   const [search, setSearch] = useState('');
   const [creating, setCreating] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [historyTask, setHistoryTask] = useState(null);
+  const [requestUpdateTask, setRequestUpdateTask] = useState(null);
+  const [viewRequestsTask, setViewRequestsTask] = useState(null);
   const [toast, setToast] = useState('');
 
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 2600); };
@@ -226,9 +393,16 @@ export default function Tasks() {
                     <td className="px-5 py-3 text-gray-500">{fmtDue(t.end_datetime)}</td>
                     <td className="px-5 py-3"><Badge status={t.status} /></td>
                     <td className="px-5 py-3">
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <button onClick={() => setEditingTask(t)} className="text-xs text-primary-600 hover:underline">Edit</button>
                         <button onClick={() => delTask(t)} className="text-xs text-red-500 hover:underline">Delete</button>
+                        <button onClick={() => setHistoryTask(t)} className="text-xs text-gray-500 hover:underline">History</button>
+                        {['ASSIGNED', 'IN_PROGRESS'].includes(t.status) && (
+                          <button onClick={() => setRequestUpdateTask(t)} className="text-xs text-amber-600 hover:underline">Request Update</button>
+                        )}
+                        {['ASSIGNED', 'IN_PROGRESS'].includes(t.status) && (
+                          <button onClick={() => setViewRequestsTask(t)} className="text-xs text-blue-500 hover:underline">View Requests</button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -254,6 +428,15 @@ export default function Tasks() {
           onSaved={(t) => { load(); showToast(`Task “${t.title}” updated`); }}
         />
       )}
+      {historyTask && <AllocationHistoryModal task={historyTask} onClose={() => setHistoryTask(null)} />}
+      {requestUpdateTask && (
+        <RequestUpdateModal
+          task={requestUpdateTask}
+          onClose={() => setRequestUpdateTask(null)}
+          onSent={() => showToast('Update request sent to worker')}
+        />
+      )}
+      {viewRequestsTask && <UpdateRequestsViewModal task={viewRequestsTask} onClose={() => setViewRequestsTask(null)} />}
       {toast && <div className="fixed bottom-6 right-6 z-50 bg-gray-900 text-white text-sm px-4 py-2.5 rounded-lg shadow-lg">{toast}</div>}
     </DashboardLayout>
   );
