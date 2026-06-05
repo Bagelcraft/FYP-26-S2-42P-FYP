@@ -4,6 +4,7 @@ const { requireRole } = require('../middleware/rbac.middleware');
 const workerController = require('../controllers/worker.controller');
 const updateRequestController = require('../controllers/task-update-request.controller');
 const availabilityController = require('../controllers/availability.controller');
+const attendanceController = require('../controllers/attendance.controller');
 
 const router = express.Router();
 
@@ -54,16 +55,8 @@ router.post('/leave', (req, res) => {
   res.json({ message: 'Apply for leave — to be implemented' });
 });
 
-router.post('/attendance/clock-in', (req, res) => {
-  res.json({ message: 'Clock in — to be implemented' });
-});
-
-router.put('/attendance/clock-out', (req, res) => {
-  res.json({ message: 'Clock out — to be implemented' });
-});
-
-router.get('/attendance', (req, res) => {
-  res.json({ message: 'Get attendance history — to be implemented' });
-});
+router.post('/attendance/clock-in', attendanceController.clockIn);
+router.put('/attendance/clock-out', attendanceController.clockOut);
+router.get('/attendance', attendanceController.getAttendance);
 
 module.exports = router;

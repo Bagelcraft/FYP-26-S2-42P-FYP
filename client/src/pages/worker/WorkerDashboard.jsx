@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import Badge from '../../components/Badge';
 import { WORKER_NAV } from './nav';
+import api from '../../utils/api';
 
 const mockTasks = [
   { id: 1, title: 'Build Login API', dept: 'Engineering', status: 'ASSIGNED', due: '26 May', progress: 0 },
@@ -14,25 +15,85 @@ const mockAvailability = [
   { date: 'Wed 28 May', time: 'Annual Leave', status: 'ON_LEAVE' },
 ];
 
+function formatTime(dt) {
+  return new Date(dt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function formatHours(decimal) {
+  if (decimal == null) return '—';
+  const totalMinutes = Math.round(parseFloat(decimal) * 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
 export default function WorkerDashboard() {
-  const [clockedIn, setClockedIn] = useState(false);
+  const [openSession, setOpenSession] = useState(null);
+  const [todayRecord, setTodayRecord] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api.get('/worker/attendance').then((r) => {
+      const records = r.data.data;
+      const today = new Date().toDateString();
+      const open = records.find((rec) => rec.clock_out === null);
+      const todayDone = records.find(
+        (rec) => rec.clock_out !== null && new Date(rec.clock_in).toDateString() === today,
+      );
+      setOpenSession(open || null);
+      setTodayRecord(todayDone || null);
+    }).catch(() => {});
+  }, []);
+
+  const isClockedIn = Boolean(openSession);
+
+  const handleClockIn = async () => {
+    setActionLoading(true);
+    setError('');
+    try {
+      const res = await api.post('/worker/attendance/clock-in');
+      setOpenSession(res.data.data);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to clock in.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleClockOut = async () => {
+    setActionLoading(true);
+    setError('');
+    try {
+      const res = await api.put('/worker/attendance/clock-out');
+      setOpenSession(null);
+      setTodayRecord(res.data.data);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to clock out.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const hoursToday = isClockedIn ? 'Active' : (todayRecord ? formatHours(todayRecord.working_hours) : '0h');
 
   const clockInButton = (
     <div className="flex items-center gap-2">
-      {clockedIn && (
+      {isClockedIn && (
         <span className="text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full tracking-wide">
           CLOCKED IN
         </span>
       )}
       <button
-        onClick={() => setClockedIn(!clockedIn)}
-        className={`text-sm font-medium px-4 py-1.5 rounded-lg transition-colors ${
-          clockedIn
+        onClick={isClockedIn ? handleClockOut : handleClockIn}
+        disabled={actionLoading}
+        className={`text-sm font-medium px-4 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
+          isClockedIn
             ? 'bg-red-500 hover:bg-red-600 text-white'
             : 'bg-green-500 hover:bg-green-600 text-white'
         }`}
       >
-        {clockedIn ? 'Clock Out' : 'Clock In'}
+        {actionLoading ? 'Processing…' : isClockedIn ? 'Clock Out' : 'Clock In'}
       </button>
     </div>
   );
@@ -45,18 +106,25 @@ export default function WorkerDashboard() {
           <p className="text-gray-500 text-sm mt-0.5">View your tasks, manage availability, and track attendance.</p>
         </div>
 
+        {isClockedIn && (
+          <div className="bg-green-50 border border-green-100 rounded-xl px-5 py-3 text-sm text-green-700">
+            Clocked in at <span className="font-semibold">{formatTime(openSession.clock_in)}</span>
+          </div>
+        )}
+
+        {error && <p className="text-red-500 text-sm">{error}</p>}
+
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { label: 'ASSIGNED TASKS', value: '2', color: 'text-blue-600' },
             { label: 'IN PROGRESS', value: '1', color: 'text-purple-600' },
-            { label: 'ANNUAL LEAVE LEFT', value: '12 days',color: 'text-green-600' },
-            { label: 'HOURS TODAY', value: clockedIn ? 'Active' : '0h','text-green-600' : 'text-gray-400' },
+            { label: 'ANNUAL LEAVE LEFT', value: '12 days', color: 'text-green-600' },
+            { label: 'HOURS TODAY', value: hoursToday, color: isClockedIn ? 'text-green-600' : 'text-gray-400' },
           ].map((s) => (
             <div key={s.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{s.label}</p>
-              <p className="text-2xl font-bold text-gray-800 mt-1">{s.value}</p>
-              <p className={`text-xs mt-1 ${s.color}`}>{s.delta}</p>
+              <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.value}</p>
             </div>
           ))}
         </div>
@@ -116,18 +184,26 @@ export default function WorkerDashboard() {
               <h3 className="font-semibold text-gray-800 text-sm mb-3">Today</h3>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Shift</span>
-                  <span className="text-gray-800 font-medium">09:00 – 18:00</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Status</span>
-                  <span className={`font-medium ${clockedIn ? 'text-green-600' : 'text-gray-400'}`}>
-                    {clockedIn ? 'Clocked in' : 'Not started'}
+                  <span className="text-gray-500">Clock In</span>
+                  <span className="text-gray-800 font-medium">
+                    {openSession ? formatTime(openSession.clock_in) : todayRecord ? formatTime(todayRecord.clock_in) : '—'}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Tasks due</span>
-                  <span className="text-gray-800 font-medium">1</span>
+                  <span className="text-gray-500">Clock Out</span>
+                  <span className="text-gray-800 font-medium">
+                    {todayRecord ? formatTime(todayRecord.clock_out) : '—'}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Status</span>
+                  <span className={`font-medium ${isClockedIn ? 'text-green-600' : todayRecord ? 'text-gray-600' : 'text-gray-400'}`}>
+                    {isClockedIn ? 'Clocked in' : todayRecord ? 'Completed' : 'Not started'}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Hours</span>
+                  <span className="text-gray-800 font-medium">{hoursToday}</span>
                 </div>
               </div>
             </div>
@@ -154,10 +230,9 @@ export default function WorkerDashboard() {
               {[
                 { label: 'Request Leave', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100' },
                 { label: 'Update Availability', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100' },
-                { label: 'View Time Sheet',color: 'bg-blue-50 text-blue-700 hover:bg-blue-100' },
+                { label: 'View Time Sheet', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100' },
               ].map((a) => (
                 <button key={a.label} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${a.color}`}>
-                  <span>{a.icon}</span>
                   {a.label}
                 </button>
               ))}
