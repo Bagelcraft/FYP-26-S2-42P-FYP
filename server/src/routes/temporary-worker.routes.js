@@ -3,6 +3,7 @@ const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
 const workerController = require('../controllers/worker.controller');
 const updateRequestController = require('../controllers/task-update-request.controller');
+const availabilityController = require('../controllers/availability.controller');
 
 const router = express.Router();
 
@@ -47,9 +48,10 @@ router.put('/skills', (req, res) => {
   res.json({ message: 'Update skills — to be implemented' });
 });
 
-router.post('/availability', (req, res) => {
-  res.json({ message: 'Set availability — to be implemented' });
-});
+router.get('/availability', availabilityController.getAvailability);
+router.post('/availability', availabilityController.availabilityRules, availabilityController.setAvailability);
+router.put('/availability/:id', availabilityController.availabilityRules, availabilityController.updateAvailability);
+router.delete('/availability/:id', availabilityController.removeAvailability);
 
 router.post('/attendance/clock-in', (req, res) => {
   res.json({ message: 'Clock in — to be implemented' });
