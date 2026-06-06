@@ -1,5 +1,6 @@
 const { body, validationResult } = require('express-validator');
 const taskService = require('../services/task.service');
+const workerService = require('../services/worker.service');
 
 function sendValidationError(req, res) {
   const errors = validationResult(req);
@@ -91,4 +92,42 @@ const progressRules = [
     .withMessage('status must be IN_PROGRESS or COMPLETED'),
 ];
 
-module.exports = { listMyTasks, getMyTask, acknowledge, updateProgress, listAvailableTasks, progressRules };
+const profileUpdateRules = [
+  body('requested_changes')
+    .notEmpty()
+    .withMessage('requested_changes is required'),
+  body('reason')
+    .optional()
+    .isString()
+    .withMessage('reason must be text'),
+];
+
+const updateMyProfile = async (req, res, next) => {
+  try {
+    const updatedUser = await workerService.updateMyProfile(
+      req.user.userId,
+      req.body
+    );
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: updatedUser,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+module.exports = {
+  listMyTasks,
+  getMyTask,
+  acknowledge,
+  updateProgress,
+  listAvailableTasks,
+  progressRules,
+  profileUpdateRules,
+  updateMyProfile,
+};
+

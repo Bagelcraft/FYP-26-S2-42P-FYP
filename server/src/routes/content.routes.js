@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { verifyToken } = require("../middleware/auth.middleware");
 
 const {
   getContent,
@@ -16,20 +17,24 @@ const {
   deleteTestimonial,
 } = require("../controllers/contentController");
 
+// Public route
 router.get("/", getContent);
 
-router.put("/hero", updateHero);
-router.put("/video", updateVideo);
-router.put("/pricing", updatePricing);
+// Protected routes
+router.put("/hero", verifyToken, updateHero);
+router.put("/video", verifyToken, updateVideo);
+router.put("/pricing", verifyToken, updatePricing);
 
-router.get("/features", getFeatures);
-router.post("/features", createFeature);
-router.put("/features/:id", updateFeature);
-router.delete("/features/:id", deleteFeature);
+// Features
+router.get("/features", getFeatures); // public
+router.post("/features", verifyToken, createFeature);
+router.put("/features/:id", verifyToken, updateFeature);
+router.delete("/features/:id", verifyToken, deleteFeature);
 
-router.get("/testimonials", getTestimonials);
-router.post("/testimonials", createTestimonial);
-router.put("/testimonials/:id", updateTestimonial);
-router.delete("/testimonials/:id", deleteTestimonial);
+// Testimonials
+router.get("/testimonials", getTestimonials); // public
+router.post("/testimonials", verifyToken, createTestimonial);
+router.put("/testimonials/:id", verifyToken, updateTestimonial);
+router.delete("/testimonials/:id", verifyToken, deleteTestimonial);
 
 module.exports = router;
