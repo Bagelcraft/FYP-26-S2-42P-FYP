@@ -54,8 +54,13 @@ export default function Availability() {
     setError('');
     try {
       const res = await api.post('/worker/availability', {
+<<<<<<< Updated upstream
         start_datetime: `${form.date}T${form.start}:00`,
         end_datetime: `${form.date}T${form.end}:00`,
+=======
+        start_datetime: `${form.date}T${form.start}`,
+        end_datetime: `${form.date}T${form.end}`,
+>>>>>>> Stashed changes
         status: form.status,
       });
       setSlots((prev) => [...prev, res.data.data]);
@@ -90,8 +95,13 @@ export default function Availability() {
     setError('');
     try {
       const res = await api.put(`/worker/availability/${editingId}`, {
+<<<<<<< Updated upstream
         start_datetime: `${editForm.date}T${editForm.start}:00`,
         end_datetime: `${editForm.date}T${editForm.end}:00`,
+=======
+        start_datetime: `${editForm.date}T${editForm.start}`,
+        end_datetime: `${editForm.date}T${editForm.end}`,
+>>>>>>> Stashed changes
         status: editForm.status,
       });
       setSlots((prev) => prev.map((s) => s.availability_id === editingId ? res.data.data : s));
@@ -158,7 +168,13 @@ export default function Availability() {
                 <label className="block text-xs text-gray-500 mb-1">Status</label>
                 <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+<<<<<<< Updated upstream
                   {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+=======
+                  <option value="AVAILABLE">Available</option>
+                  <option value="UNAVAILABLE">Unavailable</option>
+                  <option value="ON_LEAVE">On Leave</option>
+>>>>>>> Stashed changes
                 </select>
               </div>
             </div>
@@ -201,7 +217,13 @@ export default function Availability() {
                     <label className="block text-xs text-gray-500 mb-1">Status</label>
                     <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+<<<<<<< Updated upstream
                       {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+=======
+                      <option value="AVAILABLE">Available</option>
+                      <option value="UNAVAILABLE">Unavailable</option>
+                      <option value="ON_LEAVE">On Leave</option>
+>>>>>>> Stashed changes
                     </select>
                   </div>
                 </div>
