@@ -1,23 +1,50 @@
 import { useState } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import { TEMP_NAV } from './nav';
-
-const initialSkills = ['JavaScript', 'SQL'];
+import { useAuth } from '../../context/AuthContext';
+import api from '../../utils/api';
 
 export default function Profile() {
+  const { user, login } = useAuth();
   const [editing, setEditing] = useState(false);
-  const [skills, setSkills] = useState(initialSkills);
-  const [newSkill, setNewSkill] = useState('');
+  const [form, setForm] = useState({ full_name: user?.full_name ?? '', email: user?.email ?? '' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
-  const addSkill = () => {
-    const trimmed = newSkill.trim();
-    if (trimmed && !skills.includes(trimmed)) {
-      setSkills([...skills, trimmed]);
-      setNewSkill('');
+  function startEdit() {
+    setForm({ full_name: user?.full_name ?? '', email: user?.email ?? '' });
+    setError('');
+    setSuccess('');
+    setEditing(true);
+  }
+
+  function cancelEdit() {
+    setEditing(false);
+    setError('');
+  }
+
+  async function save() {
+    if (!form.full_name.trim() || !form.email.trim()) {
+      setError('Name and email are required.');
+      return;
     }
-  };
+    setSaving(true);
+    setError('');
+    try {
+      const { data } = await api.put('/temp-worker/profile', { full_name: form.full_name.trim(), email: form.email.trim() });
+      const token = localStorage.getItem('token');
+      login({ ...user, full_name: data.data.full_name, email: data.data.email }, token);
+      setSuccess('Profile updated successfully.');
+      setEditing(false);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
 
-  const removeSkill = (s) => setSkills(skills.filter((sk) => sk !== s));
+  const initials = (user?.full_name ?? 'T').charAt(0).toUpperCase();
 
   return (
     <DashboardLayout navItems={TEMP_NAV} roleLabel="Temporary Worker">
@@ -25,88 +52,80 @@ export default function Profile() {
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-800">My Profile</h2>
-            <p className="text-gray-500 text-sm mt-0.5">Your personal details and registered skills.</p>
+            <p className="text-gray-500 text-sm mt-0.5">Your personal details.</p>
           </div>
-          <button
-            onClick={() => setEditing(!editing)}
-            className="border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            {editing ? 'Cancel' : 'Edit Profile'}
-          </button>
+          {!editing && (
+            <button
+              onClick={startEdit}
+              className="border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              Edit Profile
+            </button>
+          )}
         </div>
 
-        {/* Profile card */}
+        {success && (
+          <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-sm text-green-700">{success}</div>
+        )}
+
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
           <div className="flex items-center gap-5 mb-6">
             <div className="w-16 h-16 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 text-2xl font-bold">
-              R
+              {initials}
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-800">Rachel Ng</h3>
-              <p className="text-sm text-gray-500">Contractor · Operations</p>
-              <p className="text-sm text-gray-400">rachel@techcorp.com</p>
+              <h3 className="text-lg font-semibold text-gray-800">{user?.full_name}</h3>
+              <p className="text-sm text-gray-400">{user?.email}</p>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            {[
-              { label: 'Full Name', value: 'Rachel Ng' },
-              { label: 'Employee Type', value: 'Temporary Worker' },
-              { label: 'Department', value: 'Operations' },
-              { label: 'Job Title', value: 'Contractor' },
-              { label: 'Email', value: 'rachel@techcorp.com' },
-              { label: 'Phone', value: '+65 9876 5432' },
-            ].map((f) => (
-              <div key={f.label}>
-                <label className="block text-xs text-gray-400 mb-1">{f.label}</label>
-                {editing ? (
-                  <input
-                    defaultValue={f.value}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                ) : (
-                  <p className="text-sm font-medium text-gray-700">{f.value}</p>
-                )}
-              </div>
-            ))}
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Full Name</label>
+              {editing ? (
+                <input
+                  value={form.full_name}
+                  onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              ) : (
+                <p className="text-sm font-medium text-gray-700">{user?.full_name}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Email</label>
+              {editing ? (
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              ) : (
+                <p className="text-sm font-medium text-gray-700">{user?.email}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1">Employee Type</label>
+              <p className="text-sm font-medium text-gray-700">Temporary Worker</p>
+            </div>
           </div>
 
           {editing && (
-            <div className="mt-4 flex justify-end">
-              <button className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg">
-                Save Changes
-              </button>
+            <div className="mt-5 pt-4 border-t border-gray-100">
+              {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
+              <div className="flex justify-end gap-3">
+                <button onClick={cancelEdit} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
+                <button
+                  onClick={save}
+                  disabled={saving}
+                  className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
+                >
+                  {saving ? 'Saving…' : 'Save Changes'}
+                </button>
+              </div>
             </div>
           )}
-        </div>
-
-        {/* Skills */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <h3 className="font-semibold text-gray-800 mb-3">My Skills</h3>
-          <div className="flex flex-wrap gap-2 mb-4">
-            {skills.map((s) => (
-              <div key={s} className="flex items-center gap-1.5 bg-primary-50 text-primary-700 text-sm font-medium px-3 py-1.5 rounded-full">
-                <span>{s}</span>
-                <button onClick={() => removeSkill(s)} className="text-primary-400 hover:text-red-500 text-xs">✕</button>
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newSkill}
-              onChange={(e) => setNewSkill(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && addSkill()}
-              placeholder="Add a skill..."
-              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
-            <button
-              onClick={addSkill}
-              className="border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm px-4 py-2 rounded-lg transition-colors"
-            >
-              Add
-            </button>
-          </div>
         </div>
       </div>
     </DashboardLayout>
