@@ -58,6 +58,7 @@ const removeAvailability = async (req, res, next) => {
 const availabilityRules = [
   body('start_datetime').isISO8601().withMessage('start_datetime must be a valid ISO 8601 datetime'),
   body('end_datetime').isISO8601().withMessage('end_datetime must be a valid ISO 8601 datetime'),
+  body('status').optional().isIn(['AVAILABLE', 'UNAVAILABLE', 'ON_LEAVE']).withMessage('status must be AVAILABLE, UNAVAILABLE, or ON_LEAVE'),
 ];
 
 module.exports = { getAvailability, setAvailability, updateAvailability, removeAvailability, availabilityRules };

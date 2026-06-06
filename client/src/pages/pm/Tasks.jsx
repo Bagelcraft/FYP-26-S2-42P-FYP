@@ -204,8 +204,8 @@ function TaskModal({ task, depts, skills, onClose, onSaved }) {
       const body = {
         title: form.title.trim(),
         description: form.description.trim() || null,
-        start_datetime: `${day}T09:00:00.000Z`,
-        end_datetime: `${day}T18:00:00.000Z`,
+        start_datetime: `${day}T09:00:00`,
+        end_datetime: `${day}T18:00:00`,
         department_id: form.department_id ? Number(form.department_id) : null,
         required_skill_id: form.required_skill_id ? Number(form.required_skill_id) : null,
       };

@@ -20,16 +20,22 @@ function toLocalInputs(dt) {
   return { date, time };
 }
 
+const STATUS_OPTIONS = [
+  { value: 'AVAILABLE', label: 'Available' },
+  { value: 'UNAVAILABLE', label: 'Unavailable' },
+  { value: 'ON_LEAVE', label: 'On Leave' },
+];
+
 export default function Availability() {
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ date: '', start: '', end: '' });
+  const [form, setForm] = useState({ date: '', start: '', end: '', status: 'AVAILABLE' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({ date: '', start: '', end: '' });
+  const [editForm, setEditForm] = useState({ date: '', start: '', end: '', status: 'AVAILABLE' });
   const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
@@ -48,11 +54,12 @@ export default function Availability() {
     setError('');
     try {
       const res = await api.post('/worker/availability', {
-        start_datetime: `${form.date}T${form.start}`,
-        end_datetime: `${form.date}T${form.end}`,
+        start_datetime: `${form.date}T${form.start}:00`,
+        end_datetime: `${form.date}T${form.end}:00`,
+        status: form.status,
       });
       setSlots((prev) => [...prev, res.data.data]);
-      setForm({ date: '', start: '', end: '' });
+      setForm({ date: '', start: '', end: '', status: 'AVAILABLE' });
       setShowForm(false);
     } catch (err) {
       const serverMsg =
@@ -69,7 +76,7 @@ export default function Availability() {
   const handleEditStart = (slot) => {
     const start = toLocalInputs(slot.start_datetime);
     const end = toLocalInputs(slot.end_datetime);
-    setEditForm({ date: start.date, start: start.time, end: end.time });
+    setEditForm({ date: start.date, start: start.time, end: end.time, status: slot.status });
     setEditingId(slot.availability_id);
     setError('');
   };
@@ -83,8 +90,9 @@ export default function Availability() {
     setError('');
     try {
       const res = await api.put(`/worker/availability/${editingId}`, {
-        start_datetime: `${editForm.date}T${editForm.start}`,
-        end_datetime: `${editForm.date}T${editForm.end}`,
+        start_datetime: `${editForm.date}T${editForm.start}:00`,
+        end_datetime: `${editForm.date}T${editForm.end}:00`,
+        status: editForm.status,
       });
       setSlots((prev) => prev.map((s) => s.availability_id === editingId ? res.data.data : s));
       setEditingId(null);
@@ -130,7 +138,7 @@ export default function Availability() {
         {showForm && (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
             <h3 className="font-semibold text-gray-800">New Availability Slot</h3>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Date</label>
                 <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })}
@@ -145,6 +153,13 @@ export default function Availability() {
                 <label className="block text-xs text-gray-500 mb-1">End Time</label>
                 <input type="time" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Status</label>
+                <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                  {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
               </div>
             </div>
             <div className="flex gap-2 justify-end">
@@ -166,7 +181,7 @@ export default function Availability() {
             editingId === slot.availability_id ? (
               <div key={slot.availability_id} className="px-5 py-4 space-y-3">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Edit Slot</p>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-4 gap-3">
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">Date</label>
                     <input type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
@@ -181,6 +196,13 @@ export default function Availability() {
                     <label className="block text-xs text-gray-500 mb-1">End Time</label>
                     <input type="time" value={editForm.end} onChange={(e) => setEditForm({ ...editForm, end: e.target.value })}
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Status</label>
+                    <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                      {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
                   </div>
                 </div>
                 <div className="flex gap-2 justify-end">

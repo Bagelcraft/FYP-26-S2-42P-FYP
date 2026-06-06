@@ -15,7 +15,7 @@ const listAvailability = async (userId) => {
   });
 };
 
-const createAvailability = async (userId, { start_datetime, end_datetime }) => {
+const createAvailability = async (userId, { start_datetime, end_datetime, status = 'AVAILABLE' }) => {
   const start = new Date(start_datetime);
   const end = new Date(end_datetime);
   if (start >= end) {
@@ -26,12 +26,12 @@ const createAvailability = async (userId, { start_datetime, end_datetime }) => {
       user_id: userId,
       start_datetime: start,
       end_datetime: end,
-      status: 'AVAILABLE',
+      status,
     },
   });
 };
 
-const updateAvailability = async (availabilityId, userId, { start_datetime, end_datetime }) => {
+const updateAvailability = async (availabilityId, userId, { start_datetime, end_datetime, status }) => {
   const slot = await prisma.availability.findUnique({
     where: { availability_id: availabilityId },
   });
@@ -42,7 +42,7 @@ const updateAvailability = async (availabilityId, userId, { start_datetime, end_
   if (start >= end) throw makeError('start_datetime must be before end_datetime', 400);
   return prisma.availability.update({
     where: { availability_id: availabilityId },
-    data: { start_datetime: start, end_datetime: end },
+    data: { start_datetime: start, end_datetime: end, ...(status && { status }) },
   });
 };
 
