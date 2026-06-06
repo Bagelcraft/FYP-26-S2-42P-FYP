@@ -35,19 +35,9 @@ router.get('/tasks/:id/update-requests', updateRequestController.listWorker);
 // PATCH /temp-worker/tasks/:id/update-requests/:requestId/respond
 router.patch('/tasks/:id/update-requests/:requestId/respond', updateRequestController.respondRules, updateRequestController.respond);
 
-// ─── Stubs (to be implemented) ────────────────────────────────────────────
+// ─── Profile Update Requests ──────────────────────────────────────────────
 
-router.post('/profile', (req, res) => {
-  res.json({ message: 'Create/update profile — to be implemented' });
-});
-
-router.put('/profile', (req, res) => {
-  res.json({ message: 'Update personal details — to be implemented' });
-});
-
-router.put('/skills', (req, res) => {
-  res.json({ message: 'Update skills — to be implemented' });
-});
+router.put('/profile', workerController.updateMyProfile);
 
 router.get('/availability', availabilityController.getAvailability);
 router.post('/availability', availabilityController.availabilityRules, availabilityController.setAvailability);
