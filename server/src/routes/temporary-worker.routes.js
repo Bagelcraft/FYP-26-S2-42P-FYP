@@ -1,49 +1,61 @@
 const express = require('express');
+const { verifyToken } = require('../middleware/auth.middleware');
+const { requireRole } = require('../middleware/rbac.middleware');
+const workerController = require('../controllers/worker.controller');
+const updateRequestController = require('../controllers/task-update-request.controller');
+const availabilityController = require('../controllers/availability.controller');
+const attendanceController = require('../controllers/attendance.controller');
+
 const router = express.Router();
 
-// GET /api/v1/temp-worker/tasks/assigned
-router.get('/tasks/assigned', (req, res) => {
-  res.json({ message: 'Get assigned tasks — to be implemented by Rachel' });
-});
+router.use(verifyToken, requireRole(['TEMPORARY_WORKER']));
 
-// GET /api/v1/temp-worker/tasks/unassigned
-router.get('/tasks/unassigned', (req, res) => {
-  res.json({ message: 'Get unassigned tasks — to be implemented by Rachel' });
-});
+// ─── Task views (5 — worker read-only) ───────────────────────────────────
 
-// PUT /api/v1/temp-worker/tasks/:id/progress
-router.put('/tasks/:id/progress', (req, res) => {
-  res.json({ message: 'Update task progress — to be implemented by Rachel' });
-});
+// GET  /temp-worker/tasks?status=IN_PROGRESS
+router.get('/tasks', workerController.listMyTasks);
 
-// POST /api/v1/temp-worker/profile
+// GET  /temp-worker/tasks/available  — PENDING tasks matching their skills (task pool)
+router.get('/tasks/available', workerController.listAvailableTasks);
+
+// GET  /temp-worker/tasks/:id
+router.get('/tasks/:id', workerController.getMyTask);
+
+// PATCH /temp-worker/tasks/:id/acknowledge
+router.patch('/tasks/:id/acknowledge', workerController.acknowledge);
+
+// PATCH /temp-worker/tasks/:id/progress   body: { status: "IN_PROGRESS"|"COMPLETED" }
+router.patch('/tasks/:id/progress', workerController.progressRules, workerController.updateProgress);
+
+// ─── Update requests ──────────────────────────────────────────────────────────
+
+// GET  /temp-worker/tasks/:id/update-requests
+router.get('/tasks/:id/update-requests', updateRequestController.listWorker);
+
+// PATCH /temp-worker/tasks/:id/update-requests/:requestId/respond
+router.patch('/tasks/:id/update-requests/:requestId/respond', updateRequestController.respondRules, updateRequestController.respond);
+
+// ─── Stubs (to be implemented) ────────────────────────────────────────────
+
 router.post('/profile', (req, res) => {
-  res.json({ message: 'Create/update profile — to be implemented by Rachel' });
+  res.json({ message: 'Create/update profile — to be implemented' });
 });
 
-// PUT /api/v1/temp-worker/profile
 router.put('/profile', (req, res) => {
-  res.json({ message: 'Update personal details — to be implemented by Rachel' });
+  res.json({ message: 'Update personal details — to be implemented' });
 });
 
-// PUT /api/v1/temp-worker/skills
 router.put('/skills', (req, res) => {
-  res.json({ message: 'Update skills — to be implemented by Rachel' });
+  res.json({ message: 'Update skills — to be implemented' });
 });
 
-// POST /api/v1/temp-worker/availability
-router.post('/availability', (req, res) => {
-  res.json({ message: 'Set availability — to be implemented by Rachel' });
-});
+router.get('/availability', availabilityController.getAvailability);
+router.post('/availability', availabilityController.availabilityRules, availabilityController.setAvailability);
+router.put('/availability/:id', availabilityController.availabilityRules, availabilityController.updateAvailability);
+router.delete('/availability/:id', availabilityController.removeAvailability);
 
-// POST /api/v1/temp-worker/attendance/clock-in
-router.post('/attendance/clock-in', (req, res) => {
-  res.json({ message: 'Clock in — to be implemented by Rachel' });
-});
-
-// PUT /api/v1/temp-worker/attendance/clock-out
-router.put('/attendance/clock-out', (req, res) => {
-  res.json({ message: 'Clock out — to be implemented by Rachel' });
-});
+router.get('/attendance', attendanceController.getAttendance);
+router.post('/attendance/clock-in', attendanceController.clockIn);
+router.put('/attendance/clock-out', attendanceController.clockOut);
 
 module.exports = router;

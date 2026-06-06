@@ -16,7 +16,10 @@ const contentRoutes = require("./routes/content.routes");
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
+//Orignial 
+// app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
+//Testing database connection - can remove below after 
+app.use(cors({ origin: process.env.CLIENT_URL || /^http:\/\/localhost:\d+$/ }));
 app.use(express.json());
 
 app.get('/api/health', (req, res) => {

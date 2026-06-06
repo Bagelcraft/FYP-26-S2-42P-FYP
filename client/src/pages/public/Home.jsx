@@ -32,72 +32,106 @@ const testimonials = [
 export default function Home() {
   return (
     <div className="min-h-screen bg-white">
+
       {/* Navbar */}
-      <nav className="border-b border-gray-100 sticky top-0 bg-white z-50">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <span className="text-primary-600 font-bold text-lg">SmartTask</span>
-          <div className="hidden md:flex items-center gap-8 text-sm text-gray-600">
-            <a href="#features" className="hover:text-gray-900 transition-colors">Features</a>
-            <a href="#demo" className="hover:text-gray-900 transition-colors">About Us</a>
-            <a href="#pricing" className="hover:text-gray-900 transition-colors">Pricing</a>
-            <Link to="/login" className="hover:text-gray-900 transition-colors">Login</Link>
+      <nav className="sticky top-0 z-50 border-b border-slate-800 bg-slate-950 backdrop-blur-md">
+        <div className="w-full px-8 h-16 flex items-center justify-between">
+          <span className="text-blue-400 font-bold text-lg tracking-tight">SmartTask</span>
+          <div className="hidden md:flex items-center gap-8 text-sm text-slate-300 font-medium">
+            <a href="#features" className="hover:text-white transition-colors">Features</a>
+            <a href="#demo" className="hover:text-white transition-colors">About Us</a>
+            <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
           </div>
           <Link
-            to="/register"
-            className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
+            to="/login"
+            className="bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
           >
-            Register
+            Log In
           </Link>
         </div>
       </nav>
 
-      {/* Hero */}
-      <section className="max-w-6xl mx-auto px-6 pt-20 pb-16 flex flex-col md:flex-row items-center gap-12">
-        <div className="flex-1">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight">
-            Smart Workforce &<br />Task Allocation
-          </h1>
-          <p className="text-gray-500 mt-4 text-lg">
-            Manage your workforce. Assign tasks.<br />Track progress in real time.
-          </p>
-          <div className="flex items-center gap-3 mt-8">
-            <Link
-              to="/register"
-              className="bg-primary-600 hover:bg-primary-700 text-white font-medium px-6 py-3 rounded-lg transition-colors"
-            >
-              Get Started
-            </Link>
-            <a
-              href="#demo"
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium px-6 py-3 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
-            >
-              ▶ Watch Demo
-            </a>
+      {/* Hero — split dark/light */}
+      <section className="flex min-h-[calc(100vh-64px)]">
+        {/* Left — dark */}
+        <div className="flex-1 bg-slate-950 flex items-center px-10 lg:px-20 py-14">
+          <div className="max-w-lg">
+            <span className="inline-block text-primary-400 text-xs font-semibold uppercase tracking-widest mb-3">
+              Workforce Management Platform
+            </span>
+            <h1 className="text-4xl lg:text-5xl font-bold text-white leading-tight">
+              Smart Task Allocation
+            </h1>
+            <p className="text-slate-400 mt-4 text-base leading-relaxed">
+              Your workforce, intelligently managed. Tasks assigned automatically. <br />
+              Progress tracked in real time.
+            
+            </p>
+            <div className="flex items-center gap-3 mt-7">
+              <Link
+                to="/register"
+                className="bg-primary-600 hover:bg-primary-500 text-white font-medium px-6 py-3 rounded-lg text-sm transition-colors"
+              >
+                Get Started Free
+              </Link>
+              <a
+                href="#demo"
+                className="flex items-center gap-2 text-slate-300 hover:text-white font-medium px-6 py-3 rounded-lg border border-slate-700 hover:border-slate-500 text-sm transition-colors"
+              >
+                ▶ Watch Demo
+              </a>
+            </div>
+            <div className="flex items-center gap-6 mt-6 text-slate-500 text-xs">
+              <span>✓ No credit card required</span>
+              <span>✓ Free setup</span>
+              <span>✓ Cancel anytime</span>
+            </div>
           </div>
         </div>
 
-        {/* Dashboard preview mockup */}
-        <div className="flex-1 bg-gray-50 rounded-2xl border border-gray-200 p-4 shadow-sm">
-          <div className="bg-white rounded-xl p-4 space-y-3">
+        {/* Right — light */}
+        <div className="flex-1 bg-gray-50 hidden md:flex items-center justify-center px-10 lg:px-16 py-14">
+          <div className="w-full max-w-md bg-white rounded-2xl border border-gray-200 shadow-xl p-6 space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-gray-700">Dashboard</span>
-              <div className="flex gap-1">
-                <div className="w-2 h-2 rounded-full bg-red-400" />
-                <div className="w-2 h-2 rounded-full bg-yellow-400" />
-                <div className="w-2 h-2 rounded-full bg-green-400" />
+              <span className="text-xs font-semibold text-gray-700">SmartTask Dashboard</span>
+              <div className="flex gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
+                <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+                <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
               </div>
             </div>
+
             <div className="grid grid-cols-4 gap-2">
               {[['Total Staff', '256'], ['Tasks Done', '1,429'], ['Pending', '87'], ['On Time', '95%']].map(([label, val]) => (
-                <div key={label} className="bg-gray-50 rounded-lg p-2">
+                <div key={label} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
                   <p className="text-gray-400 text-xs">{label}</p>
-                  <p className="text-gray-800 text-sm font-bold">{val}</p>
+                  <p className="text-gray-800 text-sm font-bold mt-0.5">{val}</p>
                 </div>
               ))}
             </div>
-            <div className="h-24 bg-gradient-to-r from-primary-50 to-blue-50 rounded-lg flex items-end px-3 pb-2 gap-1">
+
+            <div className="bg-gradient-to-br from-primary-50 to-blue-50 rounded-xl h-28 flex items-end px-4 pb-3 gap-1.5 border border-primary-100">
               {[40, 65, 45, 80, 55, 70, 90].map((h, i) => (
-                <div key={i} className="flex-1 bg-primary-400 rounded-sm opacity-70" style={{ height: `${h}%` }} />
+                <div
+                  key={i}
+                  className="flex-1 bg-primary-500 rounded-t-sm opacity-75"
+                  style={{ height: `${h}%` }}
+                />
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              {[
+                { label: 'Install HVAC Unit – Bay 3', status: 'In Progress', color: 'bg-blue-100 text-blue-700' },
+                { label: 'Safety Inspection – Floor 2', status: 'Pending', color: 'bg-yellow-100 text-yellow-700' },
+                { label: 'Electrical Wiring – Room 4A', status: 'Done', color: 'bg-green-100 text-green-700' },
+              ].map((task) => (
+                <div key={task.label} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
+                  <span className="text-xs text-gray-700 truncate mr-2">{task.label}</span>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${task.color}`}>
+                    {task.status}
+                  </span>
+                </div>
               ))}
             </div>
           </div>
@@ -105,18 +139,23 @@ export default function Home() {
       </section>
 
       {/* Features */}
-      <section id="features" className="bg-gray-50 py-20">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-12">
-            <span className="text-primary-600 text-sm font-semibold uppercase tracking-wide">Features</span>
+      <section id="features" className="bg-white py-14">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-8">
+            <span className="text-primary-600 text-xs font-semibold uppercase tracking-widest">Features</span>
             <h2 className="text-3xl font-bold text-gray-900 mt-2">Everything your team needs</h2>
+            <p className="text-gray-500 mt-2 max-w-xl mx-auto text-sm">
+              One platform built for every role — admins, project managers, and workers alike.
+            </p>
           </div>
-          <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {features.map((f) => (
-              <div key={f.title} className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-                <span className="text-2xl">{f.icon}</span>
-                <h3 className="font-semibold text-gray-800 mt-3 text-sm">{f.title}</h3>
-                <p className="text-gray-500 text-xs mt-1 leading-relaxed">{f.desc}</p>
+              <div key={f.title} className="bg-gray-50 rounded-2xl border border-gray-100 p-6 hover:shadow-md transition-shadow flex gap-4 items-start">
+                <span className="text-2xl mt-1">{f.icon}</span>
+                <div>
+                  <h3 className="font-semibold text-gray-800 text-base">{f.title}</h3>
+                  <p className="text-gray-500 text-sm mt-1 leading-relaxed">{f.desc}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -124,17 +163,17 @@ export default function Home() {
       </section>
 
       {/* Demo */}
-      <section id="demo" className="py-20">
-        <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center gap-12">
+      <section id="demo" className="bg-slate-950 py-14">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center gap-10">
           <div className="flex-1">
-            <span className="text-primary-600 text-sm font-semibold uppercase tracking-wide">See it in action</span>
-            <h2 className="text-3xl font-bold text-gray-900 mt-2">See how our platform works!</h2>
-            <p className="text-gray-500 mt-4">
-              Watch how SmartTask helps organisations manage staff, automate task allocation, and track real-time progress — all from one unified platform.
+            <span className="text-primary-400 text-xs font-semibold uppercase tracking-widest">See it in action</span>
+            <h2 className="text-3xl font-bold text-white mt-2">Meet SmartTask — your all-in-one task management solution</h2>
+            <p className="text-slate-400 mt-3 text-sm leading-relaxed">
+              How SmartTask helps organisations manage staff, automate task allocation, and track real-time progress — all from one unified platform.
             </p>
           </div>
-          <div className="flex-1 bg-gray-100 rounded-2xl aspect-video flex items-center justify-center border border-gray-200">
-            <button className="w-16 h-16 bg-white rounded-full shadow-md flex items-center justify-center text-primary-600 text-2xl hover:scale-105 transition-transform">
+          <div className="flex-1 bg-slate-800 rounded-2xl aspect-video flex items-center justify-center border border-slate-700">
+            <button className="w-16 h-16 bg-white rounded-full shadow-lg flex items-center justify-center text-primary-600 text-2xl hover:scale-105 transition-transform">
               ▶
             </button>
           </div>
@@ -142,57 +181,65 @@ export default function Home() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="bg-gray-50 py-20">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-12">
-            <span className="text-primary-600 text-sm font-semibold uppercase tracking-wide">Subscription Plan</span>
+      <section id="pricing" className="bg-white py-14">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-8">
+            <span className="text-primary-600 text-xs font-semibold uppercase tracking-widest">Pricing</span>
             <h2 className="text-3xl font-bold text-gray-900 mt-2">Simple, transparent pricing</h2>
-            <p className="text-gray-500 mt-2">One plan. Full access. Cancel anytime.</p>
+            <p className="text-gray-500 mt-2 text-sm">One plan. Full access. Cancel anytime.</p>
           </div>
-          <div className="max-w-2xl mx-auto bg-white rounded-2xl border border-gray-200 shadow-sm p-8 flex flex-col md:flex-row items-center gap-8">
+          <div className="max-w-2xl mx-auto bg-slate-950 rounded-2xl border border-slate-800 p-8 flex flex-col md:flex-row items-center gap-8">
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-yellow-400 text-xl">⭐</span>
-                <span className="font-bold text-gray-800">Standard Plan</span>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-yellow-400 text-lg">⭐</span>
+                <span className="font-bold text-white">Standard Plan</span>
               </div>
               <div className="flex items-end gap-1 mt-2">
-                <span className="text-4xl font-bold text-gray-900">$9</span>
-                <span className="text-gray-400 mb-1">/month</span>
+                <span className="text-5xl font-bold text-white">$9</span>
+                <span className="text-slate-400 mb-1.5">/month</span>
               </div>
-              <p className="text-gray-500 text-sm mt-1">Perfect for small teams and growing organisations.</p>
+              <p className="text-slate-400 text-sm mt-1">Perfect for small teams and growing organisations.</p>
             </div>
             <div className="flex-1 space-y-2">
               {['Up to 50 Users', 'Task Management', 'Workforce Scheduling', 'Real-time Monitoring', 'Reports & Analytics', 'Priority Support'].map((f) => (
-                <div key={f} className="flex items-center gap-2 text-sm text-gray-600">
-                  <span className="text-green-500">✓</span> {f}
+                <div key={f} className="flex items-center gap-2.5 text-sm text-slate-300">
+                  <span className="text-green-400 font-bold">✓</span> {f}
                 </div>
               ))}
             </div>
             <div className="flex flex-col items-center gap-2">
               <Link
                 to="/register"
-                className="bg-primary-600 hover:bg-primary-700 text-white font-medium px-6 py-3 rounded-lg text-sm transition-colors whitespace-nowrap"
+                className="bg-primary-600 hover:bg-primary-500 text-white font-medium px-7 py-3 rounded-lg text-sm transition-colors whitespace-nowrap"
               >
                 Get Started Now
               </Link>
-              <span className="text-gray-400 text-xs">Cancel anytime. No commitment.</span>
+              <span className="text-slate-500 text-xs">No commitment. Cancel anytime.</span>
             </div>
           </div>
         </div>
       </section>
 
       {/* Testimonials */}
-      <section id="testimonials" className="py-20">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-12">
-            <span className="text-primary-600 text-sm font-semibold uppercase tracking-wide">Testimonials</span>
+      <section id="testimonials" className="bg-gray-50 py-14">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-8">
+            <span className="text-primary-600 text-xs font-semibold uppercase tracking-widest">Testimonials</span>
             <h2 className="text-3xl font-bold text-gray-900 mt-2">What our customers say</h2>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {testimonials.map((t) => (
-              <div key={t.name} className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold">
+              <div key={t.name} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-7 flex flex-col justify-between">
+                <div>
+                  <div className="flex gap-1 mb-4">
+                    {Array.from({ length: t.rating }).map((_, i) => (
+                      <span key={i} className="text-yellow-400 text-lg">★</span>
+                    ))}
+                  </div>
+                  <p className="text-gray-700 text-base leading-relaxed mb-5">"{t.text}"</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold text-base">
                     {t.name[0]}
                   </div>
                   <div>
@@ -200,12 +247,6 @@ export default function Home() {
                     <p className="text-gray-400 text-xs">{t.company}</p>
                   </div>
                 </div>
-                <div className="flex gap-0.5 mb-3">
-                  {Array.from({ length: t.rating }).map((_, i) => (
-                    <span key={i} className="text-yellow-400 text-sm">★</span>
-                  ))}
-                </div>
-                <p className="text-gray-600 text-sm leading-relaxed">{t.text}</p>
               </div>
             ))}
           </div>
@@ -213,10 +254,10 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-gray-100 py-8">
-        <div className="max-w-6xl mx-auto px-6 flex items-center justify-between text-sm text-gray-400">
+      <footer className="bg-slate-950 border-t border-slate-800 py-6">
+        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between text-sm text-slate-500">
+          <span className="text-primary-400 font-bold">SmartTask</span>
           <span>© 2026 SmartTask. FYP-26-S2-42P.</span>
-          <Link to="/login" className="hover:text-gray-600 transition-colors">Sign in</Link>
         </div>
       </footer>
     </div>

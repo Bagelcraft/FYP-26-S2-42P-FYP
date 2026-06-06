@@ -1,62 +1,52 @@
 const express = require('express');
+const { verifyToken } = require('../middleware/auth.middleware');
+const { requireRole } = require('../middleware/rbac.middleware');
+const planController = require('../controllers/plan.controller');
+
 const router = express.Router();
-const {
-  createEnquiry,
-  getAllEnquiries,
-  getEnquiryById,
-  respondToEnquiry,
-  deleteEnquiry
-} = require("../controllers/enquiryController");
 
-// GET /api/v1/admin/health
+router.use(verifyToken, requireRole(['SYSTEM_ADMIN']));
+
+// ─── System health ────────────────────────────────────────────
+
 router.get('/health', (req, res) => {
-  res.json({ message: 'System health endpoint — to be implemented by Daniel' });
+  res.json({ success: true, data: { status: 'OK' } });
 });
 
-// GET /api/v1/admin/organisations
+// ─── Organisations (stub) ─────────────────────────────────────
+
 router.get('/organisations', (req, res) => {
-  res.json({ message: 'Get all organisations — to be implemented by Daniel' });
+  res.json({ message: 'Get all organisations — to be implemented' });
 });
 
-// POST /api/v1/admin/organisations
 router.post('/organisations', (req, res) => {
-  res.json({ message: 'Create organisation — to be implemented by Daniel' });
+  res.json({ message: 'Create organisation — to be implemented' });
 });
 
-// PUT /api/v1/admin/organisations/:id/suspend
 router.put('/organisations/:id/suspend', (req, res) => {
-  res.json({ message: 'Suspend organisation — to be implemented by Daniel' });
+  res.json({ message: 'Suspend organisation — to be implemented' });
 });
 
-// GET /api/v1/admin/logs
+// ─── Audit logs (stub) ────────────────────────────────────────
+
 router.get('/logs', (req, res) => {
-  res.json({ message: 'Get audit logs — to be implemented by Daniel' });
+  res.json({ message: 'Get audit logs — to be implemented' });
 });
 
+// ─── Subscription Plans (Phase 3) ────────────────────────────
 
-/*
-|--------------------------------------------------------------------------
-| Contact Enquiry Routes
-|--------------------------------------------------------------------------
-*/
+router.get('/plans',                                                              planController.list);
+router.get('/plans/:id',                                                          planController.getOne);
+router.post('/plans',    planController.createRules, planController.validate,    planController.create);
+router.patch('/plans/:id', planController.updateRules, planController.validate,  planController.update);
+router.patch('/plans/:id/deactivate',                                             planController.deactivate);
+router.patch('/plans/:id/reactivate',                                             planController.reactivate);
 
-router.post("/enquiries", createEnquiry);
-
-router.get("/enquiries", getAllEnquiries);
-
-router.get(
-  "/enquiries/:id",
-  getEnquiryById
+router.post('/plans/:id/features',
+  planController.featureRules, planController.validate,
+  planController.addFeature,
 );
-
-router.put(
-  "/enquiries/:id/respond",
-  respondToEnquiry
-);
-
-router.delete(
-  "/enquiries/:id",
-  deleteEnquiry
-);
+router.delete('/plans/:id/features/:featureId', planController.removeFeature);
+router.delete('/plans/:id', planController.deletePlan);
 
 module.exports = router;
