@@ -97,4 +97,11 @@ router.get('/billing',      managerController.listBilling);
 router.get('/departments', managerController.getDepartments);
 router.get('/skills',      managerController.getSkills);
 
+// Testimonials CRUD (Weishi) — real `Testimonial` model (user-authored), scoped
+// to the manager's org. Exposed under /pm so the PROJECT_MANAGER guard applies.
+router.get('/testimonials',        managerController.listTestimonials);
+router.post('/testimonials',       managerController.createTestimonial);
+router.put('/testimonials/:id',    managerController.updateTestimonial);
+router.delete('/testimonials/:id', managerController.deleteTestimonial);
+
 module.exports = router;
