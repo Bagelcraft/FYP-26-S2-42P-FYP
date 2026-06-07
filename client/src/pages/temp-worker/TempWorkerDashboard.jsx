@@ -1,7 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import Badge from '../../components/Badge';
 import { TEMP_NAV } from './nav';
+import api from '../../utils/api';
+
+function formatTime(dt) {
+  return new Date(dt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
 
 const mockShifts = [
   { id: 1, date: 'Mon 26 May', time: '09:00 – 18:00', dept: 'Engineering', task: 'Build Dashboard UI' },
@@ -18,26 +23,64 @@ const mockAvailable = [
 ];
 
 export default function TempWorkerDashboard() {
-  const [clockedIn, setClockedIn] = useState(false);
+  const [openSession, setOpenSession] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [error, setError] = useState('');
   const [swapModal, setSwapModal] = useState(null);
   const [swapForm, setSwapForm] = useState({ reason: '', alternative: '' });
 
+  useEffect(() => {
+    api.get('/temp-worker/attendance').then((r) => {
+      const open = r.data.data.find((rec) => rec.clock_out === null);
+      setOpenSession(open || null);
+    }).catch(() => {});
+  }, []);
+
+  const isClockedIn = Boolean(openSession);
+
+  const handleClockIn = async () => {
+    setActionLoading(true);
+    setError('');
+    try {
+      const res = await api.post('/temp-worker/attendance/clock-in');
+      setOpenSession(res.data.data);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to clock in.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleClockOut = async () => {
+    setActionLoading(true);
+    setError('');
+    try {
+      await api.put('/temp-worker/attendance/clock-out');
+      setOpenSession(null);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to clock out.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const clockInButton = (
     <div className="flex items-center gap-2">
-      {clockedIn && (
+      {isClockedIn && (
         <span className="text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full tracking-wide">
           CLOCKED IN
         </span>
       )}
       <button
-        onClick={() => setClockedIn(!clockedIn)}
-        className={`text-sm font-medium px-4 py-1.5 rounded-lg transition-colors ${
-          clockedIn
+        onClick={isClockedIn ? handleClockOut : handleClockIn}
+        disabled={actionLoading}
+        className={`text-sm font-medium px-4 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
+          isClockedIn
             ? 'bg-red-500 hover:bg-red-600 text-white'
             : 'bg-green-500 hover:bg-green-600 text-white'
         }`}
       >
-        {clockedIn ? 'Clock Out' : 'Clock In'}
+        {actionLoading ? 'Processing…' : isClockedIn ? 'Clock Out' : 'Clock In'}
       </button>
     </div>
   );
@@ -50,17 +93,24 @@ export default function TempWorkerDashboard() {
           <p className="text-gray-500 text-sm mt-0.5">Track your assigned tasks and manage your schedule.</p>
         </div>
 
+        {isClockedIn && (
+          <div className="bg-green-50 border border-green-100 rounded-xl px-5 py-3 text-sm text-green-700">
+            Clocked in at <span className="font-semibold">{formatTime(openSession.clock_in)}</span>
+          </div>
+        )}
+
+        {error && <p className="text-red-500 text-sm">{error}</p>}
+
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4">
           {[
             { label: 'ASSIGNED TASKS', value: '1', color: 'text-blue-600' },
             { label: 'UPCOMING SHIFTS', value: '3', color: 'text-yellow-600' },
-            { label: 'HOURS THIS WEEK', value: clockedIn ? 'Active' : '0h', 'text-green-600' : 'text-gray-400' },
+            { label: 'HOURS THIS WEEK', value: isClockedIn ? 'Active' : '0h', color: isClockedIn ? 'text-green-600' : 'text-gray-400' },
           ].map((s) => (
             <div key={s.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{s.label}</p>
-              <p className="text-3xl font-bold text-gray-800 mt-1">{s.value}</p>
-              <p className={`text-xs mt-1 ${s.color}`}>{s.delta}</p>
+              <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.value}</p>
             </div>
           ))}
         </div>
