@@ -423,3 +423,37 @@ model PlanFeature {
 
   plan         SubscriptionPlan @relation(fields: [plan_id], references: [plan_id])
 }
+// ─── Landing page CMS (used by contentController.js) ─────────
+
+model landingContent {
+  id              Int      @id @default(autoincrement())
+  hero_title      String?  @db.VarChar(200)
+  hero_subtitle   String?  @db.Text
+  hero_image_url  String?  @db.VarChar(500)
+  video_title     String?  @db.VarChar(200)
+  video_subtitle  String?  @db.Text
+  video_url       String?  @db.VarChar(500)
+  plan_name       String?  @db.VarChar(100)
+  plan_price      String?  @db.VarChar(50)
+  plan_description String? @db.Text
+}
+
+model landingFeature {
+  feature_id  Int      @id @default(autoincrement())
+  title       String   @db.VarChar(200)
+  description String?  @db.Text
+  icon_url    String?  @db.VarChar(500)
+  sort_order  Int      @default(0)
+  is_active   Boolean  @default(true)
+}
+
+model landingTestimonial {
+  testimonial_id Int      @id @default(autoincrement())
+  name           String   @db.VarChar(100)
+  company        String?  @db.VarChar(150)
+  rating         Int      @default(5)
+  review_text    String   @db.Text
+  profile_image  String?  @db.VarChar(500)
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now())
+}
