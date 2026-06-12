@@ -24,13 +24,13 @@ import StaffRoles from './pages/org-admin/StaffRoles';
 // Manager
 import PMDashboard from './pages/pm/PMDashboard';
 import Tasks from './pages/pm/Tasks';
-import Team from './pages/pm/Team';                     // NEW
+import Team from './pages/pm/Team';
 import Allocate from './pages/pm/Allocate';
-import PMLeave from './pages/pm/Leave';                  // NEW (aliased — worker Leave also exists)
-import Subscription from './pages/pm/Subscription';      // NEW
-import Testimonials from './pages/pm/Testimonials';      // NEW
+import PMLeave from './pages/pm/Leave';
+import Testimonials from './pages/pm/Testimonials';
 import Reports from './pages/pm/Reports';
 import PMNotifications from './pages/pm/PMNotifications';
+// NOTE: Subscription import removed — page no longer mounted under the Manager portal.
 
 // Permanent Worker
 import WorkerDashboard from './pages/worker/WorkerDashboard';
@@ -79,10 +79,10 @@ export default function App() {
           <Route path="/pm/team" element={<Team />} />
           <Route path="/pm/allocate" element={<Allocate />} />
           <Route path="/pm/leave" element={<PMLeave />} />
-          <Route path="/pm/subscription" element={<Subscription />} />
           <Route path="/pm/testimonials" element={<Testimonials />} />
           <Route path="/pm/reports" element={<Reports />} />
           <Route path="/pm/notifications" element={<PMNotifications />} />
+          {/* NOTE: /pm/subscription route removed. */}
 
           {/* Permanent Worker */}
           <Route path="/worker" element={<WorkerDashboard />} />

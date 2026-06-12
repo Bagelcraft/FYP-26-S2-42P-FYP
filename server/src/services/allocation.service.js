@@ -25,24 +25,27 @@ function currentWeekBounds() {
 //
 // Eligibility rules:
 //   1. User is PERMANENT_WORKER or TEMPORARY_WORKER in the same org
-//   2. User has the required skill (if task has one)
-//   3. User has at least one AVAILABLE slot overlapping the task window  (3b availability)
-//   4. User's attendance hours this week < their StaffRole max_working_hours (3b hours)
+//   2. User has ALL of the task's required skills (multi-skill — via TaskSkill)
+//   3. User has at least one AVAILABLE slot overlapping the task window
+//   4. User's hours this week < their StaffRole max_working_hours
 //
 // Ranking: eligible first → PERMANENT before TEMPORARY → most remaining hours first
 
 async function getEligibleStaff(taskId, organisationId) {
   const task = await prisma.task.findFirst({
     where: { task_id: taskId, organisation_id: organisationId },
+    include: { requiredSkills: { include: { skill: { select: { skill_id: true, skill_name: true } } } } },
   });
   if (!task) throw makeError('Task not found', 404);
   if (task.status !== 'PENDING') {
     throw makeError('Only PENDING tasks can be evaluated for allocation', 422);
   }
 
-  // Build skill filter only when the task requires one
-  const skillFilter = task.required_skill_id
-    ? { skills: { some: { skill_id: task.required_skill_id } } }
+  const reqSkillIds = (task.requiredSkills ?? []).map((ts) => ts.skill_id);
+
+  // Require the candidate to hold EVERY required skill (one `some` clause each).
+  const skillFilter = reqSkillIds.length
+    ? { AND: reqSkillIds.map((id) => ({ skills: { some: { skill_id: id } } })) }
     : {};
 
   const { monday, sunday } = currentWeekBounds();
@@ -57,7 +60,6 @@ async function getEligibleStaff(taskId, organisationId) {
     include: {
       staffRole:  true,
       skills: { include: { skill: { select: { skill_name: true } } } },
-      // Availability slots that overlap the task window
       availability: {
         where: {
           status:         'AVAILABLE',
@@ -65,14 +67,12 @@ async function getEligibleStaff(taskId, organisationId) {
           end_datetime:   { gte: task.start_datetime },
         },
       },
-      // Attendance records in the current week (actual clocked hours)
       attendance: {
         where: {
           clock_in:      { gte: monday, lte: sunday },
           working_hours: { not: null },
         },
       },
-      // Already-assigned tasks this week (committed hours not yet worked)
       assignedTasks: {
         where: { task: { status: { in: ['ASSIGNED', 'IN_PROGRESS'] } } },
         include: { task: { select: { start_datetime: true, end_datetime: true } } },
@@ -81,9 +81,9 @@ async function getEligibleStaff(taskId, organisationId) {
   });
 
   const result = candidates.map((u) => {
-    const isAvailable       = u.availability.length > 0;
-    const attendanceHours   = u.attendance.reduce((sum, a) => sum + Number(a.working_hours ?? 0), 0);
-    const committedHours    = u.assignedTasks.reduce((sum, ta) => {
+    const isAvailable     = u.availability.length > 0;
+    const attendanceHours = u.attendance.reduce((sum, a) => sum + Number(a.working_hours ?? 0), 0);
+    const committedHours  = u.assignedTasks.reduce((sum, ta) => {
       const start = new Date(ta.task.start_datetime);
       const end   = new Date(ta.task.end_datetime);
       if (start <= sunday && end >= monday) {
@@ -201,6 +201,7 @@ async function assignTask(taskId, organisationId, assignedTo, assignedBy, type =
     include: {
       department:    { select: { name: true } },
       requiredSkill: { select: { skill_name: true } },
+      requiredSkills: { include: { skill: { select: { skill_id: true, skill_name: true } } } },
       assignments: {
         include: { assignedTo: { select: { full_name: true, email: true } } },
       },
@@ -216,8 +217,6 @@ async function autoAllocate(taskId, organisationId, allocatedBy) {
   if (!top) throw makeError('No eligible staff found for auto-allocation', 422);
   return assignTask(taskId, organisationId, top.userId, allocatedBy, 'AUTO');
 }
-
-
 
 // --- Allocation history for a task -------------------------------------------
 
@@ -236,4 +235,5 @@ async function getAllocationHistory(taskId, organisationId) {
     orderBy: { timestamp: 'desc' },
   });
 }
+
 module.exports = { getEligibleStaff, assignTask, autoAllocate, getAllocationHistory };

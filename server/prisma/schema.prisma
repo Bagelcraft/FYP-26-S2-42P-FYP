@@ -193,6 +193,7 @@ model Skill {
   organisation    Organisation @relation(fields: [organisation_id], references: [organisation_id])
   userSkills      UserSkill[]
   tasks           Task[]
+  taskSkills      TaskSkill[]
 }
 
 model UserSkill {
@@ -272,9 +273,21 @@ model Task {
   department        Department?      @relation(fields: [department_id], references: [department_id])
   createdBy         User             @relation("CreatedTasks", fields: [created_by], references: [userId])
   requiredSkill     Skill?           @relation(fields: [required_skill_id], references: [skill_id])
+  requiredSkills    TaskSkill[]
   assignments       TaskAssignment[]
   allocationHistory AllocationHistory[]
   updateRequests    TaskUpdateRequest[]
+}
+
+model TaskSkill {
+  task_skill_id Int   @id @default(autoincrement())
+  task_id       Int
+  skill_id      Int
+
+  task  Task  @relation(fields: [task_id],  references: [task_id], onDelete: Cascade)
+  skill Skill @relation(fields: [skill_id], references: [skill_id])
+
+  @@unique([task_id, skill_id])
 }
 
 model TaskAssignment {

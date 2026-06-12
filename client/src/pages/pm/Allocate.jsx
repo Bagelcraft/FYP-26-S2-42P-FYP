@@ -11,6 +11,15 @@ import { PM_NAV, PM_SECONDARY } from './nav';
 const typeLabel = (t) => (t === 'PERMANENT_WORKER' ? 'Permanent' : t === 'TEMPORARY_WORKER' ? 'Temporary' : t);
 const fmtDue = (iso) => (iso ? new Date(iso).toLocaleDateString('en-SG', { day: '2-digit', month: 'short' }) : '—');
 
+// Normalise whatever skill shape the API returns into [{ skill_id, skill_name }].
+const skillsOf = (t) => {
+  if (Array.isArray(t?.requiredSkills) && t.requiredSkills.length) {
+    return t.requiredSkills.map((s) => s.skill ?? s);
+  }
+  if (t?.requiredSkill) return [t.requiredSkill];
+  return [];
+};
+
 function HoursBar({ c }) {
   const pct = c.maxHours ? Math.min((c.weeklyHours / c.maxHours) * 100, 100) : 0;
   const near = c.eligible && c.remainingHours != null && c.remainingHours <= 4;
@@ -65,6 +74,7 @@ export default function Allocate() {
   }, [sel]);
 
   const task = pending.find((t) => t.task_id === sel);
+  const taskSkills = skillsOf(task);
   const candidates = evalData?.candidates ?? [];
   const suggestion = candidates.find((c) => c.eligible);
 
@@ -111,15 +121,18 @@ export default function Allocate() {
               <p className="text-xs text-gray-400 mt-0.5">{pending.length} pending</p>
             </div>
             <div className="divide-y divide-gray-50">
-              {loading ? <div className="px-5 py-12 text-center text-gray-400 text-sm">Loading…</div> : pending.map((t) => (
-                <button key={t.task_id} onClick={() => setSel(t.task_id)} className={`w-full text-left px-5 py-3.5 transition-colors ${sel === t.task_id ? 'bg-primary-50' : 'hover:bg-gray-50'}`}>
-                  <div className="flex items-center justify-between gap-2">
-                    <p className={`text-sm font-medium ${sel === t.task_id ? 'text-primary-700' : 'text-gray-800'}`}>{t.title}</p>
-                    {sel === t.task_id && <span className="text-primary-500 text-xs">●</span>}
-                  </div>
-                  <p className="text-xs text-gray-400 mt-0.5">{t.requiredSkill?.skill_name ?? 'Any skill'} · Due {fmtDue(t.end_datetime)}</p>
-                </button>
-              ))}
+              {loading ? <div className="px-5 py-12 text-center text-gray-400 text-sm">Loading…</div> : pending.map((t) => {
+                const sk = skillsOf(t);
+                return (
+                  <button key={t.task_id} onClick={() => setSel(t.task_id)} className={`w-full text-left px-5 py-3.5 transition-colors ${sel === t.task_id ? 'bg-primary-50' : 'hover:bg-gray-50'}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className={`text-sm font-medium ${sel === t.task_id ? 'text-primary-700' : 'text-gray-800'}`}>{t.title}</p>
+                      {sel === t.task_id && <span className="text-primary-500 text-xs">●</span>}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">{sk.length ? sk.map((s) => s.skill_name).join(', ') : 'Any skill'} · Due {fmtDue(t.end_datetime)}</p>
+                  </button>
+                );
+              })}
               {!loading && pending.length === 0 && <div className="px-5 py-12 text-center text-gray-400 text-sm">🎉 Queue empty.</div>}
             </div>
           </div>
@@ -132,7 +145,7 @@ export default function Allocate() {
                   <div className="flex items-start justify-between">
                     <div>
                       <h3 className="font-semibold text-gray-800">{task.title}</h3>
-                      <p className="text-xs text-gray-400 mt-0.5">{task.department?.name ?? 'No dept'} · Requires <span className="font-medium text-gray-600">{task.requiredSkill?.skill_name ?? 'any skill'}</span> · Due {fmtDue(task.end_datetime)}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{task.department?.name ?? 'No dept'} · Requires <span className="font-medium text-gray-600">{taskSkills.length ? taskSkills.map((s) => s.skill_name).join(' + ') : 'any skill'}</span> · Due {fmtDue(task.end_datetime)}</p>
                     </div>
                     <Badge status="PENDING" />
                   </div>
@@ -173,7 +186,8 @@ export default function Allocate() {
                           </button>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 mt-2 pl-11">
-                          {task.requiredSkill && <CheckChip ok={true}>{task.requiredSkill.skill_name}</CheckChip>}
+                          {/* One chip per required skill — green if the candidate has it, red if missing. */}
+                          {taskSkills.map((s) => <CheckChip key={s.skill_id} ok={(c.skills ?? []).includes(s.skill_name)}>{s.skill_name}</CheckChip>)}
                           <CheckChip ok={c.isAvailable}>{c.isAvailable ? 'Available' : 'No availability'}</CheckChip>
                           <CheckChip ok={c.withinHours}>{c.withinHours ? `${c.remainingHours}h spare` : 'Hours maxed'}</CheckChip>
                           <HoursBar c={c} />
@@ -181,7 +195,7 @@ export default function Allocate() {
                         {!c.eligible && c.ineligibleReason && <p className="text-xs text-red-500 mt-1 pl-11">{c.ineligibleReason}</p>}
                       </div>
                     ))}
-                    {!evalLoading && candidates.length === 0 && <div className="px-5 py-10 text-center text-gray-400 text-sm">No staff with the required skill.</div>}
+                    {!evalLoading && candidates.length === 0 && <div className="px-5 py-10 text-center text-gray-400 text-sm">No staff with the required skills.</div>}
                   </div>
                 </div>
               </>

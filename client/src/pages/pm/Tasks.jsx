@@ -176,24 +176,82 @@ const fmtDue = (iso) => {
 };
 const assigneeOf = (t) => t.assignments?.[0]?.assignedTo?.full_name ?? null;
 
+// Normalise whatever skill shape the API returns into [{ skill_id, skill_name }].
+const skillsOf = (t) => {
+  if (Array.isArray(t.requiredSkills) && t.requiredSkills.length) {
+    return t.requiredSkills.map((s) => s.skill ?? s); // tolerate raw join rows
+  }
+  if (t.requiredSkill) return [t.requiredSkill];
+  return [];
+};
+
 const STATUS_OPTIONS = ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 const toDateInput = (iso) => (iso ? new Date(iso).toISOString().slice(0, 10) : '');
 
+// ── Multi-select dropdown for skills ────────────────────────────────────────
+function SkillMultiSelect({ skills, selected, onToggle }) {
+  const [open, setOpen] = useState(false);
+  const chosen = skills.filter((s) => selected.includes(String(s.skill_id)));
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => setOpen((o) => !o)}
+        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-left flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-primary-500">
+        <span className="flex flex-wrap gap-1 flex-1 min-w-0">
+          {chosen.length === 0 && <span className="text-gray-400">Select skills…</span>}
+          {chosen.map((s) => (
+            <span key={s.skill_id} className="inline-flex items-center gap-1 bg-primary-50 text-primary-700 text-xs px-2 py-0.5 rounded-full">
+              {s.skill_name}
+              <span onClick={(e) => { e.stopPropagation(); onToggle(s.skill_id); }} className="hover:text-primary-900 cursor-pointer leading-none">×</span>
+            </span>
+          ))}
+        </span>
+        <span className={`text-gray-400 text-xs transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto py-1">
+            {skills.map((s) => {
+              const on = selected.includes(String(s.skill_id));
+              return (
+                <button type="button" key={s.skill_id} onClick={() => onToggle(s.skill_id)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-gray-700 hover:bg-gray-50">
+                  <span className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] flex-shrink-0 ${on ? 'bg-primary-600 border-primary-600 text-white' : 'border-gray-300'}`}>{on ? '✓' : ''}</span>
+                  {s.skill_name}
+                </button>
+              );
+            })}
+            {skills.length === 0 && <p className="px-3 py-2 text-sm text-gray-400">No skills defined.</p>}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function TaskModal({ task, depts, skills, onClose, onSaved }) {
   const editing = !!task;
+  const initialSkillIds = editing
+    ? skillsOf(task).map((s) => String(s.skill_id))
+    : [];
   const [form, setForm] = useState(editing
     ? {
         title: task.title,
         department_id: task.department_id ? String(task.department_id) : '',
-        required_skill_id: task.required_skill_id ? String(task.required_skill_id) : '',
+        required_skill_ids: initialSkillIds,
         status: task.status,
         due: toDateInput(task.end_datetime),
         description: task.description ?? '',
       }
-    : { title: '', department_id: '', required_skill_id: '', status: 'PENDING', due: '', description: '' });
+    : { title: '', department_id: '', required_skill_ids: [], status: 'PENDING', due: '', description: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const toggleSkill = (id) => setForm((f) => {
+    const s = String(id);
+    const has = f.required_skill_ids.includes(s);
+    return { ...f, required_skill_ids: has ? f.required_skill_ids.filter((x) => x !== s) : [...f.required_skill_ids, s] };
+  });
 
   async function submit(e) {
     e.preventDefault();
@@ -207,7 +265,7 @@ function TaskModal({ task, depts, skills, onClose, onSaved }) {
         start_datetime: `${day}T09:00:00`,
         end_datetime: `${day}T18:00:00`,
         department_id: form.department_id ? Number(form.department_id) : null,
-        required_skill_id: form.required_skill_id ? Number(form.required_skill_id) : null,
+        required_skill_ids: form.required_skill_ids.map(Number),
       };
       let res;
       if (editing) {
@@ -239,21 +297,17 @@ function TaskModal({ task, depts, skills, onClose, onSaved }) {
             <input required value={form.title} onChange={set('title')} placeholder="e.g. Build Reports Export"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Department</label>
-              <select value={form.department_id} onChange={set('department_id')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-                <option value="">— None —</option>
-                {depts.map((d) => <option key={d.department_id} value={d.department_id}>{d.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Required Skill</label>
-              <select value={form.required_skill_id} onChange={set('required_skill_id')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-                <option value="">— None —</option>
-                {skills.map((s) => <option key={s.skill_id} value={s.skill_id}>{s.skill_name}</option>)}
-              </select>
-            </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Department</label>
+            <select value={form.department_id} onChange={set('department_id')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <option value="">— None —</option>
+              {depts.map((d) => <option key={d.department_id} value={d.department_id}>{d.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">Required Skills</label>
+            <SkillMultiSelect skills={skills} selected={form.required_skill_ids} onToggle={toggleSkill} />
+            <p className="text-xs text-gray-400 mt-1.5">Select one or more skills a worker must have. The allocation engine requires <span className="font-medium text-gray-500">all</span> selected skills.</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -375,38 +429,45 @@ export default function Tasks() {
                   <th className="px-5 py-3 text-left font-medium">Task</th>
                   <th className="px-5 py-3 text-left font-medium">Department</th>
                   <th className="px-5 py-3 text-left font-medium">Assigned To</th>
-                  <th className="px-5 py-3 text-left font-medium">Skill</th>
+                  <th className="px-5 py-3 text-left font-medium">Skills</th>
                   <th className="px-5 py-3 text-left font-medium">Due</th>
                   <th className="px-5 py-3 text-left font-medium">Status</th>
                   <th className="px-5 py-3 text-left font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filtered.map((t) => (
-                  <tr key={t.task_id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-5 py-3 font-medium text-gray-800">{t.title}</td>
-                    <td className="px-5 py-3 text-gray-500">{t.department?.name ?? '—'}</td>
-                    <td className="px-5 py-3 text-gray-600">{assigneeOf(t) ?? <span className="text-gray-400">Unassigned</span>}</td>
-                    <td className="px-5 py-3">
-                      {t.requiredSkill ? <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">{t.requiredSkill.skill_name}</span> : <span className="text-gray-300">—</span>}
-                    </td>
-                    <td className="px-5 py-3 text-gray-500">{fmtDue(t.end_datetime)}</td>
-                    <td className="px-5 py-3"><Badge status={t.status} /></td>
-                    <td className="px-5 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <button onClick={() => setEditingTask(t)} className="text-xs text-primary-600 hover:underline">Edit</button>
-                        <button onClick={() => delTask(t)} className="text-xs text-red-500 hover:underline">Delete</button>
-                        <button onClick={() => setHistoryTask(t)} className="text-xs text-gray-500 hover:underline">History</button>
-                        {['ASSIGNED', 'IN_PROGRESS'].includes(t.status) && (
-                          <button onClick={() => setRequestUpdateTask(t)} className="text-xs text-amber-600 hover:underline">Request Update</button>
-                        )}
-                        {['ASSIGNED', 'IN_PROGRESS'].includes(t.status) && (
-                          <button onClick={() => setViewRequestsTask(t)} className="text-xs text-blue-500 hover:underline">View Requests</button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map((t) => {
+                  const tSkills = skillsOf(t);
+                  return (
+                    <tr key={t.task_id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-5 py-3 font-medium text-gray-800">{t.title}</td>
+                      <td className="px-5 py-3 text-gray-500">{t.department?.name ?? '—'}</td>
+                      <td className="px-5 py-3 text-gray-600">{assigneeOf(t) ?? <span className="text-gray-400">Unassigned</span>}</td>
+                      <td className="px-5 py-3">
+                        {tSkills.length ? (
+                          <div className="flex flex-wrap gap-1">
+                            {tSkills.map((s) => <span key={s.skill_id} className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">{s.skill_name}</span>)}
+                          </div>
+                        ) : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-5 py-3 text-gray-500">{fmtDue(t.end_datetime)}</td>
+                      <td className="px-5 py-3"><Badge status={t.status} /></td>
+                      <td className="px-5 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          <button onClick={() => setEditingTask(t)} className="text-xs text-primary-600 hover:underline">Edit</button>
+                          <button onClick={() => delTask(t)} className="text-xs text-red-500 hover:underline">Delete</button>
+                          <button onClick={() => setHistoryTask(t)} className="text-xs text-gray-500 hover:underline">History</button>
+                          {['ASSIGNED', 'IN_PROGRESS'].includes(t.status) && (
+                            <button onClick={() => setRequestUpdateTask(t)} className="text-xs text-amber-600 hover:underline">Request Update</button>
+                          )}
+                          {['ASSIGNED', 'IN_PROGRESS'].includes(t.status) && (
+                            <button onClick={() => setViewRequestsTask(t)} className="text-xs text-blue-500 hover:underline">View Requests</button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
                 {filtered.length === 0 && <tr><td colSpan={7} className="px-5 py-10 text-center text-gray-400">No tasks found.</td></tr>}
               </tbody>
             </table>

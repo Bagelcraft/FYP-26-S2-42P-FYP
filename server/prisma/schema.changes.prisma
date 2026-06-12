@@ -1,0 +1,41 @@
+// ============================================================================
+//  schema.prisma — CHANGES ONLY (multi-skill tasks)
+//  Apply these three edits to server/prisma/schema.prisma, then run the
+//  migration in _HOW_TO_APPLY.md.
+// ============================================================================
+
+
+// ── 1. ADD this new join model (anywhere in the file, e.g. under Task) ──────
+model TaskSkill {
+  task_skill_id Int   @id @default(autoincrement())
+  task_id       Int
+  skill_id      Int
+
+  task  Task  @relation(fields: [task_id],  references: [task_id], onDelete: Cascade)
+  skill Skill @relation(fields: [skill_id], references: [skill_id])
+
+  @@unique([task_id, skill_id])
+}
+
+
+// ── 2. EDIT model Task — add the `requiredSkills` back-relation ─────────────
+//     (keep required_skill_id / requiredSkill for backward compatibility)
+//
+//   model Task {
+//     ...existing fields...
+//     requiredSkill     Skill?              @relation(fields: [required_skill_id], references: [skill_id])
+//     requiredSkills    TaskSkill[]          // <-- ADD THIS LINE
+//     assignments       TaskAssignment[]
+//     allocationHistory AllocationHistory[]
+//     updateRequests    TaskUpdateRequest[]
+//   }
+
+
+// ── 3. EDIT model Skill — add the `taskSkills` back-relation ────────────────
+//
+//   model Skill {
+//     ...existing fields...
+//     userSkills      UserSkill[]
+//     tasks           Task[]
+//     taskSkills      TaskSkill[]            // <-- ADD THIS LINE
+//   }
