@@ -5,6 +5,7 @@ const workerController = require('../controllers/worker.controller');
 const updateRequestController = require('../controllers/task-update-request.controller');
 const availabilityController = require('../controllers/availability.controller');
 const attendanceController = require('../controllers/attendance.controller');
+const profileChangeController = require('../controllers/profileChangeRequest.controller');
 
 const router = express.Router();
 
@@ -38,9 +39,8 @@ router.get('/profile', (req, res) => {
   res.json({ message: 'Get profile — to be implemented' });
 });
 
-router.put('/profile', (req, res) => {
-  res.json({ message: 'Update profile — to be implemented' });
-});
+// POST /worker/profile/change-request
+router.post('/profile/change-request', profileChangeController.submitRules, profileChangeController.submitRequest);
 
 router.get('/skills', (req, res) => {
   res.json({ message: 'Get skills — to be implemented' });

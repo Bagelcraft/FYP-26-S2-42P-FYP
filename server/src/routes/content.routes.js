@@ -1,5 +1,7 @@
 const express = require("express");
 const router = express.Router();
+const { verifyToken } = require("../middleware/auth.middleware");
+const { requireRole } = require("../middleware/rbac.middleware");
 
 const {
   getContent,
@@ -16,20 +18,24 @@ const {
   deleteTestimonial,
 } = require("../controllers/contentController");
 
+const adminOnly = [verifyToken, requireRole(["SYSTEM_ADMIN"])];
+
+// Public reads (used by the landing page)
 router.get("/", getContent);
-
-router.put("/hero", updateHero);
-router.put("/video", updateVideo);
-router.put("/pricing", updatePricing);
-
 router.get("/features", getFeatures);
-router.post("/features", createFeature);
-router.put("/features/:id", updateFeature);
-router.delete("/features/:id", deleteFeature);
-
 router.get("/testimonials", getTestimonials);
-router.post("/testimonials", createTestimonial);
-router.put("/testimonials/:id", updateTestimonial);
-router.delete("/testimonials/:id", deleteTestimonial);
+
+// Admin-only writes
+router.put("/hero",    ...adminOnly, updateHero);
+router.put("/video",   ...adminOnly, updateVideo);
+router.put("/pricing", ...adminOnly, updatePricing);
+
+router.post("/features",        ...adminOnly, createFeature);
+router.put("/features/:id",     ...adminOnly, updateFeature);
+router.delete("/features/:id",  ...adminOnly, deleteFeature);
+
+router.post("/testimonials",        ...adminOnly, createTestimonial);
+router.put("/testimonials/:id",     ...adminOnly, updateTestimonial);
+router.delete("/testimonials/:id",  ...adminOnly, deleteTestimonial);
 
 module.exports = router;

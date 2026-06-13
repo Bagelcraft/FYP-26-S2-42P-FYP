@@ -7,26 +7,25 @@ import api from '../../utils/api';
 // Replace with GET /pm/subscription, /pm/billing, GET /admin/plans when wired.
 const ORG = 'TechCorp Pte Ltd';
 const SUBSCRIPTION = {
-  plan: 'Growth', amount: 79.99, status: 'ACTIVE',
+  plan: 'Core', amount: 108, status: 'ACTIVE',
   start: '01 Jan 2026', renews: '01 Jul 2026', seatsUsed: 12, seatsTotal: 25,
 };
-const PLANS = [
-  { name: 'Starter',    monthly: 29.99, annual: 299, maxUsers: 10, features: ['Up to 10 staff', 'Manual task allocation', 'Basic reports', 'Email support'] },
-  { name: 'Growth',     monthly: 79.99, annual: 799, maxUsers: 25, features: ['Up to 25 staff', 'Automated allocation engine', 'Leave management', 'Working-hour tracking', 'Priority support'], current: true },
-  { name: 'Enterprise', monthly: 149.99, annual: 1499, maxUsers: null, features: ['Unlimited staff', 'Automated allocation engine', 'Advanced analytics', 'Dedicated account manager', 'SSO & audit logs'] },
-];
+const CORE_PLAN = {
+  name: 'Core', monthly: 108, maxUsers: 25,
+  features: ['Up to 25 staff', 'Task creation & management', 'Automated allocation engine', 'Leave management', 'Working-hour tracking', 'Real-time notifications', 'Reports & analytics', 'Priority support'],
+  current: true,
+};
 const BILLING = [
-  { id: 'INV-2026-006', date: '01 Jun 2026', amount: 79.99, status: 'PAID', method: 'Visa •••• 4242' },
-  { id: 'INV-2026-005', date: '01 May 2026', amount: 79.99, status: 'PAID', method: 'Visa •••• 4242' },
-  { id: 'INV-2026-004', date: '01 Apr 2026', amount: 79.99, status: 'PAID', method: 'Visa •••• 4242' },
-  { id: 'INV-2026-003', date: '01 Mar 2026', amount: 79.99, status: 'PAID', method: 'Visa •••• 4242' },
-  { id: 'INV-2026-002', date: '01 Feb 2026', amount: 79.99, status: 'PAID', method: 'Visa •••• 4242' },
-  { id: 'INV-2026-001', date: '01 Jan 2026', amount: 79.99, status: 'PAID', method: 'Visa •••• 4242' },
+  { id: 'INV-2026-006', date: '01 Jun 2026', amount: 108, status: 'PAID', method: 'Visa •••• 4242' },
+  { id: 'INV-2026-005', date: '01 May 2026', amount: 108, status: 'PAID', method: 'Visa •••• 4242' },
+  { id: 'INV-2026-004', date: '01 Apr 2026', amount: 108, status: 'PAID', method: 'Visa •••• 4242' },
+  { id: 'INV-2026-003', date: '01 Mar 2026', amount: 108, status: 'PAID', method: 'Visa •••• 4242' },
+  { id: 'INV-2026-002', date: '01 Feb 2026', amount: 108, status: 'PAID', method: 'Visa •••• 4242' },
+  { id: 'INV-2026-001', date: '01 Jan 2026', amount: 108, status: 'PAID', method: 'Visa •••• 4242' },
 ];
 
 export default function Subscription() {
   const [sub, setSub] = useState(SUBSCRIPTION);
-  const [plans, setPlans] = useState(PLANS);
   const [billing, setBilling] = useState(BILLING);
   const [demo, setDemo] = useState(false);
   const [status, setStatus] = useState(SUBSCRIPTION.status);
@@ -88,28 +87,25 @@ export default function Subscription() {
           </div>
         </div>
 
-        {/* Plan tiers */}
+        {/* Plan */}
         <div>
-          <h3 className="font-semibold text-gray-800 mb-3">Available Plans</h3>
-          <div className="grid sm:grid-cols-3 gap-5">
-            {plans.map((p) => (
-              <div key={p.name} className={`bg-white rounded-xl border shadow-sm flex flex-col ${p.current ? 'border-primary-300 ring-1 ring-primary-200' : 'border-gray-100'}`}>
-                <div className="px-5 py-4 border-b border-gray-50">
-                  <div className="flex items-center justify-between"><h4 className="font-semibold text-gray-800">{p.name}</h4>{p.current && <span className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">Current</span>}</div>
-                  <p className="text-2xl font-bold text-gray-800 mt-2">S${p.monthly.toFixed(2)}<span className="text-sm font-normal text-gray-400">/mo</span></p>
-                  <p className="text-xs text-gray-400 mt-0.5">{p.maxUsers ? `Up to ${p.maxUsers} staff` : 'Unlimited staff'} · S${p.annual}/yr</p>
-                </div>
-                <ul className="px-5 py-4 space-y-1.5 flex-1">
-                  {p.features.map((f) => <li key={f} className="text-xs text-gray-600 flex items-start gap-1.5"><span className="text-green-500 mt-px">✓</span>{f}</li>)}
-                </ul>
-                <div className="px-5 pb-4">
-                  <button disabled={p.current} onClick={() => note(`Switched to the ${p.name} plan`)}
-                    className={`w-full text-sm font-medium px-4 py-2 rounded-lg transition-colors ${p.current ? 'bg-gray-100 text-gray-400 cursor-default' : 'bg-primary-50 text-primary-700 hover:bg-primary-100'}`}>
-                    {p.current ? 'Current plan' : p.monthly > sub.amount ? 'Upgrade' : 'Downgrade'}
-                  </button>
-                </div>
+          <h3 className="font-semibold text-gray-800 mb-3">Plan Details</h3>
+          <div className="bg-white rounded-xl border border-primary-300 ring-1 ring-primary-200 shadow-sm flex flex-col sm:flex-row">
+            <div className="px-6 py-5 border-b sm:border-b-0 sm:border-r border-gray-100 sm:w-56 flex-shrink-0">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold text-gray-800">{CORE_PLAN.name} Plan</h4>
+                <span className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">Current</span>
               </div>
-            ))}
+              <p className="text-3xl font-bold text-gray-800">S${CORE_PLAN.monthly.toFixed(2)}<span className="text-sm font-normal text-gray-400">/mo</span></p>
+              <p className="text-xs text-gray-400 mt-1">Up to {CORE_PLAN.maxUsers} staff</p>
+            </div>
+            <ul className="px-6 py-5 grid sm:grid-cols-2 gap-x-8 gap-y-2 flex-1">
+              {CORE_PLAN.features.map((f) => (
+                <li key={f} className="text-sm text-gray-600 flex items-start gap-1.5">
+                  <span className="text-green-500 mt-px">✓</span>{f}
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
 
@@ -154,7 +150,7 @@ export default function Subscription() {
               <div className="bg-gray-50 rounded-lg px-4 py-3 flex items-center justify-between"><div><p className="text-sm font-medium text-gray-800">{sub.plan} Plan · monthly</p><p className="text-xs text-gray-400">Renews {sub.renews}</p></div><p className="text-lg font-bold text-gray-800">S${sub.amount.toFixed(2)}</p></div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Billing cycle</label>
-                <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"><option>Monthly — S$79.99 / month</option><option>Annual — S$799.00 / year (save 17%)</option></select>
+                <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"><option>Monthly — S$108.00 / month</option><option>Annual — S$1,080.00 / year (save ~17%)</option></select>
               </div>
               <div><label className="block text-xs font-medium text-gray-600 mb-1">Payment method</label><div className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 flex items-center justify-between">Visa •••• 4242<button className="text-xs text-primary-600 hover:underline">Change</button></div></div>
               <div className="flex justify-end gap-3 pt-2 border-t border-gray-100"><button onClick={() => setRenewOpen(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button><button onClick={() => { setRenewOpen(false); note('Subscription renewed — valid until 01 Jul 2026'); }} className="px-5 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg transition-colors">Confirm &amp; Pay</button></div>

@@ -7,11 +7,17 @@ const prisma = require("../config/prisma");
 */
 exports.createEnquiry = async (req, res) => {
   try {
-    const { user_id, subject, message } = req.body;
+    const { name, email, subject, message, user_id } = req.body;
+
+    if (!subject || !message) {
+      return res.status(400).json({ message: 'Subject and message are required.' });
+    }
 
     const enquiry = await prisma.contactEnquiry.create({
       data: {
-        user_id,
+        user_id: user_id || null,
+        name: name || null,
+        email: email || null,
         subject,
         message,
       },

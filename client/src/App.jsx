@@ -12,9 +12,14 @@ import Organisations from './pages/admin/Organisations';
 import AuditLogs from './pages/admin/AuditLogs';
 import AdminNotifications from './pages/admin/AdminNotifications';
 import SubscriptionPlans from './pages/admin/SubscriptionPlans';
+import AdminEnquiries from './pages/admin/AdminEnquiries';
+import AdminLandingContent from './pages/admin/AdminLandingContent';
 
 // Org Admin
 import OrgAdminDashboard from './pages/org-admin/OrgAdminDashboard';
+import OrgProfile from './pages/org-admin/OrgProfile';
+import ProfileChangeRequests from './pages/org-admin/ProfileChangeRequests';
+import OrgTaskManagement from './pages/org-admin/TaskManagement';
 import Staff from './pages/org-admin/Staff';
 import Departments from './pages/org-admin/Departments';
 import Skills from './pages/org-admin/Skills';
@@ -62,15 +67,20 @@ export default function App() {
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/organisations" element={<Organisations />} />
           <Route path="/admin/plans" element={<SubscriptionPlans />} />
+          <Route path="/admin/enquiries" element={<AdminEnquiries />} />
+          <Route path="/admin/landing-content" element={<AdminLandingContent />} />
           <Route path="/admin/logs" element={<AuditLogs />} />
           <Route path="/admin/notifications" element={<AdminNotifications />} />
 
           {/* Organisation Admin */}
           <Route path="/org-admin" element={<OrgAdminDashboard />} />
+          <Route path="/org-admin/profile" element={<OrgProfile />} />
+          <Route path="/org-admin/tasks" element={<OrgTaskManagement />} />
           <Route path="/org-admin/staff" element={<Staff />} />
           <Route path="/org-admin/departments" element={<Departments />} />
           <Route path="/org-admin/skills" element={<Skills />} />
           <Route path="/org-admin/roles" element={<StaffRoles />} />
+          <Route path="/org-admin/profile-change-requests" element={<ProfileChangeRequests />} />
           <Route path="/org-admin/notifications" element={<OrgAdminNotifications />} />
 
           {/* Manager */}

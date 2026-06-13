@@ -2,6 +2,7 @@ const express = require('express');
 const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
 const planController = require('../controllers/plan.controller');
+const enquiryController = require('../controllers/enquiryController');
 
 const router = express.Router();
 
@@ -32,6 +33,13 @@ router.put('/organisations/:id/suspend', (req, res) => {
 router.get('/logs', (req, res) => {
   res.json({ message: 'Get audit logs — to be implemented' });
 });
+
+// ─── Enquiries ────────────────────────────────────────────────
+
+router.get('/enquiries', enquiryController.getAllEnquiries);
+router.get('/enquiries/:id', enquiryController.getEnquiryById);
+router.patch('/enquiries/:id/respond', enquiryController.respondToEnquiry);
+router.delete('/enquiries/:id', enquiryController.deleteEnquiry);
 
 // ─── Subscription Plans (Phase 3) ────────────────────────────
 

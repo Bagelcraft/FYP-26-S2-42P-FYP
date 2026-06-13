@@ -168,6 +168,139 @@ function UpdateRequestsViewModal({ task, onClose }) {
   );
 }
 
+// ── Allocate modal ────────────────────────────────────────────────────────
+const typeLabel = (t) => (t === 'PERMANENT_WORKER' ? 'Permanent' : t === 'TEMPORARY_WORKER' ? 'Temporary' : t);
+
+function HoursBar({ c }) {
+  const pct = c.maxHours ? Math.min((c.weeklyHours / c.maxHours) * 100, 100) : 0;
+  const near = c.eligible && c.remainingHours != null && c.remainingHours <= 4;
+  const color = !c.withinHours ? 'bg-red-500' : near ? 'bg-yellow-500' : 'bg-green-500';
+  return (
+    <div className="flex items-center gap-2">
+      <div className="bg-gray-100 rounded-full h-1.5 w-16"><div className={`${color} h-1.5 rounded-full`} style={{ width: `${pct}%` }} /></div>
+      <span className="text-xs text-gray-500 whitespace-nowrap">{c.weeklyHours}/{c.maxHours ?? '∞'}h</span>
+    </div>
+  );
+}
+function CheckChip({ ok, children }) {
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+      <span>{ok ? '✓' : '✕'}</span>{children}
+    </span>
+  );
+}
+function CandidateAvatar({ name, ring }) {
+  return <div className={`w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 text-sm font-bold flex-shrink-0 ${ring ? 'ring-2 ring-primary-500 ring-offset-1' : ''}`}>{name?.[0] ?? '?'}</div>;
+}
+
+function AllocateModal({ task, onClose, onAllocated }) {
+  const [candidates, setCandidates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api.get(`/pm/tasks/${task.task_id}/eligible-staff`)
+      .then((r) => setCandidates(r.data.data?.candidates ?? []))
+      .catch((e) => setError(e.response?.data?.message || e.message))
+      .finally(() => setLoading(false));
+  }, [task.task_id]);
+
+  const suggestion = candidates.find((c) => c.eligible);
+
+  async function assign(userId, auto) {
+    setBusy(true); setError('');
+    try {
+      const url = auto ? `/pm/tasks/${task.task_id}/auto-allocate` : `/pm/tasks/${task.task_id}/assign`;
+      await api.post(url, auto ? {} : { assigned_to: userId });
+      const name = auto ? (suggestion?.full_name ?? 'staff') : (candidates.find((c) => c.userId === userId)?.full_name ?? 'staff');
+      onAllocated(`${auto ? 'Auto-allocated' : 'Assigned'} "${task.title}" → ${name}`);
+      onClose();
+    } catch (e) {
+      setError(e.response?.data?.message || e.message);
+      setBusy(false);
+    }
+  }
+
+  const fmtDueLocal = (iso) => (iso ? new Date(iso).toLocaleDateString('en-SG', { day: '2-digit', month: 'short' }) : '—');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+          <div>
+            <h2 className="font-semibold text-gray-800">Allocate Task</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{task.title} · {task.requiredSkill?.skill_name ?? 'Any skill'} · Due {fmtDueLocal(task.end_datetime)}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
+          {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-600">{error}</div>}
+
+          {loading && <p className="text-sm text-gray-400 text-center py-10">Evaluating eligibility…</p>}
+
+          {!loading && suggestion && (
+            <div className="flex items-center justify-between bg-gradient-to-r from-primary-50 to-blue-50 border border-primary-100 rounded-xl px-4 py-3">
+              <div className="flex items-center gap-3">
+                <CandidateAvatar name={suggestion.full_name} ring />
+                <div>
+                  <p className="text-xs text-primary-600 font-semibold uppercase tracking-wide">🤖 Engine recommendation</p>
+                  <p className="text-sm font-medium text-gray-800">{suggestion.full_name}{suggestion.remainingHours != null ? ` · ${suggestion.remainingHours}h spare` : ''}</p>
+                </div>
+              </div>
+              <button disabled={busy} onClick={() => assign(suggestion.userId, true)}
+                className="text-sm font-medium bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg transition-colors">
+                Auto-assign
+              </button>
+            </div>
+          )}
+
+          {!loading && candidates.length === 0 && (
+            <p className="text-sm text-gray-400 text-center py-10">No staff with the required skill found.</p>
+          )}
+
+          {!loading && candidates.length > 0 && (
+            <div className="border border-gray-100 rounded-xl overflow-hidden">
+              <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Ranked Candidates</p>
+                <span className="text-xs text-gray-400">{candidates.filter((c) => c.eligible).length} of {candidates.length} eligible</span>
+              </div>
+              <div className="divide-y divide-gray-50">
+                {candidates.map((c, i) => (
+                  <div key={c.userId} className={`px-4 py-3.5 ${!c.eligible ? 'opacity-60' : ''}`}>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-gray-300 font-mono w-4">{i + 1}</span>
+                        <CandidateAvatar name={c.full_name} ring={c === suggestion} />
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">{c.full_name}</p>
+                          <p className="text-xs text-gray-400">{typeLabel(c.user_type)}{c.staffRole ? ` · ${c.staffRole}` : ''}</p>
+                        </div>
+                      </div>
+                      <button disabled={!c.eligible || busy} onClick={() => assign(c.userId, false)}
+                        className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${c.eligible ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}>
+                        {c.eligible ? 'Assign' : 'Skip'}
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 mt-2 pl-11">
+                      {task.requiredSkill && <CheckChip ok>{task.requiredSkill.skill_name}</CheckChip>}
+                      <CheckChip ok={c.isAvailable}>{c.isAvailable ? 'Available' : 'No availability'}</CheckChip>
+                      <CheckChip ok={c.withinHours}>{c.withinHours ? `${c.remainingHours}h spare` : 'Hours maxed'}</CheckChip>
+                      <HoursBar c={c} />
+                    </div>
+                    {!c.eligible && c.ineligibleReason && <p className="text-xs text-red-500 mt-1 pl-11">{c.ineligibleReason}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── helpers ────────────────────────────────────────────────────────────────
 const fmtDue = (iso) => {
   if (!iso) return '—';
@@ -292,14 +425,28 @@ export default function Tasks() {
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [search, setSearch] = useState('');
-  const [creating, setCreating] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [allocatingTask, setAllocatingTask] = useState(null);
   const [historyTask, setHistoryTask] = useState(null);
   const [requestUpdateTask, setRequestUpdateTask] = useState(null);
   const [viewRequestsTask, setViewRequestsTask] = useState(null);
+  const [autoAllocating, setAutoAllocating] = useState(null);
   const [toast, setToast] = useState('');
 
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 2600); };
+
+  async function autoAllocate(t) {
+    setAutoAllocating(t.task_id);
+    try {
+      await api.post(`/pm/tasks/${t.task_id}/auto-allocate`, {});
+      load();
+      showToast(`Auto-allocated "${t.title}" · working hours updated`);
+    } catch (e) {
+      alert(e.response?.data?.message || e.message);
+    } finally {
+      setAutoAllocating(null);
+    }
+  }
 
   const load = useCallback(() => {
     setLoading(true);
@@ -342,12 +489,9 @@ export default function Tasks() {
   return (
     <DashboardLayout navItems={PM_NAV} secondaryNav={PM_SECONDARY} roleLabel="Manager">
       <div className="space-y-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-gray-800">Tasks</h2>
-            <p className="text-gray-500 text-sm mt-0.5">Create, assign, track and delete tasks.</p>
-          </div>
-          <button onClick={() => setCreating(true)} className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">+ Create Task</button>
+        <div>
+          <h2 className="text-xl font-bold text-gray-800">Tasks</h2>
+          <p className="text-gray-500 text-sm mt-0.5">View, assign, track and manage tasks.</p>
         </div>
 
         {error && <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-600">{error}</div>}
@@ -394,6 +538,14 @@ export default function Tasks() {
                     <td className="px-5 py-3"><Badge status={t.status} /></td>
                     <td className="px-5 py-3">
                       <div className="flex flex-wrap gap-2">
+                        {t.status === 'PENDING' && (
+                          <>
+                            <button onClick={() => setAllocatingTask(t)} className="text-xs text-green-600 font-medium hover:underline">Allocate</button>
+                            <button disabled={autoAllocating === t.task_id} onClick={() => autoAllocate(t)} className="text-xs text-purple-600 font-medium hover:underline disabled:opacity-50">
+                              {autoAllocating === t.task_id ? 'Allocating…' : '🤖 Auto'}
+                            </button>
+                          </>
+                        )}
                         <button onClick={() => setEditingTask(t)} className="text-xs text-primary-600 hover:underline">Edit</button>
                         <button onClick={() => delTask(t)} className="text-xs text-red-500 hover:underline">Delete</button>
                         <button onClick={() => setHistoryTask(t)} className="text-xs text-gray-500 hover:underline">History</button>
@@ -414,18 +566,18 @@ export default function Tasks() {
         </div>
       </div>
 
-      {creating && (
-        <TaskModal
-          depts={depts} skills={skills}
-          onClose={() => setCreating(false)}
-          onSaved={(t) => { load(); showToast(`Task “${t.title}” created`); }}
-        />
-      )}
       {editingTask && (
         <TaskModal
           task={editingTask} depts={depts} skills={skills}
           onClose={() => setEditingTask(null)}
           onSaved={(t) => { load(); showToast(`Task “${t.title}” updated`); }}
+        />
+      )}
+      {allocatingTask && (
+        <AllocateModal
+          task={allocatingTask}
+          onClose={() => setAllocatingTask(null)}
+          onAllocated={(msg) => { load(); showToast(msg); }}
         />
       )}
       {historyTask && <AllocationHistoryModal task={historyTask} onClose={() => setHistoryTask(null)} />}

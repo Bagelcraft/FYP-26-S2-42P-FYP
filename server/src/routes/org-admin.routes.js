@@ -2,10 +2,16 @@ const express = require('express');
 const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
 const c = require('../controllers/org-admin.controller');
+const pcr = require('../controllers/profileChangeRequest.controller');
 
 const router = express.Router();
 
 router.use(verifyToken, requireRole(['ORG_ADMIN']));
+
+// ─── Organisation Profile ─────────────────────────────────────
+
+router.get('/profile',    c.getProfile);
+router.patch('/profile',  c.profileUpdateRules, c.validate, c.updateProfile);
 
 // ─── Departments ──────────────────────────────────────────────
 
@@ -39,5 +45,10 @@ router.patch('/staff/:id/deactivate', c.deactivateStaff);
 
 router.post('/staff/:id/skills',              c.assignSkillRules, c.validate, c.assignSkill);
 router.delete('/staff/:id/skills/:skillId',   c.removeSkill);
+
+// ─── Profile Change Requests ──────────────────────────────────
+
+router.get('/profile-change-requests',          pcr.listRequests);
+router.patch('/profile-change-requests/:id',    pcr.reviewRules, pcr.reviewRequest);
 
 module.exports = router;

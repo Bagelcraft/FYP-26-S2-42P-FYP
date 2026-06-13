@@ -9,6 +9,35 @@ function makeError(message, statusCode) {
   return err;
 }
 
+// ─── Organisation Profile ─────────────────────────────────────
+
+async function getOrgProfile(organisationId) {
+  const org = await prisma.organisation.findUnique({
+    where: { organisation_id: organisationId },
+    select: {
+      organisation_id:  true,
+      name:             true,
+      isActive:         true,
+      createdAt:        true,
+      activeSubscription: {
+        select: { subscription_id: true, status: true, start_date: true, end_date: true, amount: true },
+      },
+    },
+  });
+  if (!org) throw makeError('Organisation not found', 404);
+  return org;
+}
+
+async function updateOrgProfile(organisationId, data) {
+  const org = await prisma.organisation.findUnique({ where: { organisation_id: organisationId } });
+  if (!org) throw makeError('Organisation not found', 404);
+  return prisma.organisation.update({
+    where: { organisation_id: organisationId },
+    data:  { name: data.name },
+    select: { organisation_id: true, name: true, isActive: true, createdAt: true },
+  });
+}
+
 // ─── Departments ──────────────────────────────────────────────
 
 async function listDepartments(organisationId) {
@@ -238,6 +267,7 @@ async function removeSkillFromStaff(organisationId, userId, skillId) {
 }
 
 module.exports = {
+  getOrgProfile, updateOrgProfile,
   listDepartments, createDepartment, updateDepartment, deleteDepartment, assignStaffToDept,
   listRoles, createRole, updateRole, deleteRole,
   listSkills, createSkill, updateSkill, deleteSkill,

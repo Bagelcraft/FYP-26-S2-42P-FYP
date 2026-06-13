@@ -14,6 +14,20 @@ function ok(res, data, status = 200) {
 const orgId = (req) => req.user.organisationId;
 const id    = (req) => Number(req.params.id);
 
+// ─── Organisation Profile ─────────────────────────────────────
+
+async function getProfile(req, res, next) {
+  try { ok(res, await svc.getOrgProfile(orgId(req))); } catch (e) { next(e); }
+}
+
+const profileUpdateRules = [
+  body('name').trim().notEmpty().withMessage('name is required').isLength({ max: 150 }),
+];
+
+async function updateProfile(req, res, next) {
+  try { ok(res, await svc.updateOrgProfile(orgId(req), req.body)); } catch (e) { next(e); }
+}
+
 // ─── Departments ──────────────────────────────────────────────
 
 const deptRules = [
@@ -144,6 +158,7 @@ async function removeSkill(req, res, next) {
 
 module.exports = {
   validate,
+  getProfile, profileUpdateRules, updateProfile,
   deptRules, deptUpdateRules, listDepts, createDept, updateDept, deleteDept, assignStaffRules, assignStaffToDept,
   roleRules, roleUpdateRules, listRoles, createRole, updateRole, deleteRole,
   skillRules, skillUpdateRules, listSkills, createSkill, updateSkill, deleteSkill,

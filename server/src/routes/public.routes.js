@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const router = express.Router();
 const prisma = require('../config/prisma');
 const planService = require('../services/plan.service');
+const enquiryController = require('../controllers/enquiryController');
 
 // GET /api/v1/public/features
 router.get('/features', (req, res) => {
@@ -18,9 +19,7 @@ router.get('/pricing', async (req, res, next) => {
 });
 
 // POST /api/v1/public/enquiry
-router.post('/enquiry', (req, res) => {
-  res.json({ message: 'Submit enquiry — to be implemented by Rachel' });
-});
+router.post('/enquiry', enquiryController.createEnquiry);
 
 // POST /api/v1/public/organisations/register
 router.post('/organisations/register', async (req, res) => {
