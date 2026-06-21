@@ -9,6 +9,7 @@ import Unauthorized from './pages/Unauthorized';
 // Admin
 import AdminDashboard from './pages/admin/AdminDashboard';
 import Organisations from './pages/admin/Organisations';
+import Marketing from './pages/admin/Marketing';
 import AuditLogs from './pages/admin/AuditLogs';
 import AdminNotifications from './pages/admin/AdminNotifications';
 import SubscriptionPlans from './pages/admin/SubscriptionPlans';
@@ -60,6 +61,7 @@ export default function App() {
           {/* System Admin */}
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/organisations" element={<Organisations />} />
+          <Route path="/admin/marketing" element={<Marketing />} />
           <Route path="/admin/plans" element={<SubscriptionPlans />} />
           <Route path="/admin/logs" element={<AuditLogs />} />
           <Route path="/admin/notifications" element={<AdminNotifications />} />

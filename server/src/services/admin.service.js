@@ -1,6 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const prisma = require('../config/prisma');
 
 function makeError(message, statusCode) {
   const err = new Error(message);
@@ -91,9 +89,25 @@ async function listOrganisations() {
   });
 }
 
+async function createOrganisation(data) {
+  if (!data.name || !data.name.trim()) throw makeError('Organisation name is required', 400);
+  return prisma.organisation.create({ data: { name: data.name.trim() } });
+}
+
+async function setOrganisationActive(organisationId, isActive) {
+  const org = await prisma.organisation.findUnique({ where: { organisation_id: organisationId } });
+  if (!org) throw makeError('Organisation not found', 404);
+  return prisma.organisation.update({
+    where: { organisation_id: organisationId },
+    data:  { isActive },
+  });
+}
+
 module.exports = {
   listPendingRegistrations,
   approveRegistration,
   rejectRegistration,
   listOrganisations,
+  createOrganisation,
+  setOrganisationActive,
 };

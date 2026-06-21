@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import api from '../../utils/api';
 
 // Smoothly animates the displayed number from its current value to `end`
 // whenever `end` changes — so live updates tick instead of snapping.
@@ -232,7 +233,9 @@ function LiveDashboard() {
 // Served from client/public — swap demo.mp4 for your real marketing video (same filename = no code change)
 const DEMO_VIDEO_URL = '/demo.mp4';
 
-const features = [
+// Fallbacks used when the marketing content API has no value yet, so the page
+// always looks complete even before a system admin customises it.
+const DEFAULT_FEATURES = [
   { icon: '📋', title: 'Task Management', desc: 'Create, assign, and track tasks across your entire organisation in real time.' },
   { icon: '🤖', title: 'Auto Allocation', desc: 'Automatically assign tasks to the best available staff based on skills and schedule.' },
   { icon: '📅', title: 'Workforce Scheduling', desc: 'Manage availability, shifts, and leave in one unified calendar.' },
@@ -240,29 +243,54 @@ const features = [
   { icon: '🔔', title: 'Real-time Notifications', desc: 'Keep your team informed with instant in-app notifications for every update.' },
 ];
 
-const testimonials = [
-  {
-    name: 'Sarah Lim',
-    company: 'BuildTech Pte Ltd',
-    rating: 5,
-    text: 'SmartTask transformed how we manage our 80-person team. Auto-allocation alone saves us 3 hours every day.',
-  },
-  {
-    name: 'James Tan',
-    company: 'LogiCore Solutions',
-    rating: 5,
-    text: 'The role-based dashboards are intuitive. Our project managers and workers both love using it.',
-  },
-  {
-    name: 'Priya Nair',
-    company: 'NovaSoft Asia',
-    rating: 4,
-    text: 'Onboarding was seamless. We were fully set up in under an hour with all our staff registered.',
-  },
+const DEFAULT_TESTIMONIALS = [
+  { name: 'Sarah Lim', company: 'BuildTech Pte Ltd', rating: 5, text: 'SmartTask transformed how we manage our 80-person team. Auto-allocation alone saves us 3 hours every day.' },
+  { name: 'James Tan', company: 'LogiCore Solutions', rating: 5, text: 'The role-based dashboards are intuitive. Our project managers and workers both love using it.' },
+  { name: 'Priya Nair', company: 'NovaSoft Asia', rating: 4, text: 'Onboarding was seamless. We were fully set up in under an hour with all our staff registered.' },
 ];
+
+const DEFAULT_CONTENT = {
+  hero_title: 'Smart Task Allocation',
+  hero_subtitle: 'Your workforce, intelligently managed. Tasks assigned automatically. Progress tracked in real time.',
+  video_title: 'Meet SmartTask — your all-in-one task management solution',
+  video_subtitle: 'How SmartTask helps organisations manage staff, automate task allocation, and track real-time progress — all from one unified platform.',
+  plan_name: 'Standard Plan',
+  plan_price: '$9',
+  plan_description: 'Perfect for small teams and growing organisations.',
+};
 
 export default function Home() {
   const [showVideo, setShowVideo] = useState(false);
+  const [content, setContent] = useState(DEFAULT_CONTENT);
+  const [features, setFeatures] = useState(DEFAULT_FEATURES);
+  const [testimonials, setTestimonials] = useState(DEFAULT_TESTIMONIALS);
+
+  useEffect(() => {
+    let active = true;
+    api.get('/admin/content')
+      .then(({ data }) => {
+        if (!active) return;
+        // Merge: keep a default for any field the admin hasn't set.
+        const c = data.content ?? {};
+        setContent({
+          hero_title: c.hero_title || DEFAULT_CONTENT.hero_title,
+          hero_subtitle: c.hero_subtitle || DEFAULT_CONTENT.hero_subtitle,
+          video_title: c.video_title || DEFAULT_CONTENT.video_title,
+          video_subtitle: c.video_subtitle || DEFAULT_CONTENT.video_subtitle,
+          plan_name: c.plan_name || DEFAULT_CONTENT.plan_name,
+          plan_price: c.plan_price || DEFAULT_CONTENT.plan_price,
+          plan_description: c.plan_description || DEFAULT_CONTENT.plan_description,
+        });
+        if (Array.isArray(data.features) && data.features.length) {
+          setFeatures(data.features.map((f) => ({ icon: f.icon_url || '✨', title: f.title, desc: f.description })));
+        }
+        if (Array.isArray(data.testimonials) && data.testimonials.length) {
+          setTestimonials(data.testimonials.map((t) => ({ name: t.name, company: t.company, rating: t.rating, text: t.review_text })));
+        }
+      })
+      .catch(() => { /* keep defaults if the API is unavailable */ });
+    return () => { active = false; };
+  }, []);
 
   return (
     <div className="min-h-screen bg-white">
@@ -304,12 +332,10 @@ export default function Home() {
               Workforce Management Platform
             </span>
             <h1 className="text-4xl lg:text-5xl font-bold text-white leading-tight">
-              Smart Task Allocation
+              {content.hero_title}
             </h1>
-            <p className="text-slate-400 mt-4 text-base leading-relaxed">
-              Your workforce, intelligently managed. Tasks assigned automatically. <br />
-              Progress tracked in real time.
-
+            <p className="text-slate-400 mt-4 text-base leading-relaxed whitespace-pre-line">
+              {content.hero_subtitle}
             </p>
             <div className="flex items-center gap-3 mt-7">
               <Link
@@ -369,9 +395,9 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center gap-10">
           <div className="flex-1">
             <span className="text-primary-400 text-xs font-semibold uppercase tracking-widest">See it in action</span>
-            <h2 className="text-3xl font-bold text-white mt-2">Meet SmartTask — your all-in-one task management solution</h2>
+            <h2 className="text-3xl font-bold text-white mt-2">{content.video_title}</h2>
             <p className="text-slate-400 mt-3 text-sm leading-relaxed">
-              How SmartTask helps organisations manage staff, automate task allocation, and track real-time progress — all from one unified platform.
+              {content.video_subtitle}
             </p>
           </div>
           <button
@@ -407,13 +433,13 @@ export default function Home() {
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-yellow-400 text-lg">⭐</span>
-                <span className="font-bold text-white">Standard Plan</span>
+                <span className="font-bold text-white">{content.plan_name}</span>
               </div>
               <div className="flex items-end gap-1 mt-2">
-                <span className="text-5xl font-bold text-white">$9</span>
+                <span className="text-5xl font-bold text-white">{content.plan_price}</span>
                 <span className="text-slate-400 mb-1.5">/month</span>
               </div>
-              <p className="text-slate-400 text-sm mt-1">Perfect for small teams and growing organisations.</p>
+              <p className="text-slate-400 text-sm mt-1">{content.plan_description}</p>
             </div>
             <div className="flex-1 space-y-2">
               {['Up to 50 Users', 'Task Management', 'Workforce Scheduling', 'Real-time Monitoring', 'Reports & Analytics', 'Priority Support'].map((f) => (

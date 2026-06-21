@@ -1,12 +1,11 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
 const authService = require('../services/auth.service');
 const { verifyToken } = require('../middleware/auth.middleware');
 
 const router = express.Router();
-const prisma = new PrismaClient();
+const prisma = require('../config/prisma');
 
 function validate(req, res, next) {
   const errors = validationResult(req);

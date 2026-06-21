@@ -1,7 +1,5 @@
 const bcrypt = require('bcrypt');
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const prisma = require('../config/prisma');
 
 function makeError(message, statusCode) {
   const err = new Error(message);
@@ -206,10 +204,44 @@ async function registerStaff(organisationId, data) {
   });
 }
 
+async function updateStaff(organisationId, userId, data) {
+  const user = await prisma.user.findFirst({ where: { userId, organisationId } });
+  if (!user) throw makeError('Staff member not found', 404);
+
+  if (data.email && data.email !== user.email) {
+    const existing = await prisma.user.findUnique({ where: { email: data.email } });
+    if (existing) throw makeError('Email already in use', 409);
+  }
+  if (data.role_id) {
+    const role = await prisma.staffRole.findFirst({ where: { role_id: data.role_id, organisation_id: organisationId } });
+    if (!role) throw makeError('Staff role not found in this organisation', 404);
+  }
+
+  return prisma.user.update({
+    where: { userId },
+    data: {
+      full_name: data.full_name !== undefined ? data.full_name : undefined,
+      email:     data.email     !== undefined ? data.email     : undefined,
+      role_id:   data.role_id   !== undefined ? data.role_id   : undefined,
+      user_type: data.user_type !== undefined ? data.user_type : undefined,
+    },
+    select: {
+      userId: true, full_name: true, email: true, user_type: true, is_active: true, createdAt: true,
+      staffRole: { select: { role_id: true, role_name: true } },
+    },
+  });
+}
+
 async function deactivateStaff(organisationId, userId) {
   const user = await prisma.user.findFirst({ where: { userId, organisationId } });
   if (!user) throw makeError('Staff member not found', 404);
   return prisma.user.update({ where: { userId }, data: { is_active: false } });
+}
+
+async function reactivateStaff(organisationId, userId) {
+  const user = await prisma.user.findFirst({ where: { userId, organisationId } });
+  if (!user) throw makeError('Staff member not found', 404);
+  return prisma.user.update({ where: { userId }, data: { is_active: true } });
 }
 
 // ─── User Skills ──────────────────────────────────────────────
@@ -241,6 +273,6 @@ module.exports = {
   listDepartments, createDepartment, updateDepartment, deleteDepartment, assignStaffToDept,
   listRoles, createRole, updateRole, deleteRole,
   listSkills, createSkill, updateSkill, deleteSkill,
-  listStaff, registerStaff, deactivateStaff,
+  listStaff, registerStaff, updateStaff, deactivateStaff, reactivateStaff,
   assignSkillToStaff, removeSkillFromStaff,
 };

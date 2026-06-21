@@ -42,9 +42,10 @@ router.post('/availability', availabilityController.availabilityRules, availabil
 router.put('/availability/:id', availabilityController.availabilityRules, availabilityController.updateAvailability);
 router.delete('/availability/:id', availabilityController.removeAvailability);
 
-router.post('/leave', (req, res) => {
-  res.json({ message: 'Apply for leave — to be implemented' });
-});
+// ─── Leave (worker self-service) ──────────────────────────────
+router.get('/leave', workerController.listMyLeave);
+router.post('/leave', workerController.leaveRules, workerController.applyLeave);
+router.delete('/leave/:id', workerController.cancelLeave);
 
 router.post('/attendance/clock-in', attendanceController.clockIn);
 router.put('/attendance/clock-out', attendanceController.clockOut);

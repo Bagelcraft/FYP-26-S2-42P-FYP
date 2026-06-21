@@ -3,10 +3,17 @@ const bcrypt = require('bcrypt');
 const router = express.Router();
 const prisma = require('../config/prisma');
 const planService = require('../services/plan.service');
+const enquiryController = require('../controllers/enquiry.controller');
 
-// GET /api/v1/public/features
-router.get('/features', (req, res) => {
-  res.json({ message: 'Get platform features — to be implemented by Rachel' });
+// GET /api/v1/public/features — active landing features for the marketing site
+router.get('/features', async (req, res, next) => {
+  try {
+    const features = await prisma.landingFeature.findMany({
+      where:   { is_active: true },
+      orderBy: { sort_order: 'asc' },
+    });
+    res.json({ success: true, data: features });
+  } catch (err) { next(err); }
 });
 
 // GET /api/v1/public/pricing  — no auth required
@@ -18,9 +25,7 @@ router.get('/pricing', async (req, res, next) => {
 });
 
 // POST /api/v1/public/enquiry
-router.post('/enquiry', (req, res) => {
-  res.json({ message: 'Submit enquiry — to be implemented by Rachel' });
-});
+router.post('/enquiry', enquiryController.create);
 
 // POST /api/v1/public/organisations/register
 router.post('/organisations/register', async (req, res) => {

@@ -119,6 +119,54 @@ const updateMyProfile = async (req, res, next) => {
   }
 };
 
+// ─── Leave (worker self-service) ──────────────────────────────
+
+const LEAVE_TYPES = ['ANNUAL', 'MEDICAL', 'UNPAID', 'OTHER'];
+
+const leaveRules = [
+  body('leave_type').isIn(LEAVE_TYPES).withMessage(`leave_type must be one of: ${LEAVE_TYPES.join(', ')}`),
+  body('start_date').isISO8601().withMessage('start_date must be a valid ISO 8601 date'),
+  body('end_date')
+    .isISO8601().withMessage('end_date must be a valid ISO 8601 date')
+    .custom((val, { req }) => {
+      if (new Date(val) < new Date(req.body.start_date)) {
+        throw new Error('end_date must be on or after start_date');
+      }
+      return true;
+    }),
+];
+
+// POST /worker/leave  (apply)
+const applyLeave = async (req, res, next) => {
+  if (sendValidationError(req, res)) return;
+  try {
+    const leave = await workerService.applyLeave(req.user.userId, req.body);
+    res.status(201).json({ success: true, data: leave });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /worker/leave  (own requests)
+const listMyLeave = async (req, res, next) => {
+  try {
+    const data = await workerService.listMyLeave(req.user.userId);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// DELETE /worker/leave/:id  (withdraw a pending request)
+const cancelLeave = async (req, res, next) => {
+  try {
+    await workerService.cancelLeave(req.user.userId, parseInt(req.params.id, 10));
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+};
+
 
 module.exports = {
   listMyTasks,
@@ -129,5 +177,9 @@ module.exports = {
   progressRules,
   profileUpdateRules,
   updateMyProfile,
+  leaveRules,
+  applyLeave,
+  listMyLeave,
+  cancelLeave,
 };
 

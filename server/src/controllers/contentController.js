@@ -162,18 +162,34 @@ exports.createTestimonial = async (req, res) => {
   }
 };
 
+// Managers edit testimonial *content* only — visibility (is_active) is the
+// system admin's decision and is updated via setTestimonialVisibility.
 exports.updateTestimonial = async (req, res) => {
   try {
-    const { name, company, rating, review_text, profile_image, is_active } = req.body;
+    const { name, company, rating, review_text, profile_image } = req.body;
 
     const testimonial = await prisma.landingTestimonial.update({
       where: { testimonial_id: parseInt(req.params.id) },
-      data: { name, company, rating, review_text, profile_image, is_active },
+      data: { name, company, rating, review_text, profile_image },
     });
 
     res.json(testimonial);
   } catch (error) {
     res.status(500).json({ message: "Failed to update testimonial", error: error.message });
+  }
+};
+
+// System admin chooses which testimonials are shown on the marketing site.
+exports.setTestimonialVisibility = async (req, res) => {
+  try {
+    const testimonial = await prisma.landingTestimonial.update({
+      where: { testimonial_id: parseInt(req.params.id) },
+      data: { is_active: !!req.body.is_active },
+    });
+
+    res.json(testimonial);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update testimonial visibility", error: error.message });
   }
 };
 

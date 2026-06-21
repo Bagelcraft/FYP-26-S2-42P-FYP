@@ -6,7 +6,7 @@ import { PM_NAV, PM_SECONDARY } from './nav';
 
 // Backend: content.routes.js → landingTestimonial model.
 //   GET    /admin/content/testimonials        → Testimonial[]  (raw array)
-//   POST   /admin/content/testimonials        { name, company, rating, review_text, is_active }
+//   POST   /admin/content/testimonials        { name, company, rating, review_text }
 //   PUT    /admin/content/testimonials/:id    { ...same }
 //   DELETE /admin/content/testimonials/:id
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' }) : '');
@@ -28,8 +28,8 @@ function TestimonialModal({ item, onClose, onSaved }) {
   // New testimonials are authored by the logged-in manager, so the author's
   // name is auto-filled from their account rather than typed in.
   const [form, setForm] = useState(editing
-    ? { name: item.name ?? '', company: item.company ?? '', rating: item.rating ?? 5, review_text: item.review_text ?? '', is_active: item.is_active ?? true }
-    : { name: user?.full_name ?? '', company: '', rating: 5, review_text: '', is_active: true });
+    ? { name: item.name ?? '', company: item.company ?? '', rating: item.rating ?? 5, review_text: item.review_text ?? '' }
+    : { name: user?.full_name ?? '', company: '', rating: 5, review_text: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
@@ -38,7 +38,7 @@ function TestimonialModal({ item, onClose, onSaved }) {
     e.preventDefault();
     setSaving(true); setError('');
     try {
-      const body = { name: form.name.trim(), company: form.company.trim(), rating: Number(form.rating), review_text: form.review_text.trim(), is_active: form.is_active };
+      const body = { name: form.name.trim(), company: form.company.trim(), rating: Number(form.rating), review_text: form.review_text.trim() };
       const res = editing
         ? await api.put(`/admin/content/testimonials/${item.testimonial_id}`, body)
         : await api.post('/admin/content/testimonials', body);
@@ -83,13 +83,10 @@ function TestimonialModal({ item, onClose, onSaved }) {
             <textarea rows={4} value={form.review_text} onChange={set('review_text')} placeholder="Share your experience with Smart Task Allocation…"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
           </div>
-          <label className="flex items-center gap-2 text-sm text-gray-600">
-            <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="rounded" />
-            Publish to marketing site
-          </label>
+          <p className="text-xs text-gray-400">A system admin chooses whether this testimonial appears on the marketing site.</p>
           <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
-            <button type="submit" disabled={saving || !form.review_text.trim()} className="px-5 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">{saving ? 'Saving…' : editing ? 'Save Changes' : 'Publish'}</button>
+            <button type="submit" disabled={saving || !form.review_text.trim()} className="px-5 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">{saving ? 'Saving…' : editing ? 'Save Changes' : 'Add Testimonial'}</button>
           </div>
         </div>
       </form>
@@ -118,13 +115,6 @@ export default function Testimonials() {
     if (wasEdit) setItems((p) => p.map((t) => (t.testimonial_id === saved.testimonial_id ? saved : t)));
     else setItems((p) => [saved, ...p]);
     note(wasEdit ? 'Testimonial updated' : 'Testimonial published');
-  }
-  async function togglePublish(t) {
-    try {
-      const res = await api.put(`/admin/content/testimonials/${t.testimonial_id}`, { ...t, is_active: !t.is_active });
-      setItems((p) => p.map((x) => (x.testimonial_id === t.testimonial_id ? res.data : x)));
-      note(t.is_active ? 'Unpublished' : 'Published');
-    } catch (e) { alert(e.response?.data?.message || e.message); }
   }
   async function remove(t) {
     if (!confirm('Delete this testimonial?')) return;
@@ -155,7 +145,12 @@ export default function Testimonials() {
             {items.map((t) => (
               <div key={t.testimonial_id} className={`bg-white rounded-xl border shadow-sm flex flex-col ${t.is_active ? 'border-gray-100' : 'border-gray-200 opacity-70'}`}>
                 <div className="px-5 py-4 flex-1">
-                  <div className="flex items-center justify-between"><Stars n={t.rating} />{!t.is_active && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Draft</span>}</div>
+                  <div className="flex items-center justify-between">
+                    <Stars n={t.rating} />
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${t.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {t.is_active ? 'Shown on site' : 'Not shown'}
+                    </span>
+                  </div>
                   <p className="text-sm text-gray-700 mt-3 leading-relaxed">“{t.review_text}”</p>
                 </div>
                 <div className="px-5 py-3 border-t border-gray-50">
@@ -164,7 +159,6 @@ export default function Testimonials() {
                 </div>
                 <div className="px-5 py-3 border-t border-gray-50 flex gap-3">
                   <button onClick={() => setModal(t)} className="text-xs text-primary-600 hover:underline font-medium">Edit</button>
-                  <button onClick={() => togglePublish(t)} className="text-xs text-yellow-600 hover:underline font-medium">{t.is_active ? 'Unpublish' : 'Publish'}</button>
                   <button onClick={() => remove(t)} className="text-xs text-red-500 hover:underline font-medium ml-auto">Delete</button>
                 </div>
               </div>

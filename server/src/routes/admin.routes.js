@@ -3,6 +3,7 @@ const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
 const planController = require('../controllers/plan.controller');
 const adminController = require('../controllers/admin.controller');
+const enquiryController = require('../controllers/enquiry.controller');
 
 const router = express.Router();
 
@@ -22,15 +23,16 @@ router.post('/registrations/:id/reject',  adminController.rejectRegistration);
 
 // ─── Organisations ────────────────────────────────────────────
 
-router.get('/organisations', adminController.listOrganisations);
+router.get('/organisations',                 adminController.listOrganisations);
+router.post('/organisations',                adminController.createOrganisation);
+router.put('/organisations/:id/suspend',     adminController.suspendOrganisation);
+router.put('/organisations/:id/reactivate',  adminController.reactivateOrganisation);
 
-router.post('/organisations', (req, res) => {
-  res.json({ message: 'Create organisation — to be implemented' });
-});
+// ─── Contact enquiries ────────────────────────────────────────
 
-router.put('/organisations/:id/suspend', (req, res) => {
-  res.json({ message: 'Suspend organisation — to be implemented' });
-});
+router.get('/enquiries',         enquiryController.list);
+router.get('/enquiries/:id',     enquiryController.getOne);
+router.delete('/enquiries/:id',  enquiryController.remove);
 
 // ─── Audit logs (stub) ────────────────────────────────────────
 

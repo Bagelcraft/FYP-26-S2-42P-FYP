@@ -114,6 +114,13 @@ const staffQueryRules = [
   query('search').optional().isString(),
 ];
 
+const staffUpdateRules = [
+  body('full_name').optional().trim().notEmpty().isLength({ max: 100 }),
+  body('email').optional().isEmail().withMessage('Valid email required').normalizeEmail(),
+  body('user_type').optional().isIn(WORKER_TYPES).withMessage(`user_type must be one of: ${WORKER_TYPES.join(', ')}`),
+  body('role_id').optional({ nullable: true }).isInt({ min: 1 }),
+];
+
 async function listStaff(req, res, next) {
   try {
     ok(res, await svc.listStaff(orgId(req), { user_type: req.query.user_type, search: req.query.search }));
@@ -122,8 +129,14 @@ async function listStaff(req, res, next) {
 async function registerStaff(req, res, next) {
   try { ok(res, await svc.registerStaff(orgId(req), req.body), 201); } catch (e) { next(e); }
 }
+async function updateStaff(req, res, next) {
+  try { ok(res, await svc.updateStaff(orgId(req), id(req), req.body)); } catch (e) { next(e); }
+}
 async function deactivateStaff(req, res, next) {
   try { ok(res, await svc.deactivateStaff(orgId(req), id(req))); } catch (e) { next(e); }
+}
+async function reactivateStaff(req, res, next) {
+  try { ok(res, await svc.reactivateStaff(orgId(req), id(req))); } catch (e) { next(e); }
 }
 
 // ─── User Skills ──────────────────────────────────────────────
@@ -147,6 +160,6 @@ module.exports = {
   deptRules, deptUpdateRules, listDepts, createDept, updateDept, deleteDept, assignStaffRules, assignStaffToDept,
   roleRules, roleUpdateRules, listRoles, createRole, updateRole, deleteRole,
   skillRules, skillUpdateRules, listSkills, createSkill, updateSkill, deleteSkill,
-  staffRules, staffQueryRules, listStaff, registerStaff, deactivateStaff,
+  staffRules, staffQueryRules, staffUpdateRules, listStaff, registerStaff, updateStaff, deactivateStaff, reactivateStaff,
   assignSkillRules, assignSkill, removeSkill,
 };

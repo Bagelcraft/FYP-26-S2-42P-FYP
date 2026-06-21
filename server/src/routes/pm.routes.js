@@ -5,6 +5,7 @@ const { requireRole } = require('../middleware/rbac.middleware');
 const taskController = require('../controllers/task.controller');
 const allocationController = require('../controllers/allocation.controller');
 const managerController = require('../controllers/manager.controller'); // NEW
+const updateRequestController = require('../controllers/task-update-request.controller');
 
 const router = express.Router();
 
@@ -77,6 +78,10 @@ router.get('/tasks/:id/eligible-staff', allocationController.getEligibleStaff);
 router.post('/tasks/:id/assign',      allocationController.assignBodyRules, allocationController.manualAssign);
 router.post('/tasks/:id/reallocate',  allocationController.assignBodyRules, allocationController.reallocate);
 router.post('/tasks/:id/auto-allocate', allocationController.autoAllocate);
+
+// ─── Task update requests (manager → worker) ──────────────────
+router.get('/tasks/:id/update-requests',  updateRequestController.list);
+router.post('/tasks/:id/update-requests', updateRequestController.createRules, updateRequestController.create);
 
 // ─── Manager portal (NEW — Weishi) ────────────────────────────────────────
 

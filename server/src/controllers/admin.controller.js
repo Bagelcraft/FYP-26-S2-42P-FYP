@@ -22,9 +22,24 @@ async function listOrganisations(req, res, next) {
   try { ok(res, await svc.listOrganisations()); } catch (e) { next(e); }
 }
 
+async function createOrganisation(req, res, next) {
+  try { ok(res, await svc.createOrganisation(req.body), 201); } catch (e) { next(e); }
+}
+
+async function suspendOrganisation(req, res, next) {
+  try { ok(res, await svc.setOrganisationActive(id(req), false)); } catch (e) { next(e); }
+}
+
+async function reactivateOrganisation(req, res, next) {
+  try { ok(res, await svc.setOrganisationActive(id(req), true)); } catch (e) { next(e); }
+}
+
 module.exports = {
   listRegistrations,
   approveRegistration,
   rejectRegistration,
   listOrganisations,
+  createOrganisation,
+  suspendOrganisation,
+  reactivateOrganisation,
 };

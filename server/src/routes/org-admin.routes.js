@@ -31,9 +31,11 @@ router.delete('/skills/:id',  c.deleteSkill);
 
 // ─── Staff ────────────────────────────────────────────────────
 
-router.get('/staff',                  c.staffQueryRules, c.validate, c.listStaff);
-router.post('/staff',                 c.staffRules,      c.validate, c.registerStaff);
+router.get('/staff',                  c.staffQueryRules,  c.validate, c.listStaff);
+router.post('/staff',                 c.staffRules,       c.validate, c.registerStaff);
+router.patch('/staff/:id',            c.staffUpdateRules, c.validate, c.updateStaff);
 router.patch('/staff/:id/deactivate', c.deactivateStaff);
+router.patch('/staff/:id/reactivate', c.reactivateStaff);
 
 // ─── User Skills ──────────────────────────────────────────────
 
