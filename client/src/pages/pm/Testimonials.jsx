@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import api from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
 import { PM_NAV, PM_SECONDARY } from './nav';
 
 // Backend: content.routes.js → landingTestimonial model.
@@ -22,10 +23,13 @@ function Stars({ n, onChange }) {
 }
 
 function TestimonialModal({ item, onClose, onSaved }) {
+  const { user } = useAuth();
   const editing = !!item;
+  // New testimonials are authored by the logged-in manager, so the author's
+  // name is auto-filled from their account rather than typed in.
   const [form, setForm] = useState(editing
     ? { name: item.name ?? '', company: item.company ?? '', rating: item.rating ?? 5, review_text: item.review_text ?? '', is_active: item.is_active ?? true }
-    : { name: '', company: '', rating: 5, review_text: '', is_active: true });
+    : { name: user?.full_name ?? '', company: '', rating: 5, review_text: '', is_active: true });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
@@ -59,7 +63,14 @@ function TestimonialModal({ item, onClose, onSaved }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Name *</label>
-              <input required value={form.name} onChange={set('name')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              <input
+                required
+                value={form.name}
+                onChange={set('name')}
+                readOnly={!editing}
+                title={!editing ? 'Auto-filled from your account' : undefined}
+                className={`w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${!editing ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Company / Role</label>

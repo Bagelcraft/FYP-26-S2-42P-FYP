@@ -57,6 +57,10 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
+        <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 mb-6 transition-colors">
+          <span aria-hidden="true">←</span> Back to home
+        </Link>
+
         {/* Logo */}
         <div className="text-center mb-8">
           <span className="text-primary-600 font-bold text-2xl">SmartTask</span>

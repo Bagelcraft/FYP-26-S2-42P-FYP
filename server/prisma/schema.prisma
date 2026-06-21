@@ -337,6 +337,7 @@ model ShiftChangeRequest {
 model UnregisteredUser {
   marketing_user_id Int      @id @default(autoincrement())
   organisation_id   Int?
+  full_name         String?  @db.VarChar(150)
   email             String   @db.VarChar(150)
   password          String   @db.VarChar(255)
   role              String?  @db.VarChar(50)

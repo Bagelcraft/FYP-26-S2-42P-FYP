@@ -1,21 +1,69 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import Badge from '../../components/Badge';
 import { ADMIN_NAV } from './nav';
+import api from '../../utils/api';
 
-const mockOrgs = [
-  { id: 1, name: 'TechCorp Pte Ltd', status: 'ACTIVE', staff: 12, plan: 'Pro', created: '2026-01-15' },
-  { id: 2, name: 'BuildTech Solutions', status: 'ACTIVE', staff: 8, plan: 'Basic', created: '2026-02-20' },
-  { id: 3, name: 'LogiCore Asia', status: 'SUSPENDED', staff: 5, plan: 'Pro', created: '2026-03-10' },
-];
+const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : '—');
 
 export default function Organisations() {
+  const [pending, setPending] = useState([]);
+  const [orgs, setOrgs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [actingId, setActingId] = useState(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('ALL');
 
-  const filtered = mockOrgs.filter((o) => {
+  const load = async () => {
+    setError('');
+    try {
+      const [regRes, orgRes] = await Promise.all([
+        api.get('/admin/registrations'),
+        api.get('/admin/organisations'),
+      ]);
+      setPending(regRes.data.data ?? []);
+      setOrgs(orgRes.data.data ?? []);
+    } catch (err) {
+      setError(err.response?.data?.message ?? 'Failed to load organisations.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const approve = async (id) => {
+    setActingId(id);
+    setError('');
+    try {
+      await api.post(`/admin/registrations/${id}/approve`);
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.message ?? 'Failed to approve registration.');
+    } finally {
+      setActingId(null);
+    }
+  };
+
+  const reject = async (id) => {
+    if (!window.confirm('Reject this registration request? This cannot be undone.')) return;
+    setActingId(id);
+    setError('');
+    try {
+      await api.post(`/admin/registrations/${id}/reject`);
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.message ?? 'Failed to reject registration.');
+    } finally {
+      setActingId(null);
+    }
+  };
+
+  const filtered = orgs.filter((o) => {
+    const status = o.isActive ? 'ACTIVE' : 'SUSPENDED';
     const matchSearch = o.name.toLowerCase().includes(search.toLowerCase());
-    const matchFilter = filter === 'ALL' || o.status === filter;
+    const matchFilter = filter === 'ALL' || status === filter;
     return matchSearch && matchFilter;
   });
 
@@ -25,11 +73,72 @@ export default function Organisations() {
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-800">Organisations</h2>
-            <p className="text-gray-500 text-sm mt-0.5">Manage all registered organisations on the platform.</p>
+            <p className="text-gray-500 text-sm mt-0.5">Review registration requests and manage registered organisations.</p>
           </div>
-          <button className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-            + Add Organisation
-          </button>
+        </div>
+
+        {error && (
+          <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">
+            {error}
+          </div>
+        )}
+
+        {/* Pending registration requests */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-gray-800">Pending Registration Requests</h3>
+            {pending.length > 0 && (
+              <span className="text-xs font-medium text-yellow-700 bg-yellow-100 rounded-full px-2 py-0.5">
+                {pending.length}
+              </span>
+            )}
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+                <th className="px-5 py-3 text-left font-medium">Company</th>
+                <th className="px-5 py-3 text-left font-medium">Applicant</th>
+                <th className="px-5 py-3 text-left font-medium">Email</th>
+                <th className="px-5 py-3 text-left font-medium">Position</th>
+                <th className="px-5 py-3 text-left font-medium">Submitted</th>
+                <th className="px-5 py-3 text-left font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {pending.map((r) => (
+                <tr key={r.marketing_user_id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-5 py-3 font-medium text-gray-800">{r.company_name}</td>
+                  <td className="px-5 py-3 text-gray-600">{r.full_name ?? '—'}</td>
+                  <td className="px-5 py-3 text-gray-600">{r.email}</td>
+                  <td className="px-5 py-3 text-gray-500">{r.position ?? '—'}</td>
+                  <td className="px-5 py-3 text-gray-500">{fmtDate(r.created_at)}</td>
+                  <td className="px-5 py-3">
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => approve(r.marketing_user_id)}
+                        disabled={actingId === r.marketing_user_id}
+                        className="text-xs font-medium text-green-600 hover:underline disabled:opacity-50"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => reject(r.marketing_user_id)}
+                        disabled={actingId === r.marketing_user_id}
+                        className="text-xs font-medium text-red-600 hover:underline disabled:opacity-50"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {!loading && pending.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-5 py-8 text-center text-gray-400">No pending requests.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
 
         {/* Filters */}
@@ -52,40 +161,34 @@ export default function Organisations() {
           </select>
         </div>
 
-        {/* Table */}
+        {/* Registered organisations */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
                 <th className="px-5 py-3 text-left font-medium">Organisation</th>
-                <th className="px-5 py-3 text-left font-medium">Plan</th>
                 <th className="px-5 py-3 text-left font-medium">Staff</th>
                 <th className="px-5 py-3 text-left font-medium">Registered</th>
                 <th className="px-5 py-3 text-left font-medium">Status</th>
-                <th className="px-5 py-3 text-left font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.map((org) => (
-                <tr key={org.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={org.organisation_id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-5 py-3 font-medium text-gray-800">{org.name}</td>
-                  <td className="px-5 py-3 text-gray-600">{org.plan}</td>
-                  <td className="px-5 py-3 text-gray-600">{org.staff}</td>
-                  <td className="px-5 py-3 text-gray-500">{org.created}</td>
-                  <td className="px-5 py-3"><Badge status={org.status} /></td>
-                  <td className="px-5 py-3">
-                    <div className="flex gap-3">
-                      <button className="text-xs text-primary-600 hover:underline">View</button>
-                      <button className="text-xs text-yellow-600 hover:underline">
-                        {org.status === 'ACTIVE' ? 'Suspend' : 'Reinstate'}
-                      </button>
-                    </div>
-                  </td>
+                  <td className="px-5 py-3 text-gray-600">{org._count?.users ?? 0}</td>
+                  <td className="px-5 py-3 text-gray-500">{fmtDate(org.createdAt)}</td>
+                  <td className="px-5 py-3"><Badge status={org.isActive ? 'ACTIVE' : 'SUSPENDED'} /></td>
                 </tr>
               ))}
-              {filtered.length === 0 && (
+              {!loading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center text-gray-400">No organisations found.</td>
+                  <td colSpan={4} className="px-5 py-10 text-center text-gray-400">No organisations found.</td>
+                </tr>
+              )}
+              {loading && (
+                <tr>
+                  <td colSpan={4} className="px-5 py-10 text-center text-gray-400">Loading…</td>
                 </tr>
               )}
             </tbody>

@@ -12,6 +12,5 @@ export const PM_NAV = [
 // Account / peripheral — rendered as a subordinate "Account" group at the
 // bottom of the sidebar (see DashboardLayout `secondaryNav` prop).
 export const PM_SECONDARY = [
-  { path: '/pm/subscription', icon: '💳', label: 'Subscription' },
   { path: '/pm/testimonials', icon: '⭐', label: 'Testimonials' },
 ];
