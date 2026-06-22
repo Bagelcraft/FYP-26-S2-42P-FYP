@@ -310,6 +310,13 @@ export default function Home() {
         <div className="w-full px-8 h-16 flex items-center justify-between">
           <span className="text-blue-400 font-bold text-lg tracking-tight">SmartTask</span>
           <div className="hidden md:flex items-center gap-8 text-sm text-slate-300 font-medium">
+            <a
+              href="#top"
+              onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              className="hover:text-white transition-colors"
+            >
+              Home
+            </a>
             <a href="#features" className="hover:text-white transition-colors">Features</a>
             <a href="#demo" className="hover:text-white transition-colors">About Us</a>
             <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
