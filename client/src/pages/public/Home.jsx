@@ -321,12 +321,20 @@ export default function Home() {
             <a href="#demo" className="hover:text-white transition-colors">About Us</a>
             <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
           </div>
-          <Link
-            to="/login"
-            className="bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
-          >
-            Log In
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/login"
+              className="bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
+            >
+              Log In
+            </Link>
+            <Link
+              to="/register"
+              className="bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
+            >
+              Sign Up
+            </Link>
+          </div>
         </div>
       </nav>
 
