@@ -9,7 +9,6 @@ import Unauthorized from './pages/Unauthorized';
 // Admin
 import AdminDashboard from './pages/admin/AdminDashboard';
 import Organisations from './pages/admin/Organisations';
-import Marketing from './pages/admin/Marketing';
 import AuditLogs from './pages/admin/AuditLogs';
 import AdminNotifications from './pages/admin/AdminNotifications';
 import SubscriptionPlans from './pages/admin/SubscriptionPlans';
@@ -33,7 +32,6 @@ import Tasks from './pages/pm/Tasks';
 import Team from './pages/pm/Team';                     // NEW
 import Allocate from './pages/pm/Allocate';
 import PMLeave from './pages/pm/Leave';                  // NEW (aliased — worker Leave also exists)
-import Testimonials from './pages/pm/Testimonials';      // NEW
 import Reports from './pages/pm/Reports';
 import PMNotifications from './pages/pm/PMNotifications';
 
@@ -66,7 +64,6 @@ export default function App() {
           {/* System Admin */}
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/organisations" element={<Organisations />} />
-          <Route path="/admin/marketing" element={<Marketing />} />
           <Route path="/admin/plans" element={<SubscriptionPlans />} />
           <Route path="/admin/enquiries" element={<AdminEnquiries />} />
           <Route path="/admin/landing-content" element={<AdminLandingContent />} />
@@ -90,7 +87,6 @@ export default function App() {
           <Route path="/pm/team" element={<Team />} />
           <Route path="/pm/allocate" element={<Allocate />} />
           <Route path="/pm/leave" element={<PMLeave />} />
-          <Route path="/pm/testimonials" element={<Testimonials />} />
           <Route path="/pm/reports" element={<Reports />} />
           <Route path="/pm/notifications" element={<PMNotifications />} />
 

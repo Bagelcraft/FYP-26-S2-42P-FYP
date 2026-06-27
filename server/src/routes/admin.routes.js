@@ -3,6 +3,7 @@ const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
 const planController = require('../controllers/plan.controller');
 const enquiryController = require('../controllers/enquiryController');
+const adminController = require('../controllers/admin.controller');
 
 const router = express.Router();
 
@@ -14,19 +15,18 @@ router.get('/health', (req, res) => {
   res.json({ success: true, data: { status: 'OK' } });
 });
 
-// ─── Organisations (stub) ─────────────────────────────────────
+// ─── Organisation registration requests ──────────────────────
 
-router.get('/organisations', (req, res) => {
-  res.json({ message: 'Get all organisations — to be implemented' });
-});
+router.get('/registrations',              adminController.listRegistrations);
+router.post('/registrations/:id/approve', adminController.approveRegistration);
+router.post('/registrations/:id/reject',  adminController.rejectRegistration);
 
-router.post('/organisations', (req, res) => {
-  res.json({ message: 'Create organisation — to be implemented' });
-});
+// ─── Organisations ────────────────────────────────────────────
 
-router.put('/organisations/:id/suspend', (req, res) => {
-  res.json({ message: 'Suspend organisation — to be implemented' });
-});
+router.get('/organisations',                 adminController.listOrganisations);
+router.post('/organisations',                adminController.createOrganisation);
+router.put('/organisations/:id/suspend',     adminController.suspendOrganisation);
+router.put('/organisations/:id/reactivate',  adminController.reactivateOrganisation);
 
 // ─── Audit logs (stub) ────────────────────────────────────────
 

@@ -58,4 +58,9 @@ router.get('/attendance', attendanceController.getAttendance);
 router.post('/attendance/clock-in', attendanceController.clockIn);
 router.put('/attendance/clock-out', attendanceController.clockOut);
 
+// ─── Leave (worker self-service) ──────────────────────────────
+router.get('/leave', workerController.listMyLeave);
+router.post('/leave', workerController.leaveRules, workerController.applyLeave);
+router.delete('/leave/:id', workerController.cancelLeave);
+
 module.exports = router;
