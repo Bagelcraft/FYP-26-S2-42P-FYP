@@ -19,6 +19,8 @@ const {
 } = require("../controllers/contentController");
 
 const adminOnly = [verifyToken, requireRole(["SYSTEM_ADMIN"])];
+// Testimonials content is managed by managers; admins can manage them too.
+const testimonialWriters = [verifyToken, requireRole(["SYSTEM_ADMIN", "PROJECT_MANAGER"])];
 
 // Public reads (used by the landing page)
 router.get("/", getContent);
@@ -34,8 +36,8 @@ router.post("/features",        ...adminOnly, createFeature);
 router.put("/features/:id",     ...adminOnly, updateFeature);
 router.delete("/features/:id",  ...adminOnly, deleteFeature);
 
-router.post("/testimonials",        ...adminOnly, createTestimonial);
-router.put("/testimonials/:id",     ...adminOnly, updateTestimonial);
-router.delete("/testimonials/:id",  ...adminOnly, deleteTestimonial);
+router.post("/testimonials",        ...testimonialWriters, createTestimonial);
+router.put("/testimonials/:id",     ...testimonialWriters, updateTestimonial);
+router.delete("/testimonials/:id",  ...testimonialWriters, deleteTestimonial);
 
 module.exports = router;
