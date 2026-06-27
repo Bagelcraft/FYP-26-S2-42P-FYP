@@ -92,7 +92,40 @@ const getSkills = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// GET /pm/testimonials
+const listTestimonials = async (req, res, next) => {
+  try {
+    const data = await managerService.listTestimonials(req.user.organisationId);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
+// POST /pm/testimonials  { rating, review_text, profile_image? }
+const createTestimonial = async (req, res, next) => {
+  try {
+    const data = await managerService.createTestimonial(req.user.userId, req.body);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
+// PUT /pm/testimonials/:id
+const updateTestimonial = async (req, res, next) => {
+  try {
+    const data = await managerService.updateTestimonial(parseInt(req.params.id, 10), req.user.organisationId, req.body);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
+// DELETE /pm/testimonials/:id
+const deleteTestimonial = async (req, res, next) => {
+  try {
+    const data = await managerService.deleteTestimonial(parseInt(req.params.id, 10), req.user.organisationId);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
   getTeam, listLeave, decideLeave, listLeaveBalances, updateLeaveBalance, getSubscription, listBilling,
   getDepartments, getSkills,
+  listTestimonials, createTestimonial, updateTestimonial, deleteTestimonial,
 };

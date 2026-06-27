@@ -195,6 +195,7 @@ model Skill {
   organisation    Organisation @relation(fields: [organisation_id], references: [organisation_id])
   userSkills      UserSkill[]
   tasks           Task[]
+  taskSkills      TaskSkill[]
 }
 
 model UserSkill {
@@ -274,9 +275,21 @@ model Task {
   department        Department?      @relation(fields: [department_id], references: [department_id])
   createdBy         User             @relation("CreatedTasks", fields: [created_by], references: [userId])
   requiredSkill     Skill?           @relation(fields: [required_skill_id], references: [skill_id])
+  requiredSkills    TaskSkill[]
   assignments       TaskAssignment[]
   allocationHistory AllocationHistory[]
   updateRequests    TaskUpdateRequest[]
+}
+
+model TaskSkill {
+  task_skill_id Int   @id @default(autoincrement())
+  task_id       Int
+  skill_id      Int
+
+  task  Task  @relation(fields: [task_id],  references: [task_id], onDelete: Cascade)
+  skill Skill @relation(fields: [skill_id], references: [skill_id])
+
+  @@unique([task_id, skill_id])
 }
 
 model TaskAssignment {
@@ -471,4 +484,38 @@ model PlanFeature {
   feature_name String @db.VarChar(200)
 
   plan         SubscriptionPlan @relation(fields: [plan_id], references: [plan_id])
+}
+// ─── Landing page CMS (used by contentController.js) ─────────
+
+model landingContent {
+  id              Int      @id @default(autoincrement())
+  hero_title      String?  @db.VarChar(200)
+  hero_subtitle   String?  @db.Text
+  hero_image_url  String?  @db.VarChar(500)
+  video_title     String?  @db.VarChar(200)
+  video_subtitle  String?  @db.Text
+  video_url       String?  @db.VarChar(500)
+  plan_name       String?  @db.VarChar(100)
+  plan_price      String?  @db.VarChar(50)
+  plan_description String? @db.Text
+}
+
+model landingFeature {
+  feature_id  Int      @id @default(autoincrement())
+  title       String   @db.VarChar(200)
+  description String?  @db.Text
+  icon_url    String?  @db.VarChar(500)
+  sort_order  Int      @default(0)
+  is_active   Boolean  @default(true)
+}
+
+model landingTestimonial {
+  testimonial_id Int      @id @default(autoincrement())
+  name           String   @db.VarChar(100)
+  company        String?  @db.VarChar(150)
+  rating         Int      @default(5)
+  review_text    String   @db.Text
+  profile_image  String?  @db.VarChar(500)
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now())
 }

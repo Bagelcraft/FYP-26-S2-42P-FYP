@@ -168,139 +168,6 @@ function UpdateRequestsViewModal({ task, onClose }) {
   );
 }
 
-// ── Allocate modal ────────────────────────────────────────────────────────
-const typeLabel = (t) => (t === 'PERMANENT_WORKER' ? 'Permanent' : t === 'TEMPORARY_WORKER' ? 'Temporary' : t);
-
-function HoursBar({ c }) {
-  const pct = c.maxHours ? Math.min((c.weeklyHours / c.maxHours) * 100, 100) : 0;
-  const near = c.eligible && c.remainingHours != null && c.remainingHours <= 4;
-  const color = !c.withinHours ? 'bg-red-500' : near ? 'bg-yellow-500' : 'bg-green-500';
-  return (
-    <div className="flex items-center gap-2">
-      <div className="bg-gray-100 rounded-full h-1.5 w-16"><div className={`${color} h-1.5 rounded-full`} style={{ width: `${pct}%` }} /></div>
-      <span className="text-xs text-gray-500 whitespace-nowrap">{c.weeklyHours}/{c.maxHours ?? '∞'}h</span>
-    </div>
-  );
-}
-function CheckChip({ ok, children }) {
-  return (
-    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
-      <span>{ok ? '✓' : '✕'}</span>{children}
-    </span>
-  );
-}
-function CandidateAvatar({ name, ring }) {
-  return <div className={`w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 text-sm font-bold flex-shrink-0 ${ring ? 'ring-2 ring-primary-500 ring-offset-1' : ''}`}>{name?.[0] ?? '?'}</div>;
-}
-
-function AllocateModal({ task, onClose, onAllocated }) {
-  const [candidates, setCandidates] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    api.get(`/pm/tasks/${task.task_id}/eligible-staff`)
-      .then((r) => setCandidates(r.data.data?.candidates ?? []))
-      .catch((e) => setError(e.response?.data?.message || e.message))
-      .finally(() => setLoading(false));
-  }, [task.task_id]);
-
-  const suggestion = candidates.find((c) => c.eligible);
-
-  async function assign(userId, auto) {
-    setBusy(true); setError('');
-    try {
-      const url = auto ? `/pm/tasks/${task.task_id}/auto-allocate` : `/pm/tasks/${task.task_id}/assign`;
-      await api.post(url, auto ? {} : { assigned_to: userId });
-      const name = auto ? (suggestion?.full_name ?? 'staff') : (candidates.find((c) => c.userId === userId)?.full_name ?? 'staff');
-      onAllocated(`${auto ? 'Auto-allocated' : 'Assigned'} "${task.title}" → ${name}`);
-      onClose();
-    } catch (e) {
-      setError(e.response?.data?.message || e.message);
-      setBusy(false);
-    }
-  }
-
-  const fmtDueLocal = (iso) => (iso ? new Date(iso).toLocaleDateString('en-SG', { day: '2-digit', month: 'short' }) : '—');
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-          <div>
-            <h2 className="font-semibold text-gray-800">Allocate Task</h2>
-            <p className="text-xs text-gray-400 mt-0.5">{task.title} · {task.requiredSkill?.skill_name ?? 'Any skill'} · Due {fmtDueLocal(task.end_datetime)}</p>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
-        </div>
-
-        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
-          {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-600">{error}</div>}
-
-          {loading && <p className="text-sm text-gray-400 text-center py-10">Evaluating eligibility…</p>}
-
-          {!loading && suggestion && (
-            <div className="flex items-center justify-between bg-gradient-to-r from-primary-50 to-blue-50 border border-primary-100 rounded-xl px-4 py-3">
-              <div className="flex items-center gap-3">
-                <CandidateAvatar name={suggestion.full_name} ring />
-                <div>
-                  <p className="text-xs text-primary-600 font-semibold uppercase tracking-wide">🤖 Engine recommendation</p>
-                  <p className="text-sm font-medium text-gray-800">{suggestion.full_name}{suggestion.remainingHours != null ? ` · ${suggestion.remainingHours}h spare` : ''}</p>
-                </div>
-              </div>
-              <button disabled={busy} onClick={() => assign(suggestion.userId, true)}
-                className="text-sm font-medium bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg transition-colors">
-                Auto-assign
-              </button>
-            </div>
-          )}
-
-          {!loading && candidates.length === 0 && (
-            <p className="text-sm text-gray-400 text-center py-10">No staff with the required skill found.</p>
-          )}
-
-          {!loading && candidates.length > 0 && (
-            <div className="border border-gray-100 rounded-xl overflow-hidden">
-              <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Ranked Candidates</p>
-                <span className="text-xs text-gray-400">{candidates.filter((c) => c.eligible).length} of {candidates.length} eligible</span>
-              </div>
-              <div className="divide-y divide-gray-50">
-                {candidates.map((c, i) => (
-                  <div key={c.userId} className={`px-4 py-3.5 ${!c.eligible ? 'opacity-60' : ''}`}>
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-gray-300 font-mono w-4">{i + 1}</span>
-                        <CandidateAvatar name={c.full_name} ring={c === suggestion} />
-                        <div>
-                          <p className="text-sm font-medium text-gray-800">{c.full_name}</p>
-                          <p className="text-xs text-gray-400">{typeLabel(c.user_type)}{c.staffRole ? ` · ${c.staffRole}` : ''}</p>
-                        </div>
-                      </div>
-                      <button disabled={!c.eligible || busy} onClick={() => assign(c.userId, false)}
-                        className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${c.eligible ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}>
-                        {c.eligible ? 'Assign' : 'Skip'}
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 mt-2 pl-11">
-                      {task.requiredSkill && <CheckChip ok>{task.requiredSkill.skill_name}</CheckChip>}
-                      <CheckChip ok={c.isAvailable}>{c.isAvailable ? 'Available' : 'No availability'}</CheckChip>
-                      <CheckChip ok={c.withinHours}>{c.withinHours ? `${c.remainingHours}h spare` : 'Hours maxed'}</CheckChip>
-                      <HoursBar c={c} />
-                    </div>
-                    {!c.eligible && c.ineligibleReason && <p className="text-xs text-red-500 mt-1 pl-11">{c.ineligibleReason}</p>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── helpers ────────────────────────────────────────────────────────────────
 const fmtDue = (iso) => {
   if (!iso) return '—';
@@ -309,24 +176,82 @@ const fmtDue = (iso) => {
 };
 const assigneeOf = (t) => t.assignments?.[0]?.assignedTo?.full_name ?? null;
 
+// Normalise whatever skill shape the API returns into [{ skill_id, skill_name }].
+const skillsOf = (t) => {
+  if (Array.isArray(t.requiredSkills) && t.requiredSkills.length) {
+    return t.requiredSkills.map((s) => s.skill ?? s); // tolerate raw join rows
+  }
+  if (t.requiredSkill) return [t.requiredSkill];
+  return [];
+};
+
 const STATUS_OPTIONS = ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 const toDateInput = (iso) => (iso ? new Date(iso).toISOString().slice(0, 10) : '');
 
+// ── Multi-select dropdown for skills ────────────────────────────────────────
+function SkillMultiSelect({ skills, selected, onToggle }) {
+  const [open, setOpen] = useState(false);
+  const chosen = skills.filter((s) => selected.includes(String(s.skill_id)));
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => setOpen((o) => !o)}
+        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-left flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-primary-500">
+        <span className="flex flex-wrap gap-1 flex-1 min-w-0">
+          {chosen.length === 0 && <span className="text-gray-400">Select skills…</span>}
+          {chosen.map((s) => (
+            <span key={s.skill_id} className="inline-flex items-center gap-1 bg-primary-50 text-primary-700 text-xs px-2 py-0.5 rounded-full">
+              {s.skill_name}
+              <span onClick={(e) => { e.stopPropagation(); onToggle(s.skill_id); }} className="hover:text-primary-900 cursor-pointer leading-none">×</span>
+            </span>
+          ))}
+        </span>
+        <span className={`text-gray-400 text-xs transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto py-1">
+            {skills.map((s) => {
+              const on = selected.includes(String(s.skill_id));
+              return (
+                <button type="button" key={s.skill_id} onClick={() => onToggle(s.skill_id)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-gray-700 hover:bg-gray-50">
+                  <span className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] flex-shrink-0 ${on ? 'bg-primary-600 border-primary-600 text-white' : 'border-gray-300'}`}>{on ? '✓' : ''}</span>
+                  {s.skill_name}
+                </button>
+              );
+            })}
+            {skills.length === 0 && <p className="px-3 py-2 text-sm text-gray-400">No skills defined.</p>}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function TaskModal({ task, depts, skills, onClose, onSaved }) {
   const editing = !!task;
+  const initialSkillIds = editing
+    ? skillsOf(task).map((s) => String(s.skill_id))
+    : [];
   const [form, setForm] = useState(editing
     ? {
         title: task.title,
         department_id: task.department_id ? String(task.department_id) : '',
-        required_skill_id: task.required_skill_id ? String(task.required_skill_id) : '',
+        required_skill_ids: initialSkillIds,
         status: task.status,
         due: toDateInput(task.end_datetime),
         description: task.description ?? '',
       }
-    : { title: '', department_id: '', required_skill_id: '', status: 'PENDING', due: '', description: '' });
+    : { title: '', department_id: '', required_skill_ids: [], status: 'PENDING', due: '', description: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const toggleSkill = (id) => setForm((f) => {
+    const s = String(id);
+    const has = f.required_skill_ids.includes(s);
+    return { ...f, required_skill_ids: has ? f.required_skill_ids.filter((x) => x !== s) : [...f.required_skill_ids, s] };
+  });
 
   async function submit(e) {
     e.preventDefault();
@@ -340,7 +265,7 @@ function TaskModal({ task, depts, skills, onClose, onSaved }) {
         start_datetime: `${day}T09:00:00`,
         end_datetime: `${day}T18:00:00`,
         department_id: form.department_id ? Number(form.department_id) : null,
-        required_skill_id: form.required_skill_id ? Number(form.required_skill_id) : null,
+        required_skill_ids: form.required_skill_ids.map(Number),
       };
       let res;
       if (editing) {
@@ -372,21 +297,17 @@ function TaskModal({ task, depts, skills, onClose, onSaved }) {
             <input required value={form.title} onChange={set('title')} placeholder="e.g. Build Reports Export"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Department</label>
-              <select value={form.department_id} onChange={set('department_id')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-                <option value="">— None —</option>
-                {depts.map((d) => <option key={d.department_id} value={d.department_id}>{d.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Required Skill</label>
-              <select value={form.required_skill_id} onChange={set('required_skill_id')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-                <option value="">— None —</option>
-                {skills.map((s) => <option key={s.skill_id} value={s.skill_id}>{s.skill_name}</option>)}
-              </select>
-            </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Department</label>
+            <select value={form.department_id} onChange={set('department_id')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <option value="">— None —</option>
+              {depts.map((d) => <option key={d.department_id} value={d.department_id}>{d.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">Required Skills</label>
+            <SkillMultiSelect skills={skills} selected={form.required_skill_ids} onToggle={toggleSkill} />
+            <p className="text-xs text-gray-400 mt-1.5">Select one or more skills a worker must have. The allocation engine requires <span className="font-medium text-gray-500">all</span> selected skills.</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -425,28 +346,14 @@ export default function Tasks() {
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [search, setSearch] = useState('');
+  const [creating, setCreating] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
-  const [allocatingTask, setAllocatingTask] = useState(null);
   const [historyTask, setHistoryTask] = useState(null);
   const [requestUpdateTask, setRequestUpdateTask] = useState(null);
   const [viewRequestsTask, setViewRequestsTask] = useState(null);
-  const [autoAllocating, setAutoAllocating] = useState(null);
   const [toast, setToast] = useState('');
 
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 2600); };
-
-  async function autoAllocate(t) {
-    setAutoAllocating(t.task_id);
-    try {
-      await api.post(`/pm/tasks/${t.task_id}/auto-allocate`, {});
-      load();
-      showToast(`Auto-allocated "${t.title}" · working hours updated`);
-    } catch (e) {
-      alert(e.response?.data?.message || e.message);
-    } finally {
-      setAutoAllocating(null);
-    }
-  }
 
   const load = useCallback(() => {
     setLoading(true);
@@ -489,9 +396,12 @@ export default function Tasks() {
   return (
     <DashboardLayout navItems={PM_NAV} secondaryNav={PM_SECONDARY} roleLabel="Manager">
       <div className="space-y-6">
-        <div>
-          <h2 className="text-xl font-bold text-gray-800">Tasks</h2>
-          <p className="text-gray-500 text-sm mt-0.5">View, assign, track and manage tasks.</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-gray-800">Tasks</h2>
+            <p className="text-gray-500 text-sm mt-0.5">Create, assign, track and delete tasks.</p>
+          </div>
+          <button onClick={() => setCreating(true)} className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">+ Create Task</button>
         </div>
 
         {error && <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-600">{error}</div>}
@@ -519,46 +429,45 @@ export default function Tasks() {
                   <th className="px-5 py-3 text-left font-medium">Task</th>
                   <th className="px-5 py-3 text-left font-medium">Department</th>
                   <th className="px-5 py-3 text-left font-medium">Assigned To</th>
-                  <th className="px-5 py-3 text-left font-medium">Skill</th>
+                  <th className="px-5 py-3 text-left font-medium">Skills</th>
                   <th className="px-5 py-3 text-left font-medium">Due</th>
                   <th className="px-5 py-3 text-left font-medium">Status</th>
                   <th className="px-5 py-3 text-left font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filtered.map((t) => (
-                  <tr key={t.task_id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-5 py-3 font-medium text-gray-800">{t.title}</td>
-                    <td className="px-5 py-3 text-gray-500">{t.department?.name ?? '—'}</td>
-                    <td className="px-5 py-3 text-gray-600">{assigneeOf(t) ?? <span className="text-gray-400">Unassigned</span>}</td>
-                    <td className="px-5 py-3">
-                      {t.requiredSkill ? <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">{t.requiredSkill.skill_name}</span> : <span className="text-gray-300">—</span>}
-                    </td>
-                    <td className="px-5 py-3 text-gray-500">{fmtDue(t.end_datetime)}</td>
-                    <td className="px-5 py-3"><Badge status={t.status} /></td>
-                    <td className="px-5 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        {t.status === 'PENDING' && (
-                          <>
-                            <button onClick={() => setAllocatingTask(t)} className="text-xs text-green-600 font-medium hover:underline">Allocate</button>
-                            <button disabled={autoAllocating === t.task_id} onClick={() => autoAllocate(t)} className="text-xs text-purple-600 font-medium hover:underline disabled:opacity-50">
-                              {autoAllocating === t.task_id ? 'Allocating…' : '🤖 Auto'}
-                            </button>
-                          </>
-                        )}
-                        <button onClick={() => setEditingTask(t)} className="text-xs text-primary-600 hover:underline">Edit</button>
-                        <button onClick={() => delTask(t)} className="text-xs text-red-500 hover:underline">Delete</button>
-                        <button onClick={() => setHistoryTask(t)} className="text-xs text-gray-500 hover:underline">History</button>
-                        {['ASSIGNED', 'IN_PROGRESS'].includes(t.status) && (
-                          <button onClick={() => setRequestUpdateTask(t)} className="text-xs text-amber-600 hover:underline">Request Update</button>
-                        )}
-                        {['ASSIGNED', 'IN_PROGRESS'].includes(t.status) && (
-                          <button onClick={() => setViewRequestsTask(t)} className="text-xs text-blue-500 hover:underline">View Requests</button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map((t) => {
+                  const tSkills = skillsOf(t);
+                  return (
+                    <tr key={t.task_id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-5 py-3 font-medium text-gray-800">{t.title}</td>
+                      <td className="px-5 py-3 text-gray-500">{t.department?.name ?? '—'}</td>
+                      <td className="px-5 py-3 text-gray-600">{assigneeOf(t) ?? <span className="text-gray-400">Unassigned</span>}</td>
+                      <td className="px-5 py-3">
+                        {tSkills.length ? (
+                          <div className="flex flex-wrap gap-1">
+                            {tSkills.map((s) => <span key={s.skill_id} className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">{s.skill_name}</span>)}
+                          </div>
+                        ) : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-5 py-3 text-gray-500">{fmtDue(t.end_datetime)}</td>
+                      <td className="px-5 py-3"><Badge status={t.status} /></td>
+                      <td className="px-5 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          <button onClick={() => setEditingTask(t)} className="text-xs text-primary-600 hover:underline">Edit</button>
+                          <button onClick={() => delTask(t)} className="text-xs text-red-500 hover:underline">Delete</button>
+                          <button onClick={() => setHistoryTask(t)} className="text-xs text-gray-500 hover:underline">History</button>
+                          {['ASSIGNED', 'IN_PROGRESS'].includes(t.status) && (
+                            <button onClick={() => setRequestUpdateTask(t)} className="text-xs text-amber-600 hover:underline">Request Update</button>
+                          )}
+                          {['ASSIGNED', 'IN_PROGRESS'].includes(t.status) && (
+                            <button onClick={() => setViewRequestsTask(t)} className="text-xs text-blue-500 hover:underline">View Requests</button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
                 {filtered.length === 0 && <tr><td colSpan={7} className="px-5 py-10 text-center text-gray-400">No tasks found.</td></tr>}
               </tbody>
             </table>
@@ -566,18 +475,18 @@ export default function Tasks() {
         </div>
       </div>
 
+      {creating && (
+        <TaskModal
+          depts={depts} skills={skills}
+          onClose={() => setCreating(false)}
+          onSaved={(t) => { load(); showToast(`Task “${t.title}” created`); }}
+        />
+      )}
       {editingTask && (
         <TaskModal
           task={editingTask} depts={depts} skills={skills}
           onClose={() => setEditingTask(null)}
           onSaved={(t) => { load(); showToast(`Task “${t.title}” updated`); }}
-        />
-      )}
-      {allocatingTask && (
-        <AllocateModal
-          task={allocatingTask}
-          onClose={() => setAllocatingTask(null)}
-          onAllocated={(msg) => { load(); showToast(msg); }}
         />
       )}
       {historyTask && <AllocationHistoryModal task={historyTask} onClose={() => setHistoryTask(null)} />}

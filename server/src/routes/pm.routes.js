@@ -4,8 +4,7 @@ const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
 const taskController = require('../controllers/task.controller');
 const allocationController = require('../controllers/allocation.controller');
-const managerController = require('../controllers/manager.controller'); // NEW
-const updateRequestController = require('../controllers/task-update-request.controller');
+const managerController = require('../controllers/manager.controller');
 
 const router = express.Router();
 
@@ -33,6 +32,13 @@ const createRules = [
   body('department_id')
     .optional({ nullable: true })
     .isInt({ min: 1 }).withMessage('department_id must be a positive integer'),
+  // NEW — multi-skill. Accept an array of skill ids.
+  body('required_skill_ids')
+    .optional({ nullable: true })
+    .isArray().withMessage('required_skill_ids must be an array'),
+  body('required_skill_ids.*')
+    .isInt({ min: 1 }).withMessage('each required skill id must be a positive integer'),
+  // Legacy single-skill still accepted for backward compatibility.
   body('required_skill_id')
     .optional({ nullable: true })
     .isInt({ min: 1 }).withMessage('required_skill_id must be a positive integer'),
@@ -49,6 +55,11 @@ const updateRules = [
   body('department_id')
     .optional({ nullable: true })
     .isInt({ min: 1 }).withMessage('department_id must be a positive integer'),
+  body('required_skill_ids')
+    .optional({ nullable: true })
+    .isArray().withMessage('required_skill_ids must be an array'),
+  body('required_skill_ids.*')
+    .isInt({ min: 1 }).withMessage('each required skill id must be a positive integer'),
   body('required_skill_id')
     .optional({ nullable: true })
     .isInt({ min: 1 }).withMessage('required_skill_id must be a positive integer'),
@@ -64,7 +75,7 @@ const leaveDecisionRules = [
   body('status').isIn(['APPROVED', 'REJECTED']).withMessage('status must be APPROVED or REJECTED'),
 ];
 
-// ─── Task CRUD (5 — manager view with filters) ────────────────────────────
+// ─── Task CRUD (manager view with filters) ────────────────────────────────
 
 router.get('/tasks',        listQueryRules, taskController.list);
 router.get('/tasks/:id',                   taskController.getOne);
@@ -72,18 +83,14 @@ router.post('/tasks',       createRules,   taskController.create);
 router.patch('/tasks/:id',  updateRules,   taskController.update);
 router.delete('/tasks/:id',                taskController.remove);
 
-// ─── Allocation engine (3 + 4) ────────────────────────────────────────────
+// ─── Allocation engine ─────────────────────────────────────────────────────
 
 router.get('/tasks/:id/eligible-staff', allocationController.getEligibleStaff);
 router.post('/tasks/:id/assign',      allocationController.assignBodyRules, allocationController.manualAssign);
 router.post('/tasks/:id/reallocate',  allocationController.assignBodyRules, allocationController.reallocate);
 router.post('/tasks/:id/auto-allocate', allocationController.autoAllocate);
 
-// ─── Task update requests (manager → worker) ──────────────────
-router.get('/tasks/:id/update-requests',  updateRequestController.list);
-router.post('/tasks/:id/update-requests', updateRequestController.createRules, updateRequestController.create);
-
-// ─── Manager portal (NEW — Weishi) ────────────────────────────────────────
+// ─── Manager portal ────────────────────────────────────────────────────────
 
 // Team — view all members with skills, weekly capacity, availability
 router.get('/team', managerController.getTeam);
@@ -94,7 +101,7 @@ router.patch('/leave/:id',  leaveDecisionRules, managerController.decideLeave);
 router.get('/leave-balance',                 managerController.listLeaveBalances);
 router.patch('/leave-balance/:userId',       managerController.updateLeaveBalance);
 
-// Subscription — current plan + billing history
+// Subscription — current plan + billing history (read-only)
 router.get('/subscription', managerController.getSubscription);
 router.get('/billing',      managerController.listBilling);
 

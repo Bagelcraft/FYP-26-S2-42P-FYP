@@ -6,14 +6,48 @@ function makeError(message, statusCode) {
   return err;
 }
 
+// Include the many-to-many required skills (via TaskSkill join), plus keep the
+// legacy single requiredSkill for backward-compat.
 const TASK_INCLUDE = {
   department:    { select: { name: true } },
-  requiredSkill: { select: { skill_name: true } },
+  requiredSkill: { select: { skill_id: true, skill_name: true } },
+  requiredSkills: { include: { skill: { select: { skill_id: true, skill_name: true } } } },
   createdBy:     { select: { full_name: true } },
   assignments: {
     include: { assignedTo: { select: { full_name: true, email: true } } },
   },
 };
+
+const WORKER_TASK_INCLUDE = {
+  department:    { select: { name: true } },
+  requiredSkill: { select: { skill_id: true, skill_name: true } },
+  requiredSkills: { include: { skill: { select: { skill_id: true, skill_name: true } } } },
+};
+
+// Flatten the TaskSkill join rows into a clean requiredSkills: [{ skill_id, skill_name }]
+// and set requiredSkill to the first skill (so legacy single-skill UI still works).
+function shapeTask(task) {
+  if (!task) return task;
+  const requiredSkills = (task.requiredSkills ?? []).map((ts) => ts.skill);
+  return {
+    ...task,
+    requiredSkills,
+    requiredSkill: requiredSkills[0] ?? task.requiredSkill ?? null,
+  };
+}
+
+// Accept either an array (required_skill_ids) or the legacy single id; return
+// a de-duplicated array of integers.
+function normaliseSkillIds(arr, single) {
+  if (Array.isArray(arr)) {
+    return [...new Set(arr.map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+  }
+  if (single != null) {
+    const n = Number(single);
+    return Number.isInteger(n) && n > 0 ? [n] : [];
+  }
+  return [];
+}
 
 // ─── PM / Org-Admin ───────────────────────────────────────────
 
@@ -28,11 +62,12 @@ async function listTasks(organisationId, filters = {}) {
     where.end_datetime   = { gte: d };
   }
 
-  return prisma.task.findMany({
+  const tasks = await prisma.task.findMany({
     where,
     include: TASK_INCLUDE,
     orderBy: { createdAt: 'desc' },
   });
+  return tasks.map(shapeTask);
 }
 
 async function getTask(taskId, organisationId) {
@@ -41,21 +76,21 @@ async function getTask(taskId, organisationId) {
     include: TASK_INCLUDE,
   });
   if (!task) throw makeError('Task not found', 404);
-  return task;
+  return shapeTask(task);
 }
 
-async function validateFKs({ department_id, required_skill_id, organisationId }) {
+async function validateFKs({ department_id, skillIds = [], organisationId }) {
   if (department_id != null) {
     const dept = await prisma.department.findFirst({
       where: { department_id, organisation_id: organisationId },
     });
     if (!dept) throw makeError('department_id does not belong to your organisation', 422);
   }
-  if (required_skill_id != null) {
+  for (const sid of skillIds) {
     const skill = await prisma.skill.findFirst({
-      where: { skill_id: required_skill_id, organisation_id: organisationId },
+      where: { skill_id: sid, organisation_id: organisationId },
     });
-    if (!skill) throw makeError('required_skill_id does not belong to your organisation', 422);
+    if (!skill) throw makeError(`Skill ${sid} does not belong to your organisation`, 422);
   }
 }
 
@@ -67,11 +102,13 @@ async function createTask({
   start_datetime,
   end_datetime,
   department_id = null,
-  required_skill_id = null,
+  required_skill_id = null,   // legacy single (still accepted)
+  required_skill_ids,         // NEW — array
 }) {
-  await validateFKs({ department_id, required_skill_id, organisationId });
+  const skillIds = normaliseSkillIds(required_skill_ids, required_skill_id);
+  await validateFKs({ department_id, skillIds, organisationId });
 
-  return prisma.task.create({
+  const created = await prisma.task.create({
     data: {
       organisation_id:   organisationId,
       created_by:        createdBy,
@@ -81,31 +118,49 @@ async function createTask({
       start_datetime:    new Date(start_datetime),
       end_datetime:      new Date(end_datetime),
       department_id:     department_id ?? null,
-      required_skill_id: required_skill_id ?? null,
+      required_skill_id: skillIds[0] ?? null,                  // keep first for compat
+      requiredSkills:    { create: skillIds.map((id) => ({ skill_id: id })) },
     },
+    include: TASK_INCLUDE,
   });
+  return shapeTask(created);
 }
 
 async function updateTask(taskId, organisationId, updates) {
   await getTask(taskId, organisationId);
 
-  const { department_id, required_skill_id } = updates;
+  // Did the caller send any skill update?
+  const hasSkillUpdate = updates.required_skill_ids !== undefined || updates.required_skill_id !== undefined;
+  const skillIds = hasSkillUpdate
+    ? normaliseSkillIds(updates.required_skill_ids, updates.required_skill_id)
+    : null;
+
   await validateFKs({
-    department_id:     department_id !== undefined ? department_id : undefined,
-    required_skill_id: required_skill_id !== undefined ? required_skill_id : undefined,
+    department_id: updates.department_id !== undefined ? updates.department_id : undefined,
+    skillIds: skillIds ?? [],
     organisationId,
   });
 
   const data = {};
-  if (updates.title !== undefined)          data.title             = updates.title;
-  if (updates.description !== undefined)    data.description       = updates.description;
-  if (updates.status !== undefined)         data.status            = updates.status;
-  if (updates.start_datetime !== undefined) data.start_datetime    = new Date(updates.start_datetime);
-  if (updates.end_datetime !== undefined)   data.end_datetime      = new Date(updates.end_datetime);
-  if (department_id !== undefined)          data.department_id     = department_id;
-  if (required_skill_id !== undefined)      data.required_skill_id = required_skill_id;
+  if (updates.title !== undefined)          data.title          = updates.title;
+  if (updates.description !== undefined)    data.description    = updates.description;
+  if (updates.status !== undefined)         data.status         = updates.status;
+  if (updates.start_datetime !== undefined) data.start_datetime = new Date(updates.start_datetime);
+  if (updates.end_datetime !== undefined)   data.end_datetime   = new Date(updates.end_datetime);
+  if (updates.department_id !== undefined)  data.department_id  = updates.department_id;
+  if (skillIds !== null)                    data.required_skill_id = skillIds[0] ?? null;
 
-  return prisma.task.update({ where: { task_id: taskId }, data });
+  const updated = await prisma.$transaction(async (tx) => {
+    if (skillIds !== null) {
+      // Replace the whole set of required skills.
+      await tx.taskSkill.deleteMany({ where: { task_id: taskId } });
+      if (skillIds.length) {
+        await tx.taskSkill.createMany({ data: skillIds.map((sid) => ({ task_id: taskId, skill_id: sid })) });
+      }
+    }
+    return tx.task.update({ where: { task_id: taskId }, data, include: TASK_INCLUDE });
+  });
+  return shapeTask(updated);
 }
 
 async function deleteTask(taskId, organisationId) {
@@ -116,6 +171,7 @@ async function deleteTask(taskId, organisationId) {
     throw makeError('Cannot delete a task that has existing assignments. Unassign staff first.', 409);
   }
 
+  // TaskSkill rows are removed automatically via onDelete: Cascade (see schema).
   return prisma.task.delete({ where: { task_id: taskId } });
 }
 
@@ -128,11 +184,10 @@ async function listWorkerTasks(userId, organisationId, filters = {}) {
   };
   if (filters.status) where.status = filters.status;
 
-  return prisma.task.findMany({
+  const tasks = await prisma.task.findMany({
     where,
     include: {
-      department:    { select: { name: true } },
-      requiredSkill: { select: { skill_name: true } },
+      ...WORKER_TASK_INCLUDE,
       assignments: {
         where:   { assigned_to: userId },
         include: { assignedBy: { select: { full_name: true } } },
@@ -140,6 +195,7 @@ async function listWorkerTasks(userId, organisationId, filters = {}) {
     },
     orderBy: { start_datetime: 'asc' },
   });
+  return tasks.map(shapeTask);
 }
 
 async function getWorkerTask(taskId, userId, organisationId) {
@@ -150,8 +206,7 @@ async function getWorkerTask(taskId, userId, organisationId) {
       assignments:     { some: { assigned_to: userId } },
     },
     include: {
-      department:    { select: { name: true } },
-      requiredSkill: { select: { skill_name: true } },
+      ...WORKER_TASK_INCLUDE,
       assignments: {
         where:   { assigned_to: userId },
         include: { assignedBy: { select: { full_name: true } } },
@@ -159,7 +214,7 @@ async function getWorkerTask(taskId, userId, organisationId) {
     },
   });
   if (!task) throw makeError('Task not found or not assigned to you', 404);
-  return task;
+  return shapeTask(task);
 }
 
 async function acknowledgeTask(taskId, userId, organisationId) {
@@ -177,7 +232,9 @@ async function updateTaskStatus(taskId, userId, organisationId, status) {
   return prisma.task.update({ where: { task_id: taskId }, data: { status } });
 }
 
-// tasks that are PENDING and match the temp worker's skills (available task pool)
+// Tasks that are PENDING and whose required skills the worker FULLY satisfies.
+// (`every` over the TaskSkill relation: a task with no required skills matches
+//  everyone; a task with required skills matches only workers who hold them all.)
 async function listAvailableTasks(userId, organisationId) {
   const userSkills = await prisma.userSkill.findMany({
     where:  { user_id: userId },
@@ -185,21 +242,16 @@ async function listAvailableTasks(userId, organisationId) {
   });
   const skillIds = userSkills.map((us) => us.skill_id);
 
-  return prisma.task.findMany({
+  const tasks = await prisma.task.findMany({
     where: {
       organisation_id: organisationId,
       status:          'PENDING',
-      OR: [
-        { required_skill_id: null },
-        ...(skillIds.length > 0 ? [{ required_skill_id: { in: skillIds } }] : []),
-      ],
+      requiredSkills:  { every: { skill_id: { in: skillIds } } },
     },
-    include: {
-      department:    { select: { name: true } },
-      requiredSkill: { select: { skill_name: true } },
-    },
+    include: WORKER_TASK_INCLUDE,
     orderBy: { start_datetime: 'asc' },
   });
+  return tasks.map(shapeTask);
 }
 
 module.exports = {

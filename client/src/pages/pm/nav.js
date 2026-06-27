@@ -3,6 +3,7 @@ export const PM_NAV = [
   { path: '/pm', icon: '🏠', label: 'Dashboard' },
   { path: '/pm/tasks', icon: '📋', label: 'Tasks' },
   { path: '/pm/team', icon: '👥', label: 'Team' },
+  { path: '/pm/allocate', icon: '🤖', label: 'Allocate' },
   { path: '/pm/leave', icon: '🌴', label: 'Leave' },
   { path: '/pm/reports', icon: '📊', label: 'Reports' },
   { path: '/pm/notifications', icon: '🔔', label: 'Notifications' },
@@ -10,6 +11,7 @@ export const PM_NAV = [
 
 // Account / peripheral — rendered as a subordinate "Account" group at the
 // bottom of the sidebar (see DashboardLayout `secondaryNav` prop).
-// Testimonials are now managed by the system admin (admin Landing Content),
-// so the manager no longer has a testimonials page.
-export const PM_SECONDARY = [];
+// NOTE: Subscription removed — it does not belong under the Manager portal.
+export const PM_SECONDARY = [
+  { path: '/pm/testimonials', icon: '⭐', label: 'Testimonials' },
+];

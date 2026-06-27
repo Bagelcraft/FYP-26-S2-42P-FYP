@@ -123,7 +123,7 @@ export default function Availability() {
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-800">Availability</h2>
-            <p className="text-gray-500 text-sm mt-0.5">Set the days and hours you are available to work.</p>
+            <p className="text-gray-500 text-sm mt-0.5">Update your availability so tasks can be allocated to you.</p>
           </div>
           <button
             onClick={() => { setShowForm(!showForm); setError(''); }}

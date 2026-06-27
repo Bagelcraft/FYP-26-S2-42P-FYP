@@ -12,14 +12,9 @@ import Organisations from './pages/admin/Organisations';
 import AuditLogs from './pages/admin/AuditLogs';
 import AdminNotifications from './pages/admin/AdminNotifications';
 import SubscriptionPlans from './pages/admin/SubscriptionPlans';
-import AdminEnquiries from './pages/admin/AdminEnquiries';
-import AdminLandingContent from './pages/admin/AdminLandingContent';
 
 // Org Admin
 import OrgAdminDashboard from './pages/org-admin/OrgAdminDashboard';
-import OrgProfile from './pages/org-admin/OrgProfile';
-import ProfileChangeRequests from './pages/org-admin/ProfileChangeRequests';
-import OrgTaskManagement from './pages/org-admin/TaskManagement';
 import Staff from './pages/org-admin/Staff';
 import Departments from './pages/org-admin/Departments';
 import Skills from './pages/org-admin/Skills';
@@ -29,11 +24,13 @@ import StaffRoles from './pages/org-admin/StaffRoles';
 // Manager
 import PMDashboard from './pages/pm/PMDashboard';
 import Tasks from './pages/pm/Tasks';
-import Team from './pages/pm/Team';                     // NEW
+import Team from './pages/pm/Team';
 import Allocate from './pages/pm/Allocate';
-import PMLeave from './pages/pm/Leave';                  // NEW (aliased — worker Leave also exists)
+import PMLeave from './pages/pm/Leave';
+import Testimonials from './pages/pm/Testimonials';
 import Reports from './pages/pm/Reports';
 import PMNotifications from './pages/pm/PMNotifications';
+// NOTE: Subscription import removed — page no longer mounted under the Manager portal.
 
 // Permanent Worker
 import WorkerDashboard from './pages/worker/WorkerDashboard';
@@ -65,20 +62,15 @@ export default function App() {
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/organisations" element={<Organisations />} />
           <Route path="/admin/plans" element={<SubscriptionPlans />} />
-          <Route path="/admin/enquiries" element={<AdminEnquiries />} />
-          <Route path="/admin/landing-content" element={<AdminLandingContent />} />
           <Route path="/admin/logs" element={<AuditLogs />} />
           <Route path="/admin/notifications" element={<AdminNotifications />} />
 
           {/* Organisation Admin */}
           <Route path="/org-admin" element={<OrgAdminDashboard />} />
-          <Route path="/org-admin/profile" element={<OrgProfile />} />
-          <Route path="/org-admin/tasks" element={<OrgTaskManagement />} />
           <Route path="/org-admin/staff" element={<Staff />} />
           <Route path="/org-admin/departments" element={<Departments />} />
           <Route path="/org-admin/skills" element={<Skills />} />
           <Route path="/org-admin/roles" element={<StaffRoles />} />
-          <Route path="/org-admin/profile-change-requests" element={<ProfileChangeRequests />} />
           <Route path="/org-admin/notifications" element={<OrgAdminNotifications />} />
 
           {/* Manager */}
@@ -87,8 +79,10 @@ export default function App() {
           <Route path="/pm/team" element={<Team />} />
           <Route path="/pm/allocate" element={<Allocate />} />
           <Route path="/pm/leave" element={<PMLeave />} />
+          <Route path="/pm/testimonials" element={<Testimonials />} />
           <Route path="/pm/reports" element={<Reports />} />
           <Route path="/pm/notifications" element={<PMNotifications />} />
+          {/* NOTE: /pm/subscription route removed. */}
 
           {/* Permanent Worker */}
           <Route path="/worker" element={<WorkerDashboard />} />

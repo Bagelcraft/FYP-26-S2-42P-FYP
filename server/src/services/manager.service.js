@@ -190,7 +190,72 @@ async function getSkills(organisationId) {
   });
 }
 
+// ─── Testimonials (Weishi) ────────────────────────────────────
+// Real model is `Testimonial` (user_id, rating, review_text, profile_image,
+// created_at) — author comes from the linked user. Scoped to the manager's org.
+async function listTestimonials(organisationId) {
+  const rows = await prisma.testimonial.findMany({
+    where: { user: { organisationId } },
+    include: { user: { select: { full_name: true, staffRole: { select: { role_name: true } } } } },
+    orderBy: { created_at: 'desc' },
+  });
+  return rows.map((t) => ({
+    testimonial_id: t.testimonial_id,
+    rating: t.rating,
+    review_text: t.review_text,
+    profile_image: t.profile_image,
+    created_at: t.created_at,
+    author: t.user?.full_name ?? 'Unknown',
+    author_role: t.user?.staffRole?.role_name ?? null,
+  }));
+}
+
+async function createTestimonial(userId, { rating, review_text, profile_image }) {
+  if (!review_text || !review_text.trim()) throw makeError('review_text is required', 422);
+  const t = await prisma.testimonial.create({
+    data: {
+      user_id: userId,
+      rating: Number(rating) || 5,
+      review_text: review_text.trim(),
+      profile_image: profile_image || null,
+    },
+    include: { user: { select: { full_name: true, staffRole: { select: { role_name: true } } } } },
+  });
+  return {
+    testimonial_id: t.testimonial_id, rating: t.rating, review_text: t.review_text,
+    profile_image: t.profile_image, created_at: t.created_at,
+    author: t.user?.full_name ?? 'Unknown', author_role: t.user?.staffRole?.role_name ?? null,
+  };
+}
+
+async function updateTestimonial(testimonialId, organisationId, { rating, review_text, profile_image }) {
+  const existing = await prisma.testimonial.findFirst({ where: { testimonial_id: testimonialId, user: { organisationId } } });
+  if (!existing) throw makeError('Testimonial not found', 404);
+  const t = await prisma.testimonial.update({
+    where: { testimonial_id: testimonialId },
+    data: {
+      rating: rating != null ? Number(rating) : undefined,
+      review_text: review_text != null ? review_text.trim() : undefined,
+      profile_image: profile_image !== undefined ? profile_image : undefined,
+    },
+    include: { user: { select: { full_name: true, staffRole: { select: { role_name: true } } } } },
+  });
+  return {
+    testimonial_id: t.testimonial_id, rating: t.rating, review_text: t.review_text,
+    profile_image: t.profile_image, created_at: t.created_at,
+    author: t.user?.full_name ?? 'Unknown', author_role: t.user?.staffRole?.role_name ?? null,
+  };
+}
+
+async function deleteTestimonial(testimonialId, organisationId) {
+  const existing = await prisma.testimonial.findFirst({ where: { testimonial_id: testimonialId, user: { organisationId } } });
+  if (!existing) throw makeError('Testimonial not found', 404);
+  await prisma.testimonial.delete({ where: { testimonial_id: testimonialId } });
+  return { testimonial_id: testimonialId };
+}
+
 module.exports = {
   getTeam, listLeave, decideLeave, listLeaveBalances, updateLeaveBalance, getSubscription, listBilling,
   getDepartments, getSkills,
+  listTestimonials, createTestimonial, updateTestimonial, deleteTestimonial,
 };
