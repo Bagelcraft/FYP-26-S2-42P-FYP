@@ -31,14 +31,9 @@ export default function OrgAdminDashboard() {
   return (
     <DashboardLayout navItems={ORG_ADMIN_NAV} roleLabel="Organisation Admin">
       <div className="space-y-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-gray-800">Organisation Overview</h2>
-            <p className="text-gray-500 text-sm mt-0.5">TechCorp Pte Ltd · Manage staff, departments, and skills.</p>
-          </div>
-          <button className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-            + Register Employee
-          </button>
+        <div>
+          <h2 className="text-xl font-bold text-gray-800">Organisation Overview</h2>
+          <p className="text-gray-500 text-sm mt-0.5">TechCorp Pte Ltd · Manage staff, departments, and skills.</p>
         </div>
 
         {/* Setup progress */}

@@ -2,8 +2,7 @@ const express = require('express');
 const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
 const planController = require('../controllers/plan.controller');
-const adminController = require('../controllers/admin.controller');
-const enquiryController = require('../controllers/enquiry.controller');
+const enquiryController = require('../controllers/enquiryController');
 
 const router = express.Router();
 
@@ -15,30 +14,32 @@ router.get('/health', (req, res) => {
   res.json({ success: true, data: { status: 'OK' } });
 });
 
-// ─── Organisation registration requests ──────────────────────
+// ─── Organisations (stub) ─────────────────────────────────────
 
-router.get('/registrations',              adminController.listRegistrations);
-router.post('/registrations/:id/approve', adminController.approveRegistration);
-router.post('/registrations/:id/reject',  adminController.rejectRegistration);
+router.get('/organisations', (req, res) => {
+  res.json({ message: 'Get all organisations — to be implemented' });
+});
 
-// ─── Organisations ────────────────────────────────────────────
+router.post('/organisations', (req, res) => {
+  res.json({ message: 'Create organisation — to be implemented' });
+});
 
-router.get('/organisations',                 adminController.listOrganisations);
-router.post('/organisations',                adminController.createOrganisation);
-router.put('/organisations/:id/suspend',     adminController.suspendOrganisation);
-router.put('/organisations/:id/reactivate',  adminController.reactivateOrganisation);
-
-// ─── Contact enquiries ────────────────────────────────────────
-
-router.get('/enquiries',         enquiryController.list);
-router.get('/enquiries/:id',     enquiryController.getOne);
-router.delete('/enquiries/:id',  enquiryController.remove);
+router.put('/organisations/:id/suspend', (req, res) => {
+  res.json({ message: 'Suspend organisation — to be implemented' });
+});
 
 // ─── Audit logs (stub) ────────────────────────────────────────
 
 router.get('/logs', (req, res) => {
   res.json({ message: 'Get audit logs — to be implemented' });
 });
+
+// ─── Enquiries ────────────────────────────────────────────────
+
+router.get('/enquiries', enquiryController.getAllEnquiries);
+router.get('/enquiries/:id', enquiryController.getEnquiryById);
+router.patch('/enquiries/:id/respond', enquiryController.respondToEnquiry);
+router.delete('/enquiries/:id', enquiryController.deleteEnquiry);
 
 // ─── Subscription Plans (Phase 3) ────────────────────────────
 

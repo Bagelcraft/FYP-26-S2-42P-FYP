@@ -5,6 +5,7 @@ const workerController = require('../controllers/worker.controller');
 const updateRequestController = require('../controllers/task-update-request.controller');
 const availabilityController = require('../controllers/availability.controller');
 const attendanceController = require('../controllers/attendance.controller');
+const profileChangeController = require('../controllers/profileChangeRequest.controller');
 
 const router = express.Router();
 
@@ -35,9 +36,18 @@ router.get('/tasks/:id/update-requests', updateRequestController.listWorker);
 // PATCH /temp-worker/tasks/:id/update-requests/:requestId/respond
 router.patch('/tasks/:id/update-requests/:requestId/respond', updateRequestController.respondRules, updateRequestController.respond);
 
-// ─── Profile Update Requests ──────────────────────────────────────────────
+// ─── Stubs (to be implemented) ────────────────────────────────────────────
 
-router.put('/profile', workerController.updateMyProfile);
+router.post('/profile', (req, res) => {
+  res.json({ message: 'Create/update profile — to be implemented' });
+});
+
+// POST /temp-worker/profile/change-request
+router.post('/profile/change-request', profileChangeController.submitRules, profileChangeController.submitRequest);
+
+router.put('/skills', (req, res) => {
+  res.json({ message: 'Update skills — to be implemented' });
+});
 
 router.get('/availability', availabilityController.getAvailability);
 router.post('/availability', availabilityController.availabilityRules, availabilityController.setAvailability);
@@ -47,10 +57,5 @@ router.delete('/availability/:id', availabilityController.removeAvailability);
 router.get('/attendance', attendanceController.getAttendance);
 router.post('/attendance/clock-in', attendanceController.clockIn);
 router.put('/attendance/clock-out', attendanceController.clockOut);
-
-// ─── Leave (worker self-service) ──────────────────────────────
-router.get('/leave', workerController.listMyLeave);
-router.post('/leave', workerController.leaveRules, workerController.applyLeave);
-router.delete('/leave/:id', workerController.cancelLeave);
 
 module.exports = router;

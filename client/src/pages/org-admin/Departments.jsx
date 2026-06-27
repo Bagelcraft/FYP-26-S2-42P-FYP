@@ -76,7 +76,7 @@ export default function Departments() {
       <div className="space-y-6">
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-xl font-bold text-gray-800">Departments</h2>
+            <h2 className="text-xl font-bold text-gray-800">Department Management</h2>
             <p className="text-gray-500 text-sm mt-0.5">Organise your staff into departments.</p>
           </div>
           <button onClick={openCreate}

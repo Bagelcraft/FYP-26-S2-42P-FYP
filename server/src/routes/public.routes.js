@@ -3,17 +3,11 @@ const bcrypt = require('bcrypt');
 const router = express.Router();
 const prisma = require('../config/prisma');
 const planService = require('../services/plan.service');
-const enquiryController = require('../controllers/enquiry.controller');
+const enquiryController = require('../controllers/enquiryController');
 
-// GET /api/v1/public/features — active landing features for the marketing site
-router.get('/features', async (req, res, next) => {
-  try {
-    const features = await prisma.landingFeature.findMany({
-      where:   { is_active: true },
-      orderBy: { sort_order: 'asc' },
-    });
-    res.json({ success: true, data: features });
-  } catch (err) { next(err); }
+// GET /api/v1/public/features
+router.get('/features', (req, res) => {
+  res.json({ message: 'Get platform features — to be implemented by Rachel' });
 });
 
 // GET /api/v1/public/pricing  — no auth required
@@ -25,7 +19,7 @@ router.get('/pricing', async (req, res, next) => {
 });
 
 // POST /api/v1/public/enquiry
-router.post('/enquiry', enquiryController.create);
+router.post('/enquiry', enquiryController.createEnquiry);
 
 // POST /api/v1/public/organisations/register
 router.post('/organisations/register', async (req, res) => {
@@ -35,23 +29,16 @@ router.post('/organisations/register', async (req, res) => {
     return res.status(400).json({ message: 'Full name, email, password, and company name are required.' });
   }
 
-  // Normalise the email so it matches the lookup done at login (auth.routes.js
-  // applies normalizeEmail()). Storing the raw value here would block login
-  // after approval for any mixed-case or dotted Gmail address.
-  const normalisedEmail = String(email).trim().toLowerCase();
-
   try {
-    const existingRequest = await prisma.unregisteredUser.findFirst({ where: { email: normalisedEmail } });
-    const existingUser = await prisma.user.findUnique({ where: { email: normalisedEmail } });
-    if (existingRequest || existingUser) {
+    const existing = await prisma.unregisteredUser.findFirst({ where: { email } });
+    if (existing) {
       return res.status(409).json({ message: 'An account with this email already exists.' });
     }
 
     const password_hash = await bcrypt.hash(password, 10);
     await prisma.unregisteredUser.create({
       data: {
-        full_name,
-        email: normalisedEmail,
+        email,
         password: password_hash,
         company_name,
         position: position || null,

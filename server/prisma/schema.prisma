@@ -166,7 +166,9 @@ model User {
   feedback           Feedback[]
   testimonials       Testimonial[]
   headOfDepts        Department[]         @relation("DeptHead")
-  notifications      Notification[]
+  notifications           Notification[]
+  profileChangeRequests   ProfileChangeRequest[] @relation("ProfileChangeRequests")
+  profileChangeReviews    ProfileChangeRequest[] @relation("ProfileChangeReviews")
 }
 
 // ─── Department ───────────────────────────────────────────────
@@ -349,11 +351,16 @@ model UnregisteredUser {
 }
 
 model ContactEnquiry {
-  enquiry_id Int      @id @default(autoincrement())
-  user_id    Int?
-  subject    String   @db.VarChar(200)
-  message    String   @db.Text
-  created_at DateTime @default(now())
+  enquiry_id       Int       @id @default(autoincrement())
+  user_id          Int?
+  name             String?   @db.VarChar(100)
+  email            String?   @db.VarChar(150)
+  subject          String    @db.VarChar(200)
+  message          String    @db.Text
+  status           String    @default("OPEN") @db.VarChar(20)
+  response_message String?   @db.Text
+  responded_at     DateTime?
+  created_at       DateTime  @default(now())
 }
 
 model Testimonial {
@@ -388,6 +395,60 @@ model Notification {
   createdAt   DateTime @default(now())
 
   recipient   User     @relation(fields: [recipientId], references: [userId])
+}
+
+// ─── Landing Page Content ────────────────────────────────────
+
+model LandingContent {
+  id               Int      @id @default(autoincrement())
+  hero_title       String   @db.VarChar(200)
+  hero_subtitle    String?  @db.Text
+  hero_image_url   String?  @db.VarChar(500)
+  video_title      String?  @db.VarChar(200)
+  video_subtitle   String?  @db.Text
+  video_url        String?  @db.VarChar(500)
+  plan_name        String?  @db.VarChar(100)
+  plan_price       String?  @db.VarChar(50)
+  plan_description String?  @db.Text
+  updated_at       DateTime @updatedAt
+}
+
+model LandingFeature {
+  feature_id  Int      @id @default(autoincrement())
+  icon        String?  @db.VarChar(10)
+  title       String   @db.VarChar(200)
+  description String?  @db.Text
+  sort_order  Int      @default(0)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+}
+
+model LandingTestimonial {
+  testimonial_id Int      @id @default(autoincrement())
+  name           String   @db.VarChar(100)
+  company        String?  @db.VarChar(150)
+  rating         Int      @default(5)
+  review_text    String   @db.Text
+  is_active      Boolean  @default(true)
+  created_at     DateTime @default(now())
+}
+
+// ─── Profile Change Requests ─────────────────────────────────
+
+model ProfileChangeRequest {
+  request_id      Int       @id @default(autoincrement())
+  user_id         Int
+  field           String    @db.VarChar(100)
+  requested_value String    @db.Text
+  reason          String?   @db.Text
+  status          String    @default("PENDING") @db.VarChar(20)
+  reviewed_by     Int?
+  review_note     String?   @db.Text
+  reviewed_at     DateTime?
+  created_at      DateTime  @default(now())
+
+  user            User      @relation("ProfileChangeRequests", fields: [user_id], references: [userId])
+  reviewer        User?     @relation("ProfileChangeReviews", fields: [reviewed_by], references: [userId])
 }
 
 // ─── Subscription Plans (Phase 3) ────────────────────────────

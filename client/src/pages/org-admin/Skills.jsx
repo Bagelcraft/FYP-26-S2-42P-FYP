@@ -53,7 +53,7 @@ export default function Skills() {
     <DashboardLayout navItems={ORG_ADMIN_NAV} roleLabel="Organisation Admin">
       <div className="space-y-6">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">Skills Registry</h2>
+          <h2 className="text-xl font-bold text-gray-800">Skills Management</h2>
           <p className="text-gray-500 text-sm mt-0.5">Manage skills available for task allocation and staff profiles.</p>
         </div>
 

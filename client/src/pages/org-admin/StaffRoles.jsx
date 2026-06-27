@@ -78,7 +78,7 @@ export default function StaffRoles() {
       <div className="space-y-6">
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-xl font-bold text-gray-800">Staff Roles</h2>
+            <h2 className="text-xl font-bold text-gray-800">Role Management</h2>
             <p className="text-gray-500 text-sm mt-0.5">
               Define roles and their weekly hour limits — used by the allocation engine.
             </p>
