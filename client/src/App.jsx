@@ -20,6 +20,7 @@ import Departments from './pages/org-admin/Departments';
 import Skills from './pages/org-admin/Skills';
 import OrgAdminNotifications from './pages/org-admin/OrgAdminNotifications';
 import StaffRoles from './pages/org-admin/StaffRoles';
+import Shifts from './pages/org-admin/Shifts';
 
 // Manager
 import PMDashboard from './pages/pm/PMDashboard';
@@ -71,6 +72,7 @@ export default function App() {
           <Route path="/org-admin/departments" element={<Departments />} />
           <Route path="/org-admin/skills" element={<Skills />} />
           <Route path="/org-admin/roles" element={<StaffRoles />} />
+          <Route path="/org-admin/shifts" element={<Shifts />} />
           <Route path="/org-admin/notifications" element={<OrgAdminNotifications />} />
 
           {/* Manager */}

@@ -35,6 +35,13 @@ router.post('/skills',        c.skillRules,       c.validate, c.createSkill);
 router.patch('/skills/:id',   c.skillUpdateRules, c.validate, c.updateSkill);
 router.delete('/skills/:id',  c.deleteSkill);
 
+// ─── Shift Templates ──────────────────────────────────────────
+
+router.get('/shifts',        c.listShifts);
+router.post('/shifts',       c.shiftRules,       c.validate, c.createShift);
+router.patch('/shifts/:id',  c.shiftUpdateRules, c.validate, c.updateShift);
+router.delete('/shifts/:id', c.deleteShift);
+
 // ─── Staff ────────────────────────────────────────────────────
 
 router.get('/staff',                  c.staffQueryRules,  c.validate, c.listStaff);

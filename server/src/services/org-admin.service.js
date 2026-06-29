@@ -175,6 +175,49 @@ async function deleteSkill(organisationId, skillId) {
   await prisma.skill.delete({ where: { skill_id: skillId } });
 }
 
+// ─── Shift Templates ─────────────────────────────────────────
+
+async function listShiftTemplates(organisationId) {
+  return prisma.shiftTemplate.findMany({
+    where:   { organisation_id: organisationId },
+    orderBy: { name: 'asc' },
+  });
+}
+
+async function createShiftTemplate(organisationId, data) {
+  const existing = await prisma.shiftTemplate.findFirst({
+    where: { organisation_id: organisationId, name: { equals: data.name } },
+  });
+  if (existing) throw makeError('A shift with that name already exists', 409);
+  return prisma.shiftTemplate.create({
+    data: {
+      organisation_id: organisationId,
+      name:            data.name,
+      start_time:      data.start_time,
+      end_time:        data.end_time,
+    },
+  });
+}
+
+async function updateShiftTemplate(organisationId, shiftId, data) {
+  const shift = await prisma.shiftTemplate.findFirst({ where: { shift_id: shiftId, organisation_id: organisationId } });
+  if (!shift) throw makeError('Shift template not found', 404);
+  return prisma.shiftTemplate.update({
+    where: { shift_id: shiftId },
+    data: {
+      name:       data.name       !== undefined ? data.name       : undefined,
+      start_time: data.start_time !== undefined ? data.start_time : undefined,
+      end_time:   data.end_time   !== undefined ? data.end_time   : undefined,
+    },
+  });
+}
+
+async function deleteShiftTemplate(organisationId, shiftId) {
+  const shift = await prisma.shiftTemplate.findFirst({ where: { shift_id: shiftId, organisation_id: organisationId } });
+  if (!shift) throw makeError('Shift template not found', 404);
+  await prisma.shiftTemplate.delete({ where: { shift_id: shiftId } });
+}
+
 // ─── Staff ────────────────────────────────────────────────────
 
 async function listStaff(organisationId, filters = {}) {
@@ -303,6 +346,7 @@ module.exports = {
   listDepartments, createDepartment, updateDepartment, deleteDepartment, assignStaffToDept,
   listRoles, createRole, updateRole, deleteRole,
   listSkills, createSkill, updateSkill, deleteSkill,
+  listShiftTemplates, createShiftTemplate, updateShiftTemplate, deleteShiftTemplate,
   listStaff, registerStaff, updateStaff, deactivateStaff, reactivateStaff,
   assignSkillToStaff, removeSkillFromStaff,
 };

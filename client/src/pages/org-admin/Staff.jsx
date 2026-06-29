@@ -10,7 +10,12 @@ const TYPE_BADGE = {
   ORG_ADMIN:        { label: 'Org Admin',       color: 'bg-green-100 text-green-700' },
 };
 
-const EMPTY_FORM = { full_name: '', email: '', user_type: 'PERMANENT_WORKER', role_id: '', password: 'Password123!' };
+function generatePassword() {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$';
+  return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+const getEmptyForm = () => ({ full_name: '', email: '', user_type: 'PERMANENT_WORKER', role_id: '', password: generatePassword() });
 
 export default function Staff() {
   const [staff, setStaff]       = useState([]);
@@ -20,9 +25,10 @@ export default function Staff() {
   const [search, setSearch]     = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [showModal, setShowModal]   = useState(false);
-  const [form, setForm]         = useState(EMPTY_FORM);
+  const [form, setForm]         = useState(getEmptyForm);
   const [saving, setSaving]     = useState(false);
   const [formError, setFormError]   = useState('');
+  const [showPass, setShowPass] = useState(false);
 
   function load() {
     setLoading(true);
@@ -64,7 +70,7 @@ export default function Staff() {
       const r = await api.post('/org-admin/staff', body);
       setStaff((prev) => [...prev, r.data.data].sort((a, b) => a.full_name.localeCompare(b.full_name)));
       setShowModal(false);
-      setForm(EMPTY_FORM);
+      setForm(getEmptyForm());
     } catch (e) {
       setFormError(e.response?.data?.message || e.response?.data?.errors?.[0]?.msg || e.message);
     } finally {
@@ -90,7 +96,7 @@ export default function Staff() {
             <h2 className="text-xl font-bold text-gray-800">Employee Management</h2>
             <p className="text-gray-500 text-sm mt-0.5">Manage all employees in your organisation.</p>
           </div>
-          <button onClick={() => { setShowModal(true); setFormError(''); setForm(EMPTY_FORM); }}
+          <button onClick={() => { setShowModal(true); setFormError(''); setForm(getEmptyForm()); setShowPass(false); }}
             className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
             + Add Employee
           </button>
@@ -218,8 +224,31 @@ export default function Staff() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Initial Password *</label>
-                <input required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      required
+                      type={showPass ? 'text' : 'password'}
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 pr-16 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPass((v) => !v)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600"
+                    >
+                      {showPass ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, password: generatePassword() })}
+                    className="px-3 py-2 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    Generate
+                  </button>
+                </div>
                 <p className="text-xs text-gray-400 mt-1">Employee should change this on first login.</p>
               </div>
               <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">

@@ -111,6 +111,35 @@ async function deleteSkill(req, res, next) {
   try { await svc.deleteSkill(orgId(req), id(req)); res.status(204).end(); } catch (e) { next(e); }
 }
 
+// ─── Shift Templates ─────────────────────────────────────────
+
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+const shiftRules = [
+  body('name').trim().notEmpty().withMessage('name is required').isLength({ max: 100 }),
+  body('start_time').matches(TIME_RE).withMessage('start_time must be HH:MM (24h)'),
+  body('end_time').matches(TIME_RE).withMessage('end_time must be HH:MM (24h)'),
+];
+
+const shiftUpdateRules = [
+  body('name').optional().trim().notEmpty().isLength({ max: 100 }),
+  body('start_time').optional().matches(TIME_RE).withMessage('start_time must be HH:MM (24h)'),
+  body('end_time').optional().matches(TIME_RE).withMessage('end_time must be HH:MM (24h)'),
+];
+
+async function listShifts(req, res, next) {
+  try { ok(res, await svc.listShiftTemplates(orgId(req))); } catch (e) { next(e); }
+}
+async function createShift(req, res, next) {
+  try { ok(res, await svc.createShiftTemplate(orgId(req), req.body), 201); } catch (e) { next(e); }
+}
+async function updateShift(req, res, next) {
+  try { ok(res, await svc.updateShiftTemplate(orgId(req), id(req), req.body)); } catch (e) { next(e); }
+}
+async function deleteShift(req, res, next) {
+  try { await svc.deleteShiftTemplate(orgId(req), id(req)); res.status(204).end(); } catch (e) { next(e); }
+}
+
 // ─── Staff ────────────────────────────────────────────────────
 
 const WORKER_TYPES = ['PERMANENT_WORKER', 'TEMPORARY_WORKER', 'PROJECT_MANAGER', 'ORG_ADMIN'];
@@ -175,6 +204,7 @@ module.exports = {
   deptRules, deptUpdateRules, listDepts, createDept, updateDept, deleteDept, assignStaffRules, assignStaffToDept,
   roleRules, roleUpdateRules, listRoles, createRole, updateRole, deleteRole,
   skillRules, skillUpdateRules, listSkills, createSkill, updateSkill, deleteSkill,
+  shiftRules, shiftUpdateRules, listShifts, createShift, updateShift, deleteShift,
   staffRules, staffQueryRules, staffUpdateRules, listStaff, registerStaff, updateStaff, deactivateStaff, reactivateStaff,
   assignSkillRules, assignSkill, removeSkill,
 };

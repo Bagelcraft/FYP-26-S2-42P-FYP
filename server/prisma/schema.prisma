@@ -95,6 +95,7 @@ model Organisation {
   tasks              Task[]
   staffRoles         StaffRole[]
   unregisteredUsers  UnregisteredUser[]
+  shiftTemplates     ShiftTemplate[]
 }
 
 model Subscription {
@@ -330,6 +331,19 @@ model TaskUpdateRequest {
 
   task      Task @relation(fields: [task_id], references: [task_id])
   requester User @relation("UpdateRequestedBy", fields: [requested_by], references: [userId])
+}
+
+// ─── Shift Templates ──────────────────────────────────────────
+
+model ShiftTemplate {
+  shift_id        Int          @id @default(autoincrement())
+  organisation_id Int
+  name            String       @db.VarChar(100)
+  start_time      String       @db.VarChar(5)
+  end_time        String       @db.VarChar(5)
+  created_at      DateTime     @default(now())
+
+  organisation    Organisation @relation(fields: [organisation_id], references: [organisation_id])
 }
 
 // ─── Shift Change ─────────────────────────────────────────────
