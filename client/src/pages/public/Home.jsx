@@ -1,5 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+
+function toEmbedUrl(url) {
+  if (!url) return '';
+  let videoId = null;
+  let base = url;
+  if (url.includes('/embed/')) {
+    const m = url.match(/\/embed\/([^?&]+)/);
+    videoId = m?.[1];
+    base = `https://www.youtube-nocookie.com/embed/${videoId}`;
+  } else {
+    const watch = url.match(/[?&]v=([^&]+)/);
+    const short = url.match(/youtu\.be\/([^?&]+)/);
+    videoId = watch?.[1] ?? short?.[1];
+    if (!videoId) return url;
+    base = `https://www.youtube-nocookie.com/embed/${videoId}`;
+  }
+  return `${base}?loop=1&playlist=${videoId}&rel=0`;
+}
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
@@ -25,6 +43,99 @@ export default function Home() {
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
   const [formStatus, setFormStatus] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const SCENARIOS = [
+    {
+      label: 'Construction',
+      stats: [256, 1429, 87, 95],
+      bars:  [40, 65, 45, 80, 55, 70, 90],
+      tasks: [
+        { label: 'Install HVAC Unit – Bay 3',    status: 'In Progress', color: 'bg-blue-100 text-blue-700'   },
+        { label: 'Safety Inspection – Floor 2',   status: 'Pending',     color: 'bg-yellow-100 text-yellow-700' },
+        { label: 'Electrical Wiring – Room 4A',   status: 'Done',        color: 'bg-green-100 text-green-700'  },
+      ],
+    },
+    {
+      label: 'Healthcare',
+      stats: [184, 2103, 42, 98],
+      bars:  [60, 75, 85, 50, 90, 65, 78],
+      tasks: [
+        { label: 'Patient Sanitation – Wing B',   status: 'In Progress', color: 'bg-blue-100 text-blue-700'   },
+        { label: 'Equipment Sterilization – Lab', status: 'Pending',     color: 'bg-yellow-100 text-yellow-700' },
+        { label: 'Staff Roster Update – ICU',     status: 'Done',        color: 'bg-green-100 text-green-700'  },
+      ],
+    },
+    {
+      label: 'Logistics',
+      stats: [312, 3847, 115, 92],
+      bars:  [55, 45, 70, 85, 60, 75, 95],
+      tasks: [
+        { label: 'Package Sorting – Zone A',      status: 'In Progress', color: 'bg-blue-100 text-blue-700'   },
+        { label: 'Delivery Route Optimisation',   status: 'Pending',     color: 'bg-yellow-100 text-yellow-700' },
+        { label: 'Warehouse Audit – Bay 7',       status: 'Done',        color: 'bg-green-100 text-green-700'  },
+      ],
+    },
+    {
+      label: 'Technology',
+      stats: [94, 756, 31, 97],
+      bars:  [30, 50, 40, 65, 80, 55, 70],
+      tasks: [
+        { label: 'Server Migration – Cloud Infra', status: 'In Progress', color: 'bg-blue-100 text-blue-700'   },
+        { label: 'Security Patch Rollout – Prod',  status: 'Pending',     color: 'bg-yellow-100 text-yellow-700' },
+        { label: 'Code Review – Sprint 12',        status: 'Done',        color: 'bg-green-100 text-green-700'  },
+      ],
+    },
+  ];
+  const STAT_LABELS = ['Total Staff', 'Tasks Done', 'Pending', 'On Time'];
+  const STAT_FMT    = [(n) => n.toLocaleString(), (n) => n.toLocaleString(), (n) => String(n), (n) => `${n}%`];
+
+  const rafRef  = useRef(null);
+  const fromRef = useRef([0, 0, 0, 0]);
+  const [sceneIdx,   setSceneIdx]   = useState(0);
+  const [counts,     setCounts]     = useState([0, 0, 0, 0]);
+  const [barsActive, setBarsActive] = useState(false);
+  const [tasksIn,    setTasksIn]    = useState(false);
+
+  function animateTo(target, duration, onDone) {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    const from  = [...fromRef.current];
+    const start = performance.now();
+    const ease  = (t) => 1 - Math.pow(1 - t, 3);
+    const tick  = (now) => {
+      const t = Math.min((now - start) / duration, 1);
+      const e = ease(t);
+      const cur = from.map((f, i) => Math.round(f + (target[i] - f) * e));
+      fromRef.current = cur;
+      setCounts(cur);
+      if (t < 1) rafRef.current = requestAnimationFrame(tick);
+      else { rafRef.current = null; onDone?.(); }
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  }
+
+  // Entrance animation on first load
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setBarsActive(true);
+      animateTo(SCENARIOS[0].stats, 1800, () => setTasksIn(true));
+    }, 350);
+    return () => { clearTimeout(t); if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, []);
+
+  // Cycle through all scenarios every 4.5 s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTasksIn(false);
+      setTimeout(() => {
+        setSceneIdx((prev) => {
+          const next = (prev + 1) % SCENARIOS.length;
+          animateTo(SCENARIOS[next].stats, 1100, () => setTasksIn(true));
+          return next;
+        });
+      }, 380);
+    }, 4500);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     fetch(`${API_BASE}/admin/content`)
@@ -115,31 +226,47 @@ export default function Home() {
           <div className="w-full max-w-md bg-white rounded-2xl border border-gray-200 shadow-xl p-6 space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-gray-700">SmartTask Dashboard</span>
-              <div className="flex gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-                <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
-                <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full transition-all duration-300">
+                  {SCENARIOS[sceneIdx].label}
+                </span>
+                <div className="flex gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-4 gap-2">
-              {[['Total Staff', '256'], ['Tasks Done', '1,429'], ['Pending', '87'], ['On Time', '95%']].map(([label, val]) => (
+              {STAT_LABELS.map((label, i) => (
                 <div key={label} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
                   <p className="text-gray-400 text-xs">{label}</p>
-                  <p className="text-gray-800 text-sm font-bold mt-0.5">{val}</p>
+                  <p className="text-gray-800 text-sm font-bold mt-0.5">{STAT_FMT[i](counts[i])}</p>
                 </div>
               ))}
             </div>
             <div className="bg-gradient-to-br from-primary-50 to-blue-50 rounded-xl h-28 flex items-end px-4 pb-3 gap-1.5 border border-primary-100">
-              {[40, 65, 45, 80, 55, 70, 90].map((h, i) => (
-                <div key={i} className="flex-1 bg-primary-500 rounded-t-sm opacity-75" style={{ height: `${h}%` }} />
+              {SCENARIOS[sceneIdx].bars.map((h, i) => (
+                <div
+                  key={i}
+                  className="flex-1 bg-primary-500 rounded-t-sm"
+                  style={{
+                    height: barsActive ? `${h}%` : '2px',
+                    opacity: barsActive ? (0.5 + (h / 95) * 0.5) : 0.2,
+                    transition: `height 0.85s cubic-bezier(0.22,1,0.36,1) ${i * 0.055}s, opacity 0.5s ease ${i * 0.055}s`,
+                  }}
+                />
               ))}
             </div>
-            <div className="space-y-2">
-              {[
-                { label: 'Install HVAC Unit – Bay 3', status: 'In Progress', color: 'bg-blue-100 text-blue-700' },
-                { label: 'Safety Inspection – Floor 2', status: 'Pending', color: 'bg-yellow-100 text-yellow-700' },
-                { label: 'Electrical Wiring – Room 4A', status: 'Done', color: 'bg-green-100 text-green-700' },
-              ].map((task) => (
+            <div
+              className="space-y-2"
+              style={{
+                opacity: tasksIn ? 1 : 0,
+                transform: tasksIn ? 'translateY(0)' : 'translateY(6px)',
+                transition: 'opacity 0.35s ease, transform 0.35s ease',
+              }}
+            >
+              {SCENARIOS[sceneIdx].tasks.map((task) => (
                 <div key={task.label} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
                   <span className="text-xs text-gray-700 truncate mr-2">{task.label}</span>
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${task.color}`}>{task.status}</span>
@@ -185,9 +312,11 @@ export default function Home() {
           <div className="flex-1 bg-slate-800 rounded-2xl aspect-video flex items-center justify-center border border-slate-700">
             {content?.video_url ? (
               <iframe
-                src={content.video_url}
+                src={toEmbedUrl(content.video_url)}
                 className="w-full h-full rounded-2xl"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
+                referrerPolicy="strict-origin-when-cross-origin"
                 title="Demo video"
               />
             ) : (

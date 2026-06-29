@@ -16,7 +16,15 @@ const contentRoutes = require("./routes/content.routes");
 
 const app = express();
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+      'frame-src': ["'self'", 'https://www.youtube.com', 'https://www.youtube-nocookie.com'],
+      'img-src':   ["'self'", 'data:', 'https:'],
+    },
+  },
+}));
 app.use(cors({ origin: process.env.CLIENT_URL || /^http:\/\/localhost:\d+$/ }));
 app.use(express.json());
 

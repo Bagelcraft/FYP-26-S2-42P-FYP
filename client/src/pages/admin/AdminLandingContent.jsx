@@ -5,6 +5,16 @@ import { ADMIN_NAV } from './nav';
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 const TABS = ['Hero', 'About / Video', 'Pricing', 'Testimonials'];
 
+function toEmbedUrl(url) {
+  if (!url) return url;
+  if (url.includes('/embed/')) return url;
+  const short = url.match(/youtu\.be\/([a-zA-Z0-9_-]+)/);
+  if (short) return `https://www.youtube.com/embed/${short[1]}`;
+  const watch = url.match(/[?&]v=([a-zA-Z0-9_-]+)/);
+  if (watch) return `https://www.youtube.com/embed/${watch[1]}`;
+  return url;
+}
+
 export default function AdminLandingContent() {
   const [tab, setTab] = useState('Hero');
   const [loading, setLoading] = useState(true);
@@ -57,7 +67,9 @@ export default function AdminLandingContent() {
   };
   const saveVideo = async (e) => {
     e.preventDefault();
-    try { await put('video', video); showToast('About / Video section saved.'); } catch { showToast('Failed to save.', true); }
+    const payload = { ...video, video_url: toEmbedUrl(video.video_url) };
+    if (payload.video_url !== video.video_url) setVideo(payload);
+    try { await put('video', payload); showToast('About / Video section saved.'); } catch { showToast('Failed to save.', true); }
   };
   const savePricing = async (e) => {
     e.preventDefault();
@@ -141,8 +153,8 @@ export default function AdminLandingContent() {
                 </div>
                 <div>
                   <label className={labelCls}>Video Embed URL <span className="text-gray-400 font-normal">(optional)</span></label>
-                  <input className={inputCls} value={video.video_url} onChange={(e) => setVideo((p) => ({ ...p, video_url: e.target.value }))} placeholder="https://www.youtube.com/embed/..." />
-                  <p className="text-xs text-gray-400 mt-1">Use the embed URL, e.g. youtube.com/embed/VIDEO_ID</p>
+                  <input className={inputCls} value={video.video_url} onChange={(e) => setVideo((p) => ({ ...p, video_url: e.target.value }))} placeholder="https://www.youtube.com/watch?v=... or youtu.be/..." />
+                  <p className="text-xs text-gray-400 mt-1">Paste any YouTube link — it will be converted to an embed URL automatically on save.</p>
                 </div>
                 <button type="submit" className={saveBtnCls}>Save About / Video</button>
               </form>
