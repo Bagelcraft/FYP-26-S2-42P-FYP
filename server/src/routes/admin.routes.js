@@ -28,11 +28,9 @@ router.post('/organisations',                adminController.createOrganisation)
 router.put('/organisations/:id/suspend',     adminController.suspendOrganisation);
 router.put('/organisations/:id/reactivate',  adminController.reactivateOrganisation);
 
-// ─── Audit logs (stub) ────────────────────────────────────────
+// ─── Audit logs ───────────────────────────────────────────────
 
-router.get('/logs', (req, res) => {
-  res.json({ message: 'Get audit logs — to be implemented' });
-});
+router.get('/logs', adminController.getAuditLogs);
 
 // ─── Enquiries ────────────────────────────────────────────────
 

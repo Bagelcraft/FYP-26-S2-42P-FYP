@@ -34,6 +34,16 @@ async function reactivateOrganisation(req, res, next) {
   try { ok(res, await svc.setOrganisationActive(id(req), true)); } catch (e) { next(e); }
 }
 
+async function getAuditLogs(req, res, next) {
+  try {
+    ok(res, await svc.getAuditLogs({
+      category: req.query.category,
+      search:   req.query.search,
+      limit:    req.query.limit,
+    }));
+  } catch (e) { next(e); }
+}
+
 module.exports = {
   listRegistrations,
   approveRegistration,
@@ -42,4 +52,5 @@ module.exports = {
   createOrganisation,
   suspendOrganisation,
   reactivateOrganisation,
+  getAuditLogs,
 };

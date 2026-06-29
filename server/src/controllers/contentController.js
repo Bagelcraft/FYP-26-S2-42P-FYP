@@ -153,7 +153,7 @@ exports.createTestimonial = async (req, res) => {
     const { name, company, rating, review_text } = req.body;
 
     const testimonial = await prisma.landingTestimonial.create({
-      data: { name, company, rating: rating ?? 5, review_text },
+      data: { name, company, rating: rating ?? 5, review_text, is_active: false },
     });
 
     res.status(201).json(testimonial);
@@ -166,9 +166,16 @@ exports.updateTestimonial = async (req, res) => {
   try {
     const { name, company, rating, review_text, is_active } = req.body;
 
+    const data = {};
+    if (name        !== undefined) data.name        = name;
+    if (company     !== undefined) data.company     = company;
+    if (rating      !== undefined) data.rating      = rating;
+    if (review_text !== undefined) data.review_text = review_text;
+    if (is_active   !== undefined) data.is_active   = is_active;
+
     const testimonial = await prisma.landingTestimonial.update({
       where: { testimonial_id: parseInt(req.params.id) },
-      data: { name, company, rating, review_text, is_active },
+      data,
     });
 
     res.json(testimonial);

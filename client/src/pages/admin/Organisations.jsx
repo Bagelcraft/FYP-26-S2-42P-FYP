@@ -60,6 +60,24 @@ export default function Organisations() {
     }
   };
 
+  const toggleStatus = async (org) => {
+    const action = org.isActive ? 'suspend' : 'reactivate';
+    const label  = org.isActive ? 'Suspend' : 'Reactivate';
+    if (!window.confirm(`${label} "${org.name}"?`)) return;
+    setActingId(org.organisation_id);
+    setError('');
+    try {
+      await api.put(`/admin/organisations/${org.organisation_id}/${action}`);
+      setOrgs((prev) =>
+        prev.map((o) => o.organisation_id === org.organisation_id ? { ...o, isActive: !o.isActive } : o)
+      );
+    } catch (err) {
+      setError(err.response?.data?.message ?? `Failed to ${action} organisation.`);
+    } finally {
+      setActingId(null);
+    }
+  };
+
   const filtered = orgs.filter((o) => {
     const status = o.isActive ? 'ACTIVE' : 'SUSPENDED';
     const matchSearch = o.name.toLowerCase().includes(search.toLowerCase());
@@ -170,6 +188,7 @@ export default function Organisations() {
                 <th className="px-5 py-3 text-left font-medium">Staff</th>
                 <th className="px-5 py-3 text-left font-medium">Registered</th>
                 <th className="px-5 py-3 text-left font-medium">Status</th>
+                <th className="px-5 py-3 text-left font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -179,16 +198,25 @@ export default function Organisations() {
                   <td className="px-5 py-3 text-gray-600">{org._count?.users ?? 0}</td>
                   <td className="px-5 py-3 text-gray-500">{fmtDate(org.createdAt)}</td>
                   <td className="px-5 py-3"><Badge status={org.isActive ? 'ACTIVE' : 'SUSPENDED'} /></td>
+                  <td className="px-5 py-3">
+                    <button
+                      onClick={() => toggleStatus(org)}
+                      disabled={actingId === org.organisation_id}
+                      className={`text-xs font-medium hover:underline disabled:opacity-50 ${org.isActive ? 'text-red-500' : 'text-green-600'}`}
+                    >
+                      {actingId === org.organisation_id ? '…' : org.isActive ? 'Suspend' : 'Reactivate'}
+                    </button>
+                  </td>
                 </tr>
               ))}
               {!loading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-5 py-10 text-center text-gray-400">No organisations found.</td>
+                  <td colSpan={5} className="px-5 py-10 text-center text-gray-400">No organisations found.</td>
                 </tr>
               )}
               {loading && (
                 <tr>
-                  <td colSpan={4} className="px-5 py-10 text-center text-gray-400">Loading…</td>
+                  <td colSpan={5} className="px-5 py-10 text-center text-gray-400">Loading…</td>
                 </tr>
               )}
             </tbody>

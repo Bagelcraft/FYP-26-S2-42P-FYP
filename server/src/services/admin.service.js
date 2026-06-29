@@ -103,6 +103,109 @@ async function setOrganisationActive(organisationId, isActive) {
   });
 }
 
+// ─── Audit Logs ───────────────────────────────────────────────
+
+async function getAuditLogs(filters = {}) {
+  const limit = Math.min(Number(filters.limit) || 200, 500);
+
+  const [users, assignments, attendance, leave, orgs] = await Promise.all([
+    prisma.user.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        userId: true, full_name: true, user_type: true, createdAt: true,
+        organisation: { select: { name: true } },
+      },
+    }),
+    prisma.taskAssignment.findMany({
+      orderBy: { assigned_at: 'desc' },
+      take: limit,
+      select: {
+        assignment_id: true, assignment_type: true, assigned_at: true,
+        assignedTo: { select: { full_name: true } },
+        assignedBy: { select: { full_name: true } },
+        task:        { select: { title: true, organisation: { select: { name: true } } } },
+      },
+    }),
+    prisma.attendance.findMany({
+      orderBy: { clock_in: 'desc' },
+      take: limit,
+      select: {
+        attendance_id: true, clock_in: true,
+        user: { select: { full_name: true, organisation: { select: { name: true } } } },
+      },
+    }),
+    prisma.leaveRequest.findMany({
+      orderBy: { start_date: 'desc' },
+      take: limit,
+      select: {
+        leave_id: true, leave_type: true, status: true, start_date: true,
+        user: { select: { full_name: true, organisation: { select: { name: true } } } },
+      },
+    }),
+    prisma.organisation.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: { organisation_id: true, name: true, isActive: true, createdAt: true },
+    }),
+  ]);
+
+  const entries = [
+    ...users.map((u) => ({
+      id:       `user-${u.userId}`,
+      action:   u.user_type === 'ORG_ADMIN' ? 'Organisation admin registered' : 'Staff account created',
+      user:     u.full_name,
+      org:      u.organisation?.name ?? '—',
+      category: 'STAFF',
+      time:     u.createdAt,
+    })),
+    ...assignments.map((a) => ({
+      id:       `assign-${a.assignment_id}`,
+      action:   `Task ${a.assignment_type === 'AUTO' ? 'auto-' : ''}assigned: ${a.task?.title ?? ''}`,
+      user:     a.assignedBy?.full_name ?? 'system',
+      org:      a.task?.organisation?.name ?? '—',
+      category: 'TASK',
+      time:     a.assigned_at,
+    })),
+    ...attendance.map((a) => ({
+      id:       `att-${a.attendance_id}`,
+      action:   'Employee clocked in',
+      user:     a.user?.full_name ?? '—',
+      org:      a.user?.organisation?.name ?? '—',
+      category: 'AUTH',
+      time:     a.clock_in,
+    })),
+    ...leave.map((l) => ({
+      id:       `leave-${l.leave_id}`,
+      action:   `${l.leave_type} leave request — ${l.status}`,
+      user:     l.user?.full_name ?? '—',
+      org:      l.user?.organisation?.name ?? '—',
+      category: 'STAFF',
+      time:     l.start_date,
+    })),
+    ...orgs.map((o) => ({
+      id:       `org-${o.organisation_id}`,
+      action:   'Organisation registered',
+      user:     'system',
+      org:      o.name,
+      category: 'SYSTEM',
+      time:     o.createdAt,
+    })),
+  ];
+
+  entries.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+  const { category, search } = filters;
+  return entries
+    .filter((e) => !category || category === 'ALL' || e.category === category)
+    .filter((e) => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return e.action.toLowerCase().includes(q) || e.user.toLowerCase().includes(q) || e.org.toLowerCase().includes(q);
+    })
+    .slice(0, limit);
+}
+
 module.exports = {
   listPendingRegistrations,
   approveRegistration,
@@ -110,4 +213,5 @@ module.exports = {
   listOrganisations,
   createOrganisation,
   setOrganisationActive,
+  getAuditLogs,
 };
