@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import { PM_NAV, PM_SECONDARY } from './nav';
 import api from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
 
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' }) : '');
 
@@ -16,11 +17,11 @@ function Stars({ n, onChange }) {
   );
 }
 
-function TestimonialModal({ item, onClose, onSaved }) {
+function TestimonialModal({ item, onClose, onSaved, defaultName, defaultCompany }) {
   const editing = !!item;
   const [form, setForm] = useState(editing
     ? { name: item.name ?? '', company: item.company ?? '', rating: item.rating ?? 5, review_text: item.review_text ?? '' }
-    : { name: '', company: '', rating: 5, review_text: '' });
+    : { name: defaultName ?? '', company: defaultCompany ?? '', rating: 5, review_text: '' });
   const [saving, setSaving] = useState(false);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
@@ -61,14 +62,27 @@ function TestimonialModal({ item, onClose, onSaved }) {
         <div className="px-6 py-5 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Name *</label>
-              <input required value={form.name} onChange={set('name')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              <label className="block text-xs font-medium text-gray-600 mb-1">Name</label>
+              <input
+                value={form.name}
+                readOnly={!editing}
+                onChange={editing ? set('name') : undefined}
+                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none ${!editing ? 'bg-gray-50 border-gray-200 text-gray-500 cursor-default' : 'border-gray-200 focus:ring-2 focus:ring-primary-500'}`}
+              />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Company / Role</label>
-              <input value={form.company} onChange={set('company')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              <label className="block text-xs font-medium text-gray-600 mb-1">Organisation</label>
+              <input
+                value={form.company}
+                readOnly={!editing}
+                onChange={editing ? set('company') : undefined}
+                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none ${!editing ? 'bg-gray-50 border-gray-200 text-gray-500 cursor-default' : 'border-gray-200 focus:ring-2 focus:ring-primary-500'}`}
+              />
             </div>
           </div>
+          {!editing && (
+            <p className="text-xs text-gray-400 -mt-2">Name and organisation are filled from your account.</p>
+          )}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1.5">Rating</label>
             <Stars n={form.rating} onChange={(r) => setForm({ ...form, rating: r })} />
@@ -92,11 +106,19 @@ function TestimonialModal({ item, onClose, onSaved }) {
 }
 
 export default function Testimonials() {
+  const { user } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(undefined);
   const [toast, setToast] = useState('');
+  const [orgName, setOrgName] = useState('');
   const note = (m) => { setToast(m); setTimeout(() => setToast(''), 2400); };
+
+  useEffect(() => {
+    api.get('/pm/org-info')
+      .then((r) => setOrgName(r.data.data?.name ?? ''))
+      .catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -177,7 +199,15 @@ export default function Testimonials() {
         )}
       </div>
 
-      {modal !== undefined && <TestimonialModal item={modal} onClose={() => setModal(undefined)} onSaved={handleSaved} />}
+      {modal !== undefined && (
+        <TestimonialModal
+          item={modal}
+          onClose={() => setModal(undefined)}
+          onSaved={handleSaved}
+          defaultName={user?.full_name ?? ''}
+          defaultCompany={orgName}
+        />
+      )}
       {toast && <div className="fixed bottom-6 right-6 z-50 bg-gray-900 text-white text-sm px-4 py-2.5 rounded-lg shadow-lg">{toast}</div>}
     </DashboardLayout>
   );

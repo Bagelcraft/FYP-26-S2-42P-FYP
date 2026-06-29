@@ -1,234 +1,141 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
-import Badge from '../../components/Badge';
 import { TEMP_NAV } from './nav';
 import api from '../../utils/api';
 
-function formatDate(dt) {
-  return new Date(dt).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+function fmtDate(iso) {
+  return new Date(iso).toLocaleDateString('en-SG', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  });
 }
-
-function formatTime(start, end) {
-  const t = (dt) => new Date(dt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
-  return `${t(start)} – ${t(end)}`;
-}
-
-function toLocalInputs(dt) {
-  const d = new Date(dt);
-  const date = [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
-  const time = [String(d.getHours()).padStart(2, '0'), String(d.getMinutes()).padStart(2, '0')].join(':');
-  return { date, time };
-}
-
-const STATUS_OPTIONS = [
-  { value: 'AVAILABLE', label: 'Available' },
-  { value: 'UNAVAILABLE', label: 'Unavailable' },
-  { value: 'ON_LEAVE', label: 'On Leave' },
-];
 
 export default function Availability() {
-  const [slots, setSlots] = useState([]);
+  const [blocked, setBlocked] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ date: '', start: '', end: '', status: 'AVAILABLE' });
+  const [date, setDate] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [toast, setToast] = useState('');
 
-  const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({ date: '', start: '', end: '', status: 'AVAILABLE' });
-  const [updating, setUpdating] = useState(false);
+  const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 2600); };
 
   useEffect(() => {
     api.get('/temp-worker/availability')
-      .then((r) => setSlots(r.data.data))
-      .catch(() => setError('Failed to load availability.'))
+      .then((r) => {
+        const rows = r.data.data ?? [];
+        setBlocked(rows.filter((s) => s.status === 'UNAVAILABLE'));
+      })
+      .catch(() => setError('Failed to load unavailable days.'))
       .finally(() => setLoading(false));
   }, []);
 
-  const handleSave = async () => {
-    if (!form.date || !form.start || !form.end) {
-      setError('Please fill in all fields.');
-      return;
-    }
-    setSaving(true);
-    setError('');
+  const alreadyBlocked = (d) => blocked.some((s) => s.start_datetime.slice(0, 10) === d);
+
+  async function markUnavailable() {
+    if (!date) { setError('Please select a date.'); return; }
+    if (alreadyBlocked(date)) { setError('That date is already marked unavailable.'); return; }
+    setSaving(true); setError('');
     try {
       const res = await api.post('/temp-worker/availability', {
-        start_datetime: `${form.date}T${form.start}:00`,
-        end_datetime: `${form.date}T${form.end}:00`,
-        status: form.status,
+        start_datetime: `${date}T00:00:00`,
+        end_datetime:   `${date}T23:59:59`,
+        status: 'UNAVAILABLE',
       });
-      setSlots((prev) => [...prev, res.data.data]);
-      setForm({ date: '', start: '', end: '', status: 'AVAILABLE' });
-      setShowForm(false);
+      setBlocked((prev) => [...prev, res.data.data].sort((a, b) =>
+        a.start_datetime.localeCompare(b.start_datetime)));
+      setDate('');
+      showToast('Day marked as unavailable.');
     } catch (err) {
-      const serverMsg =
-        err.response?.data?.errors?.map((e) => e.msg).join(', ') ||
-        err.response?.data?.message ||
-        err.message ||
-        'Failed to save slot.';
-      setError(serverMsg);
+      setError(err.response?.data?.message || err.message || 'Failed to save.');
     } finally {
       setSaving(false);
     }
-  };
+  }
 
-  const handleEditStart = (slot) => {
-    const start = toLocalInputs(slot.start_datetime);
-    const end = toLocalInputs(slot.end_datetime);
-    setEditForm({ date: start.date, start: start.time, end: end.time, status: slot.status });
-    setEditingId(slot.availability_id);
-    setError('');
-  };
-
-  const handleUpdate = async () => {
-    if (!editForm.date || !editForm.start || !editForm.end) {
-      setError('Please fill in all fields.');
-      return;
-    }
-    setUpdating(true);
-    setError('');
+  async function remove(slot) {
     try {
-      const res = await api.put(`/temp-worker/availability/${editingId}`, {
-        start_datetime: `${editForm.date}T${editForm.start}:00`,
-        end_datetime: `${editForm.date}T${editForm.end}:00`,
-        status: editForm.status,
-      });
-      setSlots((prev) => prev.map((s) => s.availability_id === editingId ? res.data.data : s));
-      setEditingId(null);
-    } catch (err) {
-      const serverMsg =
-        err.response?.data?.errors?.map((e) => e.msg).join(', ') ||
-        err.response?.data?.message ||
-        err.message ||
-        'Failed to update slot.';
-      setError(serverMsg);
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  const handleRemove = async (id) => {
-    try {
-      await api.delete(`/temp-worker/availability/${id}`);
-      setSlots((prev) => prev.filter((s) => s.availability_id !== id));
+      await api.delete(`/temp-worker/availability/${slot.availability_id}`);
+      setBlocked((prev) => prev.filter((s) => s.availability_id !== slot.availability_id));
+      showToast('Day removed.');
     } catch {
-      setError('Failed to remove slot.');
+      setError('Failed to remove day.');
     }
-  };
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <DashboardLayout navItems={TEMP_NAV} roleLabel="Temporary Worker">
-      <div className="space-y-6">
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-gray-800">Availability</h2>
-            <p className="text-gray-500 text-sm mt-0.5">Tell us when you are available so tasks can be allocated to you.</p>
-          </div>
-          <button
-            onClick={() => { setShowForm(!showForm); setError(''); }}
-            className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            + Add Slot
-          </button>
+      <div className="space-y-6 max-w-xl">
+        <div>
+          <h2 className="text-xl font-bold text-gray-800">Days I Can't Work</h2>
+          <p className="text-gray-500 text-sm mt-0.5">
+            Mark dates you are unavailable. Tasks will not be assigned to you on these days.
+          </p>
         </div>
 
-        {error && <p className="text-red-500 text-sm">{error}</p>}
-
-        {showForm && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
-            <h3 className="font-semibold text-gray-800">New Availability Slot</h3>
-            <div className="grid grid-cols-4 gap-4">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Date</label>
-                <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Start Time</label>
-                <input type="time" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">End Time</label>
-                <input type="time" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Status</label>
-                <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-                  {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => { setShowForm(false); setError(''); }} className="text-sm text-gray-500 hover:underline px-4 py-2">Cancel</button>
-              <button onClick={handleSave} disabled={saving}
-                className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-50">
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-            </div>
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-600">
+            {error}
           </div>
         )}
 
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm divide-y divide-gray-50">
-          {loading && <p className="px-5 py-4 text-sm text-gray-400">Loading…</p>}
-          {!loading && slots.length === 0 && (
-            <p className="px-5 py-4 text-sm text-gray-400">No availability slots set.</p>
-          )}
-          {slots.map((slot) =>
-            editingId === slot.availability_id ? (
-              <div key={slot.availability_id} className="px-5 py-4 space-y-3">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Edit Slot</p>
-                <div className="grid grid-cols-4 gap-3">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Date</label>
-                    <input type="date" value={editForm.date} onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Start Time</label>
-                    <input type="time" value={editForm.start} onChange={(e) => setEditForm({ ...editForm, start: e.target.value })}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">End Time</label>
-                    <input type="time" value={editForm.end} onChange={(e) => setEditForm({ ...editForm, end: e.target.value })}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Status</label>
-                    <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-                      {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <button onClick={() => { setEditingId(null); setError(''); }} className="text-sm text-gray-500 hover:underline px-3 py-1.5">Cancel</button>
-                  <button onClick={handleUpdate} disabled={updating}
-                    className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-1.5 rounded-lg disabled:opacity-50">
-                    {updating ? 'Saving…' : 'Update'}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div key={slot.availability_id} className="px-5 py-4 flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-800">{formatDate(slot.start_datetime)}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{formatTime(slot.start_datetime, slot.end_datetime)}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Badge status={slot.status} />
-                  <button onClick={() => handleEditStart(slot)} className="text-xs text-gray-400 hover:text-primary-600 transition-colors">Edit</button>
-                  <button onClick={() => handleRemove(slot.availability_id)} className="text-xs text-gray-400 hover:text-red-500 transition-colors">Remove</button>
-                </div>
-              </div>
-            )
-          )}
+        {/* Add date */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Add an unavailable date</h3>
+          <div className="flex gap-3">
+            <input
+              type="date"
+              value={date}
+              min={today}
+              onChange={(e) => { setDate(e.target.value); setError(''); }}
+              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+            <button
+              onClick={markUnavailable}
+              disabled={saving || !date}
+              className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
+            >
+              {saving ? 'Saving…' : 'Mark Unavailable'}
+            </button>
+          </div>
         </div>
+
+        {/* List */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm divide-y divide-gray-50">
+          <div className="px-5 py-3 bg-gray-50 rounded-t-xl">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Unavailable Dates</p>
+          </div>
+          {loading && <p className="px-5 py-6 text-sm text-gray-400 text-center">Loading…</p>}
+          {!loading && blocked.length === 0 && (
+            <p className="px-5 py-6 text-sm text-gray-400 text-center">No unavailable days set. You're available for all tasks!</p>
+          )}
+          {blocked.map((slot) => (
+            <div key={slot.availability_id} className="px-5 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0" />
+                <p className="text-sm font-medium text-gray-800">{fmtDate(slot.start_datetime)}</p>
+              </div>
+              <button
+                onClick={() => remove(slot)}
+                className="text-xs text-red-500 hover:underline font-medium"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <p className="text-xs text-gray-400">
+          Only future dates are accepted. Contact your organisation admin for past date adjustments.
+        </p>
       </div>
+
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-gray-900 text-white text-sm px-4 py-2.5 rounded-lg shadow-lg">
+          {toast}
+        </div>
+      )}
     </DashboardLayout>
   );
 }

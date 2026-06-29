@@ -106,7 +106,9 @@ router.get('/subscription', managerController.getSubscription);
 router.get('/billing',      managerController.listBilling);
 
 // Lookups for Create/Edit Task dropdowns (manager-accessible, read-only)
-router.get('/departments', managerController.getDepartments);
-router.get('/skills',      managerController.getSkills);
+router.get('/org-info',        managerController.getOrgInfo);
+router.get('/shift-templates', managerController.getShiftTemplates);
+router.get('/departments',     managerController.getDepartments);
+router.get('/skills',          managerController.getSkills);
 
 module.exports = router;

@@ -76,6 +76,22 @@ const listBilling = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// GET /pm/org-info
+const getOrgInfo = async (req, res, next) => {
+  try {
+    const data = await managerService.getOrgInfo(req.user.organisationId);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
+// GET /pm/shift-templates
+const getShiftTemplates = async (req, res, next) => {
+  try {
+    const data = await managerService.getShiftTemplates(req.user.organisationId);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
 // GET /pm/departments
 const getDepartments = async (req, res, next) => {
   try {
@@ -126,6 +142,6 @@ const deleteTestimonial = async (req, res, next) => {
 
 module.exports = {
   getTeam, listLeave, decideLeave, listLeaveBalances, updateLeaveBalance, getSubscription, listBilling,
-  getDepartments, getSkills,
+  getOrgInfo, getShiftTemplates, getDepartments, getSkills,
   listTestimonials, createTestimonial, updateTestimonial, deleteTestimonial,
 };

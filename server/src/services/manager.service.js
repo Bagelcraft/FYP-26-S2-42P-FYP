@@ -172,6 +172,21 @@ async function listBilling(organisationId) {
 }
 
 // ─── GET /pm/departments  ·  GET /pm/skills ───────────────────
+async function getOrgInfo(organisationId) {
+  return prisma.organisation.findUnique({
+    where: { organisation_id: organisationId },
+    select: { name: true },
+  });
+}
+
+async function getShiftTemplates(organisationId) {
+  return prisma.shiftTemplate.findMany({
+    where: { organisation_id: organisationId },
+    select: { shift_id: true, name: true, start_time: true, end_time: true },
+    orderBy: { name: 'asc' },
+  });
+}
+
 // Read-only lookups so managers can populate the Create/Edit Task dropdowns
 // without org-admin rights (org-admin owns create/update/delete of these).
 async function getDepartments(organisationId) {
@@ -256,6 +271,6 @@ async function deleteTestimonial(testimonialId, organisationId) {
 
 module.exports = {
   getTeam, listLeave, decideLeave, listLeaveBalances, updateLeaveBalance, getSubscription, listBilling,
-  getDepartments, getSkills,
+  getOrgInfo, getShiftTemplates, getDepartments, getSkills,
   listTestimonials, createTestimonial, updateTestimonial, deleteTestimonial,
 };

@@ -229,7 +229,15 @@ function SkillMultiSelect({ skills, selected, onToggle }) {
   );
 }
 
-function TaskModal({ task, depts, skills, onClose, onSaved }) {
+function fmtShiftTime(t) {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  const suffix = h < 12 ? 'AM' : 'PM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${suffix}`;
+}
+
+function TaskModal({ task, depts, skills, shifts, onClose, onSaved }) {
   const editing = !!task;
   const initialSkillIds = editing
     ? skillsOf(task).map((s) => String(s.skill_id))
@@ -241,9 +249,10 @@ function TaskModal({ task, depts, skills, onClose, onSaved }) {
         required_skill_ids: initialSkillIds,
         status: task.status,
         due: toDateInput(task.end_datetime),
+        shift_id: '',
         description: task.description ?? '',
       }
-    : { title: '', department_id: '', required_skill_ids: [], status: 'PENDING', due: '', description: '' });
+    : { title: '', department_id: '', required_skill_ids: [], status: 'PENDING', due: '', shift_id: '', description: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
@@ -253,17 +262,20 @@ function TaskModal({ task, depts, skills, onClose, onSaved }) {
     return { ...f, required_skill_ids: has ? f.required_skill_ids.filter((x) => x !== s) : [...f.required_skill_ids, s] };
   });
 
+  const selectedShift = shifts.find((s) => String(s.shift_id) === form.shift_id);
+
   async function submit(e) {
     e.preventDefault();
     setSaving(true); setError('');
     try {
-      // Schema requires start/end datetimes — default to a 09:00–18:00 working day.
       const day = form.due || new Date().toISOString().slice(0, 10);
+      const startTime = selectedShift ? selectedShift.start_time : '09:00';
+      const endTime   = selectedShift ? selectedShift.end_time   : '18:00';
       const body = {
         title: form.title.trim(),
         description: form.description.trim() || null,
-        start_datetime: `${day}T09:00:00`,
-        end_datetime: `${day}T18:00:00`,
+        start_datetime: `${day}T${startTime}:00`,
+        end_datetime:   `${day}T${endTime}:00`,
         department_id: form.department_id ? Number(form.department_id) : null,
         required_skill_ids: form.required_skill_ids.map(Number),
       };
@@ -311,18 +323,34 @@ function TaskModal({ task, depts, skills, onClose, onSaved }) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Due Date</label>
-              <input type="date" value={form.due} onChange={set('due')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              <label className="block text-xs font-medium text-gray-600 mb-1">Task Date *</label>
+              <input type="date" required value={form.due} onChange={set('due')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
             </div>
-            {editing && (
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
-                <select value={form.status} onChange={set('status')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-                  {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
-                </select>
-              </div>
-            )}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Shift Template</label>
+              <select value={form.shift_id} onChange={set('shift_id')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                <option value="">— Custom (9 AM–6 PM) —</option>
+                {shifts.map((s) => (
+                  <option key={s.shift_id} value={s.shift_id}>
+                    {s.name} ({fmtShiftTime(s.start_time)} – {fmtShiftTime(s.end_time)})
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
+          {selectedShift && (
+            <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-xs text-blue-700">
+              Task hours: <span className="font-medium">{fmtShiftTime(selectedShift.start_time)} – {fmtShiftTime(selectedShift.end_time)}</span>
+            </div>
+          )}
+          {editing && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
+              <select value={form.status} onChange={set('status')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+              </select>
+            </div>
+          )}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Description (optional)</label>
             <textarea rows={2} value={form.description} onChange={set('description')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
@@ -342,6 +370,7 @@ export default function Tasks() {
   const [tasks, setTasks] = useState([]);
   const [depts, setDepts] = useState([]);
   const [skills, setSkills] = useState([]);
+  const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -373,6 +402,9 @@ export default function Tasks() {
     api.get('/pm/skills')
       .then((r) => setSkills(r.data.data))
       .catch(() => api.get('/org-admin/skills').then((r) => setSkills(r.data.data)).catch(() => setSkills([])));
+    api.get('/pm/shift-templates')
+      .then((r) => setShifts(r.data.data ?? []))
+      .catch(() => setShifts([]));
   }, []);
 
   const filtered = tasks.filter((t) => {
@@ -477,14 +509,14 @@ export default function Tasks() {
 
       {creating && (
         <TaskModal
-          depts={depts} skills={skills}
+          depts={depts} skills={skills} shifts={shifts}
           onClose={() => setCreating(false)}
           onSaved={(t) => { load(); showToast(`Task “${t.title}” created`); }}
         />
       )}
       {editingTask && (
         <TaskModal
-          task={editingTask} depts={depts} skills={skills}
+          task={editingTask} depts={depts} skills={skills} shifts={shifts}
           onClose={() => setEditingTask(null)}
           onSaved={(t) => { load(); showToast(`Task “${t.title}” updated`); }}
         />

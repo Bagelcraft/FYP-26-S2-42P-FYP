@@ -84,6 +84,18 @@ async function reviewRequest(req, res, next) {
         reviewed_at: new Date(),
       },
     });
+
+    if (req.body.action === 'APPROVED') {
+      const fieldMap = { 'Full Name': 'full_name', 'Email': 'email' };
+      const dbField = fieldMap[existing.field];
+      if (dbField) {
+        await prisma.user.update({
+          where: { userId: existing.user_id },
+          data: { [dbField]: existing.requested_value },
+        });
+      }
+    }
+
     ok(res, updated);
   } catch (e) {
     next(e);
