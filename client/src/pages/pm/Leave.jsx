@@ -81,7 +81,7 @@ export default function Leave() {
   }, []);
 
   const nameOf = (uid, fallbackName) => fallbackName ?? STAFF[uid]?.name ?? 'Staff';
-  const typeOf = (userType, uid) => (userType ? (userType === 'PERMANENT_WORKER' ? 'Permanent' : 'Temporary') : (STAFF[uid]?.type ?? ''));
+  const typeOf = (userType, uid) => (userType ? (userType === 'PERMANENT_WORKER' ? 'Permanent Employee' : 'Temporary Employee') : (STAFF[uid]?.type ?? ''));
 
   const pending = leave.filter((l) => l.status === 'PENDING');
   function decide(id, status) {

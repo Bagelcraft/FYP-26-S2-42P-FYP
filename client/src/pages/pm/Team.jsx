@@ -18,8 +18,8 @@ const mockStaff = [
 ];
 
 const TYPE_BADGE = {
-  PERMANENT_WORKER: { label: 'Permanent', color: 'bg-blue-100 text-blue-700' },
-  TEMPORARY_WORKER: { label: 'Temporary', color: 'bg-orange-100 text-orange-700' },
+  PERMANENT_WORKER: { label: 'Permanent Employee', color: 'bg-blue-100 text-blue-700' },
+  TEMPORARY_WORKER: { label: 'Temporary Employee', color: 'bg-orange-100 text-orange-700' },
 };
 
 export default function Team() {
@@ -60,8 +60,8 @@ export default function Team() {
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard label="Total Members" value={mockStaff.length} icon="👥" color="blue" />
-          <StatCard label="Permanent" value={perm} icon="🧑‍💼" color="purple" />
-          <StatCard label="Temporary" value={temp} icon="🕓" color="yellow" />
+          <StatCard label="Permanent Employees" value={perm} icon="🧑‍💼" color="purple" />
+          <StatCard label="Temporary Employees" value={temp} icon="🕓" color="yellow" />
           <StatCard label="On Leave" value={onLeave} icon="🌴" color="green" />
         </div>
 
@@ -79,8 +79,8 @@ export default function Team() {
             className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             <option value="ALL">All Types</option>
-            <option value="PERMANENT_WORKER">Permanent</option>
-            <option value="TEMPORARY_WORKER">Temporary</option>
+            <option value="PERMANENT_WORKER">Permanent Employee</option>
+            <option value="TEMPORARY_WORKER">Temporary Employee</option>
           </select>
         </div>
 

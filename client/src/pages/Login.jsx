@@ -23,8 +23,8 @@ export default function Login() {
     { label: 'System Admin',    icon: '🛡️', user_type: 'SYSTEM_ADMIN',     email: 'admin@system.com',       full_name: 'Daniel Tan',   userId: 1, organisationId: null },
     { label: 'Org Admin',       icon: '🏢', user_type: 'ORG_ADMIN',         email: 'orgadmin@techcorp.com',  full_name: 'Alson Lim',    userId: 2, organisationId: 1 },
     { label: 'Manager', icon: '📋', user_type: 'PROJECT_MANAGER',   email: 'pm@techcorp.com',        full_name: 'Basil Hia',    userId: 3, organisationId: 1 },
-    { label: 'Perm Worker',     icon: '👷', user_type: 'PERMANENT_WORKER',  email: 'worker@techcorp.com',    full_name: 'Weishi Tan',   userId: 5, organisationId: 1 },
-    { label: 'Temp Worker',     icon: '🔧', user_type: 'TEMPORARY_WORKER',  email: 'tempworker@techcorp.com',full_name: 'Rachel Ng',    userId: 6, organisationId: 1 },
+    { label: 'Perm Employee',   icon: '👷', user_type: 'PERMANENT_WORKER',  email: 'worker@techcorp.com',    full_name: 'Weishi Tan',   userId: 5, organisationId: 1 },
+    { label: 'Temp Employee',   icon: '🔧', user_type: 'TEMPORARY_WORKER',  email: 'tempworker@techcorp.com',full_name: 'Rachel Ng',    userId: 6, organisationId: 1 },
   ];
 
   const quickLogin = async (devUser) => {
@@ -101,6 +101,12 @@ export default function Login() {
                 placeholder="••••••••"
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
+            </div>
+
+            <div className="flex justify-end -mt-2">
+              <Link to="/forgot-password" className="text-xs text-primary-600 hover:underline">
+                Forgot password?
+              </Link>
             </div>
 
             <button

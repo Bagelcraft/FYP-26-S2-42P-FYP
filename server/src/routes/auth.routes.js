@@ -58,19 +58,37 @@ router.post(
   },
 );
 
-// POST /api/v1/auth/reset-password  (simplified — no email flow yet)
+// POST /api/v1/auth/forgot-password  — send reset link to email
+router.post(
+  '/forgot-password',
+  [body('email').isEmail().withMessage('Valid email required').normalizeEmail()],
+  validate,
+  async (req, res, next) => {
+    try {
+      await authService.forgotPassword(req.body.email);
+      // Always respond with success to prevent email enumeration
+      res.json({ success: true, message: 'If an account exists for that email, a reset link has been sent.' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// POST /api/v1/auth/reset-password  — validate token and set new password
 router.post(
   '/reset-password',
   [
-    body('email').isEmail().withMessage('Valid email required').normalizeEmail(),
+    body('token').notEmpty().withMessage('token is required'),
     body('newPassword')
-      .isLength({ min: 8 }).withMessage('newPassword must be at least 8 characters'),
+      .isLength({ min: 8 }).withMessage('newPassword must be at least 8 characters')
+      .matches(/[A-Z]/).withMessage('newPassword must contain an uppercase letter')
+      .matches(/[0-9]/).withMessage('newPassword must contain a number'),
   ],
   validate,
   async (req, res, next) => {
     try {
-      await authService.resetPassword(req.body.email, req.body.newPassword);
-      res.json({ success: true, message: 'Password reset successfully' });
+      await authService.resetPasswordWithToken(req.body.token, req.body.newPassword);
+      res.json({ success: true, message: 'Password reset successfully. You can now log in.' });
     } catch (err) {
       next(err);
     }

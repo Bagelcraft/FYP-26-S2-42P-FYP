@@ -8,7 +8,7 @@ import { PM_NAV, PM_SECONDARY } from './nav';
 // (GET /pm/tasks/:id/eligible-staff → { task, candidates }). Each candidate:
 //   { userId, full_name, user_type, staffRole, skills[], weeklyHours,
 //     maxHours, remainingHours, isAvailable, withinHours, eligible, ineligibleReason }
-const typeLabel = (t) => (t === 'PERMANENT_WORKER' ? 'Permanent' : t === 'TEMPORARY_WORKER' ? 'Temporary' : t);
+const typeLabel = (t) => (t === 'PERMANENT_WORKER' ? 'Permanent Employee' : t === 'TEMPORARY_WORKER' ? 'Temporary Employee' : t);
 const fmtDue = (iso) => (iso ? new Date(iso).toLocaleDateString('en-SG', { day: '2-digit', month: 'short' }) : '—');
 
 // Normalise whatever skill shape the API returns into [{ skill_id, skill_name }].

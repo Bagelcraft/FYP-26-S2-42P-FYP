@@ -37,7 +37,7 @@ export default function Profile() {
   }
 
   return (
-    <DashboardLayout navItems={WORKER_NAV} roleLabel="Permanent Worker">
+    <DashboardLayout navItems={WORKER_NAV} roleLabel="Permanent Employee">
       <div className="space-y-6">
         <div className="flex items-start justify-between">
           <div>
@@ -72,7 +72,7 @@ export default function Profile() {
           <div className="grid grid-cols-2 gap-4">
             {[
               { label: 'Full Name', value: 'Weishi Tan' },
-              { label: 'Employee Type', value: 'Permanent Worker' },
+              { label: 'Employee Type', value: 'Permanent Employee' },
               { label: 'Department', value: 'Engineering' },
               { label: 'Job Title', value: 'Software Developer' },
               { label: 'Email', value: 'weishi@techcorp.com' },

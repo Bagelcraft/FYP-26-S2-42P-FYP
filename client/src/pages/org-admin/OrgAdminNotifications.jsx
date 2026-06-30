@@ -2,7 +2,7 @@ import DashboardLayout from '../../components/DashboardLayout';
 import { ORG_ADMIN_NAV } from './nav';
 
 const mockNotifications = [
-  { id: 1, title: 'New staff registered', body: 'Rachel Ng has been added as a Temporary Worker in Operations.', time: '30 min ago', read: false },
+  { id: 1, title: 'New staff registered', body: 'Rachel Ng has been added as a Temporary Employee in Operations.', time: '30 min ago', read: false },
   { id: 2, title: 'Task overdue', body: 'Database Performance Review assigned to Rachel Ng is past its due date.', time: '2 hr ago', read: false },
   { id: 3, title: 'Leave request submitted', body: 'Weishi Tan has submitted an annual leave request for 26–28 May.', time: '5 hr ago', read: true },
   { id: 4, title: 'Department head updated', body: 'Operations department head changed to Alson Lim.', time: '1 day ago', read: true },

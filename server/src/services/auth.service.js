@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/prisma');
+const sgMail = require('@sendgrid/mail');
 
 function makeError(message, statusCode) {
   const err = new Error(message);
@@ -49,13 +50,49 @@ async function changePassword(userId, currentPassword, newPassword) {
   await prisma.user.update({ where: { userId }, data: { password_hash: hash } });
 }
 
-// Simplified reset — admin sets a new password directly (no email flow yet)
-async function resetPassword(email, newPassword) {
+async function forgotPassword(email) {
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) throw makeError('No account with that email', 404);
+  if (!user) return; // Silently succeed to prevent email enumeration
 
-  const hash = await bcrypt.hash(newPassword, 10);
-  await prisma.user.update({ where: { userId: user.userId }, data: { password_hash: hash } });
+  const token = jwt.sign(
+    { userId: user.userId, type: 'password_reset' },
+    process.env.JWT_SECRET,
+    { expiresIn: '15m' },
+  );
+
+  const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+  const resetUrl = `${clientUrl}/reset-password?token=${token}`;
+
+  if (process.env.SENDGRID_API_KEY) {
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    await sgMail.send({
+      to: email,
+      from: process.env.FROM_EMAIL || 'noreply@smarttask.com',
+      subject: 'SmartTask — Reset your password',
+      html: `
+        <p>Hi ${user.full_name},</p>
+        <p>You requested a password reset. Click the link below — it expires in <strong>15 minutes</strong>.</p>
+        <p><a href="${resetUrl}">${resetUrl}</a></p>
+        <p>If you didn't request this, you can safely ignore this email.</p>
+      `,
+    });
+  } else {
+    // Dev fallback: print to console when SendGrid is not configured
+    console.log(`[DEV] Password reset link for ${email}:\n${resetUrl}`);
+  }
 }
 
-module.exports = { login, changePassword, resetPassword };
+async function resetPasswordWithToken(token, newPassword) {
+  let payload;
+  try {
+    payload = jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
+    throw makeError('Reset link is invalid or has expired', 400);
+  }
+  if (payload.type !== 'password_reset') throw makeError('Invalid reset token', 400);
+
+  const hash = await bcrypt.hash(newPassword, 10);
+  await prisma.user.update({ where: { userId: payload.userId }, data: { password_hash: hash } });
+}
+
+module.exports = { login, changePassword, forgotPassword, resetPasswordWithToken };

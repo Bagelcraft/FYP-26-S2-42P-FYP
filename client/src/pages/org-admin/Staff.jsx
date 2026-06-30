@@ -205,8 +205,8 @@ export default function Staff() {
                   <label className="block text-xs font-medium text-gray-600 mb-1">Type *</label>
                   <select value={form.user_type} onChange={(e) => setForm({ ...form, user_type: e.target.value })}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-                    <option value="PERMANENT_WORKER">Permanent Worker</option>
-                    <option value="TEMPORARY_WORKER">Temporary Worker</option>
+                    <option value="PERMANENT_WORKER">Permanent Employee</option>
+                    <option value="TEMPORARY_WORKER">Temporary Employee</option>
                     <option value="PROJECT_MANAGER">Manager</option>
                     <option value="ORG_ADMIN">Org Admin</option>
                   </select>

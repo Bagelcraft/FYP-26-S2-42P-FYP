@@ -84,7 +84,7 @@ export default function Attendance() {
     : '0h';
 
   return (
-    <DashboardLayout navItems={TEMP_NAV} roleLabel="Temporary Worker">
+    <DashboardLayout navItems={TEMP_NAV} roleLabel="Temporary Employee">
       <div className="space-y-6">
         <div className="flex items-start justify-between">
           <div>

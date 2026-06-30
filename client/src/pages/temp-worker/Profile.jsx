@@ -37,7 +37,7 @@ export default function Profile() {
   }
 
   return (
-    <DashboardLayout navItems={TEMP_NAV} roleLabel="Temporary Worker">
+    <DashboardLayout navItems={TEMP_NAV} roleLabel="Temporary Employee">
       <div className="space-y-6">
         <div className="flex items-start justify-between">
           <div>
@@ -72,7 +72,7 @@ export default function Profile() {
           <div className="grid grid-cols-2 gap-4">
             {[
               { label: 'Full Name', value: 'Rachel Ng' },
-              { label: 'Employee Type', value: 'Temporary Worker' },
+              { label: 'Employee Type', value: 'Temporary Employee' },
               { label: 'Department', value: 'Operations' },
               { label: 'Job Title', value: 'Contractor' },
               { label: 'Email', value: 'rachel@techcorp.com' },

@@ -189,7 +189,7 @@ export default function MyTasks() {
   }
 
   return (
-    <DashboardLayout navItems={TEMP_NAV} roleLabel="Temporary Worker">
+    <DashboardLayout navItems={TEMP_NAV} roleLabel="Temporary Employee">
       <div className="space-y-6">
         <div>
           <h2 className="text-xl font-bold text-gray-800">My Tasks</h2>

@@ -99,7 +99,7 @@ export default function WorkerDashboard() {
   );
 
   return (
-    <DashboardLayout navItems={WORKER_NAV} roleLabel="Permanent Worker" topbarRight={clockInButton}>
+    <DashboardLayout navItems={WORKER_NAV} roleLabel="Permanent Employee" topbarRight={clockInButton}>
       <div className="space-y-6">
         <div>
           <h2 className="text-xl font-bold text-gray-800">My Day</h2>

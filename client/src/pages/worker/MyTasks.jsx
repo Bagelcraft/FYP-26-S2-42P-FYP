@@ -187,7 +187,7 @@ export default function MyTasks() {
   const filtered = tasks.filter((t) => statusFilter === 'ALL' || t.status === statusFilter);
 
   return (
-    <DashboardLayout navItems={WORKER_NAV} roleLabel="Permanent Worker">
+    <DashboardLayout navItems={WORKER_NAV} roleLabel="Permanent Employee">
       <div className="space-y-6">
         <div className="flex items-start justify-between">
           <div>

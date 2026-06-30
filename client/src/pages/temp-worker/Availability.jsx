@@ -65,7 +65,7 @@ export default function Availability() {
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <DashboardLayout navItems={TEMP_NAV} roleLabel="Temporary Worker">
+    <DashboardLayout navItems={TEMP_NAV} roleLabel="Temporary Employee">
       <div className="space-y-6 max-w-xl">
         <div>
           <h2 className="text-xl font-bold text-gray-800">Days I Can't Work</h2>

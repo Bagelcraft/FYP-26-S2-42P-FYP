@@ -86,7 +86,7 @@ export default function TempWorkerDashboard() {
   );
 
   return (
-    <DashboardLayout navItems={TEMP_NAV} roleLabel="Temporary Worker" topbarRight={clockInButton}>
+    <DashboardLayout navItems={TEMP_NAV} roleLabel="Temporary Employee" topbarRight={clockInButton}>
       <div className="space-y-6">
         <div>
           <h2 className="text-xl font-bold text-gray-800">My Day</h2>

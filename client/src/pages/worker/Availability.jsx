@@ -118,7 +118,7 @@ export default function Availability() {
   };
 
   return (
-    <DashboardLayout navItems={WORKER_NAV} roleLabel="Permanent Worker">
+    <DashboardLayout navItems={WORKER_NAV} roleLabel="Permanent Employee">
       <div className="space-y-6">
         <div className="flex items-start justify-between">
           <div>
