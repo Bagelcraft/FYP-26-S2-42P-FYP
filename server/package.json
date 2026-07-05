@@ -5,6 +5,9 @@
     "dev": "nodemon server.js",
     "start": "node server.js",
     "test": "jest --coverage",
+    "test:auth": "node scripts/test-auth.js",
+    "test:admin": "node scripts/test-admin.js",
+    "seed:test": "node prisma/seed-test-accounts.js",
     "lint": "eslint src/"
   },
   "prisma": {
