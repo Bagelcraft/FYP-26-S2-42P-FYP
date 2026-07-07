@@ -7,6 +7,9 @@
     "test": "jest --coverage",
     "test:auth": "node scripts/test-auth.js",
     "test:admin": "node scripts/test-admin.js",
+    "test:orgadmin": "node scripts/test-orgadmin.js",
+    "test:pm": "node scripts/test-pm.js",
+    "test:permworker": "node scripts/test-permworker.js",
     "seed:test": "node prisma/seed-test-accounts.js",
     "lint": "eslint src/"
   },
