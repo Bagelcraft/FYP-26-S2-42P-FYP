@@ -45,9 +45,20 @@ const cancelLeave = async (userId, leaveId) => {
   await prisma.leaveRequest.delete({ where: { leave_id: leaveId } });
 };
 
+// ─── Schedule (assigned shifts, today onward) ─────────────────
+const getMySchedule = async (userId) => {
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  return prisma.shiftAssignment.findMany({
+    where:   { user_id: userId, date: { gte: start } },
+    include: { shift: { select: { name: true, start_time: true, end_time: true } } },
+    orderBy: { date: 'asc' },
+  });
+};
+
 module.exports = {
   updateMyProfile,
   applyLeave,
   listMyLeave,
   cancelLeave,
+  getMySchedule,
 };

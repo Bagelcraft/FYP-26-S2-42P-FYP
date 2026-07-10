@@ -24,9 +24,10 @@ import Skills from './pages/org-admin/Skills';
 import OrgAdminNotifications from './pages/org-admin/OrgAdminNotifications';
 import StaffRoles from './pages/org-admin/StaffRoles';
 import Shifts from './pages/org-admin/Shifts';
+import OrgSubscription from './pages/org-admin/Subscription';
 import OrgProfile from './pages/org-admin/OrgProfile';
-import TaskManagement from './pages/org-admin/TaskManagement';
 import ProfileChangeRequests from './pages/org-admin/ProfileChangeRequests';
+import ShiftChangeRequests from './pages/org-admin/ShiftChangeRequests';
 
 // Manager
 import PMDashboard from './pages/pm/PMDashboard';
@@ -42,16 +43,19 @@ import PMNotifications from './pages/pm/PMNotifications';
 // Permanent Worker
 import WorkerDashboard from './pages/worker/WorkerDashboard';
 import WorkerMyTasks from './pages/worker/MyTasks';
-import WorkerAvailability from './pages/worker/Availability';
+import WorkerSchedule from './pages/worker/Schedule';
 import Leave from './pages/worker/Leave';
 import WorkerAttendance from './pages/worker/Attendance';
+import WorkerNotifications from './pages/worker/Notifications';
 import WorkerProfile from './pages/worker/Profile';
 
 // Temporary Worker
 import TempWorkerDashboard from './pages/temp-worker/TempWorkerDashboard';
 import TempMyTasks from './pages/temp-worker/MyTasks';
-import TempAvailability from './pages/temp-worker/Availability';
+import TempSchedule from './pages/temp-worker/Schedule';
+import TempLeave from './pages/temp-worker/Leave';
 import TempAttendance from './pages/temp-worker/Attendance';
+import TempNotifications from './pages/temp-worker/Notifications';
 import TempProfile from './pages/temp-worker/Profile';
 
 export default function App() {
@@ -82,9 +86,10 @@ export default function App() {
           <Route path="/org-admin/skills" element={<Skills />} />
           <Route path="/org-admin/roles" element={<StaffRoles />} />
           <Route path="/org-admin/shifts" element={<Shifts />} />
+          <Route path="/org-admin/subscription" element={<OrgSubscription />} />
           <Route path="/org-admin/profile" element={<OrgProfile />} />
-          <Route path="/org-admin/tasks" element={<TaskManagement />} />
           <Route path="/org-admin/profile-change-requests" element={<ProfileChangeRequests />} />
+          <Route path="/org-admin/shift-change-requests" element={<ShiftChangeRequests />} />
           <Route path="/org-admin/notifications" element={<OrgAdminNotifications />} />
 
           {/* Manager */}
@@ -101,16 +106,19 @@ export default function App() {
           {/* Permanent Worker */}
           <Route path="/worker" element={<WorkerDashboard />} />
           <Route path="/worker/tasks" element={<WorkerMyTasks />} />
-          <Route path="/worker/availability" element={<WorkerAvailability />} />
+          <Route path="/worker/schedule" element={<WorkerSchedule />} />
           <Route path="/worker/leave" element={<Leave />} />
           <Route path="/worker/attendance" element={<WorkerAttendance />} />
+          <Route path="/worker/notifications" element={<WorkerNotifications />} />
           <Route path="/worker/profile" element={<WorkerProfile />} />
 
           {/* Temporary Worker */}
           <Route path="/temp-worker" element={<TempWorkerDashboard />} />
           <Route path="/temp-worker/tasks" element={<TempMyTasks />} />
-          <Route path="/temp-worker/availability" element={<TempAvailability />} />
+          <Route path="/temp-worker/schedule" element={<TempSchedule />} />
+          <Route path="/temp-worker/leave" element={<TempLeave />} />
           <Route path="/temp-worker/attendance" element={<TempAttendance />} />
+          <Route path="/temp-worker/notifications" element={<TempNotifications />} />
           <Route path="/temp-worker/profile" element={<TempProfile />} />
         </Routes>
       </BrowserRouter>

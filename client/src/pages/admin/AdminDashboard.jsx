@@ -1,26 +1,39 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import DashboardLayout from '../../components/DashboardLayout';
 import Badge from '../../components/Badge';
 import { ADMIN_NAV } from './nav';
+import api from '../../utils/api';
 
-const mockOrgs = [
-  { id: 1, name: 'TechCorp Pte Ltd', status: 'ACTIVE', staff: 12, created: '15 Jan 2026' },
-  { id: 2, name: 'BuildTech Solutions', status: 'ACTIVE', staff: 8, created: '20 Feb 2026' },
-  { id: 3, name: 'LogiCore Asia', status: 'SUSPENDED', staff: 5, created: '10 Mar 2026' },
-];
-
-const mockEnquiries = [
-  { id: 1, name: 'Sarah Wong', email: 'sarah@nexustech.sg', subject: 'Enterprise plan pricing', time: '2 hr ago' },
-  { id: 2, name: 'David Lim', email: 'david@buildco.com', subject: 'Custom onboarding request', time: '1 day ago' },
-];
-
-const mockLogs = [
-  { action: 'User login', user: 'orgadmin@techcorp.com', time: '2 min ago' },
-  { action: 'Task auto-allocated', user: 'pm@techcorp.com', time: '15 min ago' },
-  { action: 'Subscription renewed', user: 'system', time: '1 hr ago' },
-  { action: 'New organisation registered', user: 'system', time: '3 hr ago' },
-];
+const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
+const timeAgo = (iso) => {
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 3600) return `${Math.max(1, Math.floor(s / 60))} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} hr ago`;
+  return `${Math.floor(s / 86400)} days ago`;
+};
 
 export default function AdminDashboard() {
+  const [orgs, setOrgs] = useState([]);
+  const [enquiries, setEnquiries] = useState([]);
+  const [pending, setPending] = useState([]);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    Promise.all([
+      api.get('/admin/organisations'),
+      api.get('/admin/enquiries'),
+      api.get('/admin/registrations'),
+    ]).then(([o, e, r]) => {
+      setOrgs(o.data.data ?? []);
+      setEnquiries(e.data.data ?? e.data ?? []);
+      setPending(r.data.data ?? []);
+    }).catch((err) => setError(err.response?.data?.message || 'Failed to load overview.'));
+  }, []);
+
+  const activeOrgs = orgs.filter((o) => o.isActive).length;
+  const openEnquiries = enquiries.filter((e) => e.status !== 'RESPONDED').length;
+
   return (
     <DashboardLayout navItems={ADMIN_NAV} roleLabel="System Admin">
       <div className="space-y-6">
@@ -29,18 +42,19 @@ export default function AdminDashboard() {
           <p className="text-gray-500 text-sm mt-0.5">Platform-wide health and organisation status.</p>
         </div>
 
+        {error && <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">{error}</div>}
+
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: 'ACTIVE ORGS', value: '3', color: 'text-blue-600' },
-            { label: 'OPEN ENQUIRIES', value: '1', color: 'text-yellow-600' },
-            { label: 'ACTIVE SUBSCRIPTIONS', value: '2',color: 'text-green-600' },
-
+            { label: 'ACTIVE ORGS', value: activeOrgs },
+            { label: 'PENDING REGISTRATIONS', value: pending.length },
+            { label: 'OPEN ENQUIRIES', value: openEnquiries },
+            { label: 'TOTAL ORGS', value: orgs.length },
           ].map((s) => (
             <div key={s.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{s.label}</p>
               <p className="text-3xl font-bold text-gray-800 mt-1">{s.value}</p>
-              <p className={`text-xs mt-1 ${s.color}`}>{s.delta}</p>
             </div>
           ))}
         </div>
@@ -50,7 +64,7 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <h3 className="font-semibold text-gray-800">Organisations</h3>
-              <button className="text-primary-600 text-sm hover:underline">View all</button>
+              <Link to="/admin/organisations" className="text-primary-600 text-sm hover:underline">View all</Link>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -63,14 +77,15 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {mockOrgs.map((org) => (
-                    <tr key={org.id} className="hover:bg-gray-50 transition-colors">
+                  {orgs.map((org) => (
+                    <tr key={org.organisation_id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-5 py-3 font-medium text-gray-800">{org.name}</td>
-                      <td className="px-5 py-3 text-gray-500">{org.staff}</td>
-                      <td className="px-5 py-3 text-gray-500">{org.created}</td>
-                      <td className="px-5 py-3"><Badge status={org.status} /></td>
+                      <td className="px-5 py-3 text-gray-500">{org._count?.users ?? 0}</td>
+                      <td className="px-5 py-3 text-gray-500">{fmtDate(org.createdAt)}</td>
+                      <td className="px-5 py-3"><Badge status={org.isActive ? 'ACTIVE' : 'SUSPENDED'} /></td>
                     </tr>
                   ))}
+                  {orgs.length === 0 && <tr><td colSpan={4} className="px-5 py-8 text-center text-gray-400">No organisations yet.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -80,46 +95,21 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <h3 className="font-semibold text-gray-800">Recent Enquiries</h3>
-              <button className="text-primary-600 text-sm hover:underline">View all</button>
+              <Link to="/admin/enquiries" className="text-primary-600 text-sm hover:underline">View all</Link>
             </div>
             <div className="divide-y divide-gray-50">
-              {mockEnquiries.map((e) => (
-                <div key={e.id} className="px-5 py-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{e.name}</p>
-                    <p className="text-xs text-gray-400">{e.subject} · {e.time}</p>
+              {enquiries.slice(0, 6).map((e) => (
+                <div key={e.enquiry_id} className="px-5 py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">{e.name || e.email || 'Enquiry'}</p>
+                    <p className="text-xs text-gray-400 truncate">{e.subject} · {timeAgo(e.created_at)}</p>
                   </div>
-                  <button className="text-xs bg-primary-50 text-primary-600 hover:bg-primary-100 px-3 py-1.5 rounded-lg transition-colors">
-                    Reply
-                  </button>
+                  <Badge status={e.status || 'OPEN'} />
                 </div>
               ))}
+              {enquiries.length === 0 && <div className="px-5 py-8 text-center text-gray-400 text-sm">No enquiries.</div>}
             </div>
           </div>
-        </div>
-
-        <div className="grid lg:grid-cols-2 gap-6">
-          {/* System Logs */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-semibold text-gray-800">Suggest to remove as not part of storyboard - System Logs</h3>
-              <button className="text-primary-600 text-sm hover:underline">View all</button>
-            </div>
-            <div className="divide-y divide-gray-50">
-              {mockLogs.map((log, i) => (
-                <div key={i} className="px-5 py-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{log.action}</p>
-                    <p className="text-xs text-gray-400">{log.user}</p>
-                  </div>
-                  <span className="text-xs text-gray-400 whitespace-nowrap">{log.time}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* System Health */}
-        
         </div>
       </div>
     </DashboardLayout>

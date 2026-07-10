@@ -78,7 +78,7 @@ function RequestUpdateModal({ task, onClose, onSent }) {
     e.preventDefault();
     setSubmitting(true); setError('');
     try {
-      await api.post(`/pm/tasks/${task.task_id}/request-update`, { message: message.trim() || null });
+      await api.post(`/pm/tasks/${task.task_id}/update-requests`, { message: message.trim() || null });
       onSent();
       onClose();
     } catch (err) {

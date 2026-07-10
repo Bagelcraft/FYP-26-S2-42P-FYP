@@ -341,12 +341,118 @@ async function removeSkillFromStaff(organisationId, userId, skillId) {
   await prisma.userSkill.delete({ where: { user_skill_id: userSkill.user_skill_id } });
 }
 
+// ─── Subscription & Billing ───────────────────────────────────
+const SUB_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const fmtLong = (d) => `${String(d.getDate()).padStart(2, '0')} ${SUB_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+
+async function getSubscription(organisationId) {
+  const org = await prisma.organisation.findUnique({
+    where: { organisation_id: organisationId },
+    include: { activeSubscription: true, users: { where: { is_active: true }, select: { userId: true } } },
+  });
+  if (!org) throw makeError('Organisation not found', 404);
+  const sub = org.activeSubscription;
+  if (!sub) return null; // UI renders a "no active subscription" state
+  const plan = await prisma.subscriptionPlan.findFirst({ where: { price_monthly: sub.amount } });
+  return {
+    subscription_id: sub.subscription_id,
+    plan:      plan?.name ?? 'Custom',
+    amount:    Number(sub.amount),
+    status:    sub.status,
+    start:     fmtLong(new Date(sub.start_date)),
+    renews:    fmtLong(new Date(sub.end_date)),
+    seatsUsed: org.users.length,
+    seatsTotal: plan?.max_users ?? null,
+  };
+}
+
+async function listBilling(organisationId) {
+  const records = await prisma.billingRecord.findMany({
+    where:   { subscription: { organisation_id: organisationId } },
+    orderBy: { billing_date: 'desc' },
+  });
+  return records.map((b) => ({
+    id:     `INV-${String(b.billing_id).padStart(6, '0')}`,
+    date:   fmtLong(new Date(b.billing_date)),
+    amount: Number(b.amount),
+    status: b.status,
+    receipt_url: b.receipt_url,
+  }));
+}
+
+// Renew: extend the period by one month and log a paid billing record.
+// (Payment is handled externally — this only records the outcome.)
+async function renewSubscription(organisationId) {
+  const org = await prisma.organisation.findUnique({
+    where: { organisation_id: organisationId }, include: { activeSubscription: true },
+  });
+  if (!org?.activeSubscription) throw makeError('No active subscription to renew', 404);
+  const sub = org.activeSubscription;
+  const base = new Date(Math.max(Date.now(), new Date(sub.end_date).getTime()));
+  const newEnd = new Date(base); newEnd.setMonth(newEnd.getMonth() + 1);
+
+  const [updated] = await prisma.$transaction([
+    prisma.subscription.update({ where: { subscription_id: sub.subscription_id }, data: { status: 'ACTIVE', end_date: newEnd } }),
+    prisma.billingRecord.create({ data: { subscription_id: sub.subscription_id, amount: sub.amount, billing_date: new Date(), status: 'PAID' } }),
+  ]);
+  return updated;
+}
+
+async function cancelSubscription(organisationId) {
+  const org = await prisma.organisation.findUnique({
+    where: { organisation_id: organisationId }, include: { activeSubscription: true },
+  });
+  if (!org?.activeSubscription) throw makeError('No active subscription to cancel', 404);
+  return prisma.subscription.update({
+    where: { subscription_id: org.activeSubscription.subscription_id },
+    data:  { status: 'CANCELLED' },
+  });
+}
+
+// ─── Shift Assignments (roster) ───────────────────────────────
+const SHIFT_ASSIGN_INCLUDE = {
+  user:  { select: { userId: true, full_name: true, user_type: true } },
+  shift: { select: { shift_id: true, name: true, start_time: true, end_time: true } },
+};
+
+async function listShiftAssignments(organisationId) {
+  return prisma.shiftAssignment.findMany({
+    where:   { organisation_id: organisationId },
+    include: SHIFT_ASSIGN_INCLUDE,
+    orderBy: [{ date: 'asc' }],
+  });
+}
+
+async function createShiftAssignment(organisationId, data) {
+  const user = await prisma.user.findFirst({ where: { userId: Number(data.user_id), organisationId } });
+  if (!user) throw makeError('Staff member not found in this organisation', 404);
+  const shift = await prisma.shiftTemplate.findFirst({ where: { shift_id: Number(data.shift_id), organisation_id: organisationId } });
+  if (!shift) throw makeError('Shift template not found in this organisation', 404);
+  return prisma.shiftAssignment.create({
+    data: {
+      organisation_id: organisationId,
+      user_id:  Number(data.user_id),
+      shift_id: Number(data.shift_id),
+      date:     new Date(data.date),
+    },
+    include: SHIFT_ASSIGN_INCLUDE,
+  });
+}
+
+async function deleteShiftAssignment(organisationId, assignmentId) {
+  const a = await prisma.shiftAssignment.findFirst({ where: { assignment_id: assignmentId, organisation_id: organisationId } });
+  if (!a) throw makeError('Shift assignment not found', 404);
+  await prisma.shiftAssignment.delete({ where: { assignment_id: assignmentId } });
+}
+
 module.exports = {
   getOrgProfile, updateOrgProfile,
   listDepartments, createDepartment, updateDepartment, deleteDepartment, assignStaffToDept,
   listRoles, createRole, updateRole, deleteRole,
   listSkills, createSkill, updateSkill, deleteSkill,
   listShiftTemplates, createShiftTemplate, updateShiftTemplate, deleteShiftTemplate,
+  listShiftAssignments, createShiftAssignment, deleteShiftAssignment,
   listStaff, registerStaff, updateStaff, deactivateStaff, reactivateStaff,
   assignSkillToStaff, removeSkillFromStaff,
+  getSubscription, listBilling, renewSubscription, cancelSubscription,
 };

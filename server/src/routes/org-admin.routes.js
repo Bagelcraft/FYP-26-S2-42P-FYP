@@ -3,6 +3,7 @@ const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
 const c = require('../controllers/org-admin.controller');
 const pcr = require('../controllers/profileChangeRequest.controller');
+const scr = require('../controllers/shiftChangeRequest.controller');
 
 const router = express.Router();
 
@@ -35,12 +36,28 @@ router.post('/skills',        c.skillRules,       c.validate, c.createSkill);
 router.patch('/skills/:id',   c.skillUpdateRules, c.validate, c.updateSkill);
 router.delete('/skills/:id',  c.deleteSkill);
 
+// ─── Subscription & Billing ───────────────────────────────────
+
+router.get('/subscription',         c.getSubscription);
+router.get('/billing',              c.listBilling);
+router.post('/subscription/renew',  c.renewSubscription);
+router.post('/subscription/cancel', c.cancelSubscription);
+
 // ─── Shift Templates ──────────────────────────────────────────
 
 router.get('/shifts',        c.listShifts);
 router.post('/shifts',       c.shiftRules,       c.validate, c.createShift);
 router.patch('/shifts/:id',  c.shiftUpdateRules, c.validate, c.updateShift);
 router.delete('/shifts/:id', c.deleteShift);
+
+// ─── Shift Assignments (roster) ───────────────────────────────
+router.get('/shift-assignments',        c.listShiftAssignments);
+router.post('/shift-assignments',       c.shiftAssignRules, c.validate, c.createShiftAssignment);
+router.delete('/shift-assignments/:id', c.deleteShiftAssignment);
+
+// ─── Shift-change requests (review) ───────────────────────────
+router.get('/shift-change-requests',       scr.listForOrg);
+router.patch('/shift-change-requests/:id', scr.reviewRules, scr.reviewRequest);
 
 // ─── Staff ────────────────────────────────────────────────────
 

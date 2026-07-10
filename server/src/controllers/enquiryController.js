@@ -84,24 +84,6 @@ exports.getEnquiryById = async (req, res) => {
 
 /*
 |--------------------------------------------------------------------------
-| Respond To Enquiry
-|--------------------------------------------------------------------------
-*/
-exports.respondToEnquiry = async (req, res) => {
-  try {
-    res.json({
-      message: "Respond enquiry feature not implemented yet",
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: "Failed to respond to enquiry",
-      error: error.message,
-    });
-  }
-};
-
-/*
-|--------------------------------------------------------------------------
 | Delete Enquiry
 |--------------------------------------------------------------------------
 */

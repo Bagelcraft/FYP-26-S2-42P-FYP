@@ -8,7 +8,7 @@ const managerController = require('../controllers/manager.controller');
 
 const router = express.Router();
 
-router.use(verifyToken, requireRole(['PROJECT_MANAGER', 'ORG_ADMIN']));
+router.use(verifyToken, requireRole(['PROJECT_MANAGER']));
 
 // ─── Validation rules ─────────────────────────────────────────────────────
 
@@ -101,9 +101,8 @@ router.patch('/leave/:id',  leaveDecisionRules, managerController.decideLeave);
 router.get('/leave-balance',                 managerController.listLeaveBalances);
 router.patch('/leave-balance/:userId',       managerController.updateLeaveBalance);
 
-// Subscription — current plan + billing history (read-only)
-router.get('/subscription', managerController.getSubscription);
-router.get('/billing',      managerController.listBilling);
+// Reports — working hours + task completion
+router.get('/reports', managerController.getReports);
 
 // Lookups for Create/Edit Task dropdowns (manager-accessible, read-only)
 router.get('/org-info',        managerController.getOrgInfo);

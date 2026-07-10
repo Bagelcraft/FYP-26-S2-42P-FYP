@@ -1,11 +1,11 @@
 import DashboardLayout from '../../components/DashboardLayout';
-import LeavePanel from '../../components/LeavePanel';
+import NotificationsList from '../../components/NotificationsList';
 import { WORKER_NAV } from './nav';
 
-export default function Leave() {
+export default function WorkerNotifications() {
   return (
     <DashboardLayout navItems={WORKER_NAV} roleLabel="Permanent Employee">
-      <LeavePanel base="/worker" />
+      <NotificationsList subtitle="Your task and schedule alerts." />
     </DashboardLayout>
   );
 }

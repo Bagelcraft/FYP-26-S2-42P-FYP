@@ -3,7 +3,7 @@ import DashboardLayout from '../../components/DashboardLayout';
 import { ADMIN_NAV } from './nav';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
-const TABS = ['Hero', 'About / Video', 'Pricing', 'Testimonials'];
+const TABS = ['Headline', 'About / Video', 'Pricing', 'Testimonials'];
 
 function toEmbedUrl(url) {
   if (!url) return url;
@@ -16,7 +16,7 @@ function toEmbedUrl(url) {
 }
 
 export default function AdminLandingContent() {
-  const [tab, setTab] = useState('Hero');
+  const [tab, setTab] = useState('Headline');
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
 
@@ -123,10 +123,10 @@ export default function AdminLandingContent() {
         ) : (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
 
-            {/* ── Hero ── */}
-            {tab === 'Hero' && (
+            {/* ── Headline ── */}
+            {tab === 'Headline' && (
               <form onSubmit={saveHero} className="space-y-5 max-w-xl">
-                <h3 className="font-semibold text-gray-800 mb-1">Hero Section</h3>
+                <h3 className="font-semibold text-gray-800 mb-1">Headline Section</h3>
                 <div>
                   <label className={labelCls}>Headline</label>
                   <input className={inputCls} value={hero.hero_title} onChange={(e) => setHero((p) => ({ ...p, hero_title: e.target.value }))} required maxLength={200} placeholder="Smart Task Allocation" />

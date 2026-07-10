@@ -66,14 +66,4 @@ router.post('/organisations/register', async (req, res) => {
   }
 });
 
-// PUT /api/v1/public/organisations/:id/details
-router.put('/organisations/:id/details', (req, res) => {
-  res.json({ message: 'Submit org details — to be implemented by Rachel' });
-});
-
-// POST /api/v1/public/organisations/:id/subscription
-router.post('/organisations/:id/subscription', (req, res) => {
-  res.json({ message: 'Choose subscription plan — to be implemented by Rachel' });
-});
-
 module.exports = router;

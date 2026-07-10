@@ -269,8 +269,54 @@ async function deleteTestimonial(testimonialId, organisationId) {
   return { testimonial_id: testimonialId };
 }
 
+// ─── GET /pm/reports ──────────────────────────────────────────
+// Per-worker working hours (this week) + completed-task counts, plus an
+// org-wide task-status breakdown and headline summary.
+async function getReports(organisationId) {
+  const { monday, sunday } = currentWeekBounds();
+
+  const users = await prisma.user.findMany({
+    where: { organisationId, is_active: true, user_type: { in: ['PERMANENT_WORKER', 'TEMPORARY_WORKER'] } },
+    include: {
+      staffRole:     { select: { role_name: true } },
+      attendance:    { where: { clock_in: { gte: monday, lte: sunday }, working_hours: { not: null } } },
+      assignedTasks: { where: { task: { status: 'COMPLETED' } }, select: { assignment_id: true } },
+    },
+    orderBy: { full_name: 'asc' },
+  });
+
+  const perStaff = users.map((u) => ({
+    name:           u.full_name,
+    type:           u.user_type === 'PERMANENT_WORKER' ? 'Permanent' : 'Temporary',
+    role:           u.staffRole?.role_name ?? '—',
+    hoursThisWeek:  Math.round(u.attendance.reduce((s, a) => s + Number(a.working_hours ?? 0), 0) * 100) / 100,
+    tasksCompleted: u.assignedTasks.length,
+  }));
+
+  const grouped = await prisma.task.groupBy({
+    by: ['status'], where: { organisation_id: organisationId }, _count: { _all: true },
+  });
+  const statusCounts = { PENDING: 0, ASSIGNED: 0, IN_PROGRESS: 0, COMPLETED: 0, CANCELLED: 0 };
+  grouped.forEach((g) => { statusCounts[g.status] = g._count._all; });
+
+  const totalTasks = Object.values(statusCounts).reduce((a, b) => a + b, 0);
+  const totalHours = perStaff.reduce((s, p) => s + p.hoursThisWeek, 0);
+
+  return {
+    perStaff,
+    statusCounts,
+    summary: {
+      totalTasks,
+      completed:      statusCounts.COMPLETED,
+      completionRate: totalTasks ? Math.round((statusCounts.COMPLETED / totalTasks) * 100) : 0,
+      totalHours:     Math.round(totalHours * 100) / 100,
+      avgHours:       perStaff.length ? Math.round((totalHours / perStaff.length) * 100) / 100 : 0,
+    },
+  };
+}
+
 module.exports = {
   getTeam, listLeave, decideLeave, listLeaveBalances, updateLeaveBalance, getSubscription, listBilling,
-  getOrgInfo, getShiftTemplates, getDepartments, getSkills,
+  getOrgInfo, getShiftTemplates, getDepartments, getSkills, getReports,
   listTestimonials, createTestimonial, updateTestimonial, deleteTestimonial,
 };

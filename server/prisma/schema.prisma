@@ -96,6 +96,7 @@ model Organisation {
   staffRoles         StaffRole[]
   unregisteredUsers  UnregisteredUser[]
   shiftTemplates     ShiftTemplate[]
+  shiftAssignments   ShiftAssignment[]
 }
 
 model Subscription {
@@ -160,6 +161,7 @@ model User {
   approvedLeave      LeaveRequest[]       @relation("ApprovedLeave")
   leaveBalance       LeaveBalance[]
   shiftRequests      ShiftChangeRequest[] @relation("UserShiftChange")
+  shiftAssignments   ShiftAssignment[]
   reviewedShifts     ShiftChangeRequest[] @relation("ReviewedShiftChange")
   allocationHistory  AllocationHistory[]  @relation("UserAllocation")
   changedAllocations AllocationHistory[]  @relation("ChangedByAllocation")
@@ -343,7 +345,22 @@ model ShiftTemplate {
   end_time        String       @db.VarChar(5)
   created_at      DateTime     @default(now())
 
-  organisation    Organisation @relation(fields: [organisation_id], references: [organisation_id])
+  organisation    Organisation      @relation(fields: [organisation_id], references: [organisation_id])
+  assignments     ShiftAssignment[]
+}
+
+// A specific worker rostered to a shift template on a given date.
+model ShiftAssignment {
+  assignment_id   Int      @id @default(autoincrement())
+  organisation_id Int
+  user_id         Int
+  shift_id        Int
+  date            DateTime @db.Date
+  created_at      DateTime @default(now())
+
+  organisation Organisation  @relation(fields: [organisation_id], references: [organisation_id])
+  user         User          @relation(fields: [user_id], references: [userId])
+  shift        ShiftTemplate @relation(fields: [shift_id], references: [shift_id])
 }
 
 // ─── Shift Change ─────────────────────────────────────────────

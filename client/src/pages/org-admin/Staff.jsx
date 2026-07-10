@@ -15,30 +15,35 @@ function generatePassword() {
   return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
-const getEmptyForm = () => ({ full_name: '', email: '', user_type: 'PERMANENT_WORKER', role_id: '', password: generatePassword() });
+const getEmptyForm = () => ({ userId: null, full_name: '', email: '', user_type: 'PERMANENT_WORKER', role_id: '', password: generatePassword() });
 
 export default function Staff() {
   const [staff, setStaff]       = useState([]);
   const [roles, setRoles]       = useState([]);
+  const [skills, setSkills]     = useState([]);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState('');
   const [search, setSearch]     = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
-  const [showModal, setShowModal]   = useState(false);
+  const [modalMode, setModalMode]   = useState(null); // null | 'add' | 'edit'
   const [form, setForm]         = useState(getEmptyForm);
   const [saving, setSaving]     = useState(false);
   const [formError, setFormError]   = useState('');
   const [showPass, setShowPass] = useState(false);
+  const [skillsForId, setSkillsForId] = useState(null); // userId whose skills modal is open
+  const [skillAddId, setSkillAddId]   = useState('');
 
   function load() {
     setLoading(true);
     Promise.all([
       api.get('/org-admin/staff'),
       api.get('/org-admin/roles'),
+      api.get('/org-admin/skills'),
     ])
-      .then(([sRes, rRes]) => {
+      .then(([sRes, rRes, skRes]) => {
         setStaff(sRes.data.data);
         setRoles(rRes.data.data);
+        setSkills(skRes.data.data);
       })
       .catch((e) => setError(e.response?.data?.message || e.message))
       .finally(() => setLoading(false));
@@ -55,22 +60,39 @@ export default function Staff() {
     return matchSearch && matchType;
   });
 
-  async function handleRegister(e) {
+  const skillsMember = staff.find((s) => s.userId === skillsForId) || null;
+
+  function openAdd() {
+    setModalMode('add'); setFormError(''); setForm(getEmptyForm()); setShowPass(false);
+  }
+  function openEdit(member) {
+    setModalMode('edit'); setFormError('');
+    setForm({
+      userId: member.userId,
+      full_name: member.full_name,
+      email: member.email,
+      user_type: member.user_type,
+      role_id: member.staffRole?.role_id ?? '',
+      password: '',
+    });
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault();
-    setSaving(true);
-    setFormError('');
+    setSaving(true); setFormError('');
     try {
-      const body = {
-        full_name: form.full_name.trim(),
-        email:     form.email.trim(),
-        user_type: form.user_type,
-        password:  form.password,
-        role_id:   form.role_id !== '' ? Number(form.role_id) : null,
-      };
-      const r = await api.post('/org-admin/staff', body);
-      setStaff((prev) => [...prev, r.data.data].sort((a, b) => a.full_name.localeCompare(b.full_name)));
-      setShowModal(false);
-      setForm(getEmptyForm());
+      const role_id = form.role_id !== '' ? Number(form.role_id) : null;
+      if (modalMode === 'add') {
+        const body = { full_name: form.full_name.trim(), email: form.email.trim(), user_type: form.user_type, password: form.password, role_id };
+        const r = await api.post('/org-admin/staff', body);
+        setStaff((prev) => [...prev, r.data.data].sort((a, b) => a.full_name.localeCompare(b.full_name)));
+      } else {
+        const body = { full_name: form.full_name.trim(), email: form.email.trim(), user_type: form.user_type, role_id };
+        const r = await api.patch(`/org-admin/staff/${form.userId}`, body);
+        // preserve skills (edit endpoint doesn't return them)
+        setStaff((prev) => prev.map((s) => (s.userId === form.userId ? { ...s, ...r.data.data } : s)));
+      }
+      setModalMode(null);
     } catch (e) {
       setFormError(e.response?.data?.message || e.response?.data?.errors?.[0]?.msg || e.message);
     } finally {
@@ -88,6 +110,35 @@ export default function Staff() {
     }
   }
 
+  async function addSkill() {
+    if (!skillAddId || !skillsMember) return;
+    try {
+      await api.post(`/org-admin/staff/${skillsMember.userId}/skills`, { skill_id: Number(skillAddId) });
+      const sk = skills.find((s) => s.skill_id === Number(skillAddId));
+      setStaff((prev) => prev.map((s) => s.userId === skillsMember.userId
+        ? { ...s, skills: [...(s.skills || []), { skill: { skill_id: sk.skill_id, skill_name: sk.skill_name } }] }
+        : s));
+      setSkillAddId('');
+    } catch (e) {
+      alert(e.response?.data?.message || e.message);
+    }
+  }
+
+  async function removeSkill(skillId) {
+    if (!skillsMember) return;
+    try {
+      await api.delete(`/org-admin/staff/${skillsMember.userId}/skills/${skillId}`);
+      setStaff((prev) => prev.map((s) => s.userId === skillsMember.userId
+        ? { ...s, skills: (s.skills || []).filter((us) => us.skill.skill_id !== skillId) }
+        : s));
+    } catch (e) {
+      alert(e.response?.data?.message || e.message);
+    }
+  }
+
+  const assignedSkillIds = new Set((skillsMember?.skills || []).map((us) => us.skill.skill_id));
+  const availableSkills = skills.filter((s) => !assignedSkillIds.has(s.skill_id));
+
   return (
     <DashboardLayout navItems={ORG_ADMIN_NAV} roleLabel="Organisation Admin">
       <div className="space-y-6">
@@ -96,7 +147,7 @@ export default function Staff() {
             <h2 className="text-xl font-bold text-gray-800">Employee Management</h2>
             <p className="text-gray-500 text-sm mt-0.5">Manage all employees in your organisation.</p>
           </div>
-          <button onClick={() => { setShowModal(true); setFormError(''); setForm(getEmptyForm()); setShowPass(false); }}
+          <button onClick={openAdd}
             className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
             + Add Employee
           </button>
@@ -165,9 +216,11 @@ export default function Staff() {
                       </span>
                     </td>
                     <td className="px-5 py-3">
-                      <button onClick={() => handleDeactivate(s)} className="text-xs text-red-500 hover:underline">
-                        Deactivate
-                      </button>
+                      <div className="flex gap-3">
+                        <button onClick={() => openEdit(s)} className="text-xs text-primary-600 hover:underline">Edit</button>
+                        <button onClick={() => { setSkillsForId(s.userId); setSkillAddId(''); }} className="text-xs text-gray-600 hover:underline">Skills</button>
+                        <button onClick={() => handleDeactivate(s)} className="text-xs text-red-500 hover:underline">Deactivate</button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -180,15 +233,15 @@ export default function Staff() {
         </div>
       </div>
 
-      {/* Register Staff Modal */}
-      {showModal && (
+      {/* Add / Edit Employee Modal */}
+      {modalMode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="font-semibold text-gray-800">Register Employee</h2>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+              <h2 className="font-semibold text-gray-800">{modalMode === 'add' ? 'Register Employee' : 'Edit Employee'}</h2>
+              <button onClick={() => setModalMode(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
             </div>
-            <form onSubmit={handleRegister} className="px-6 py-5 space-y-4">
+            <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
               {formError && <p className="text-red-500 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">{formError}</p>}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Full Name *</label>
@@ -222,44 +275,80 @@ export default function Staff() {
                   </select>
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Initial Password *</label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <input
-                      required
-                      type={showPass ? 'text' : 'password'}
-                      value={form.password}
-                      onChange={(e) => setForm({ ...form, password: e.target.value })}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 pr-16 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPass((v) => !v)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600"
-                    >
-                      {showPass ? 'Hide' : 'Show'}
+              {modalMode === 'add' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Initial Password *</label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <input required type={showPass ? 'text' : 'password'} value={form.password}
+                        onChange={(e) => setForm({ ...form, password: e.target.value })}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 pr-16 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                      <button type="button" onClick={() => setShowPass((v) => !v)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600">
+                        {showPass ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
+                    <button type="button" onClick={() => setForm({ ...form, password: generatePassword() })}
+                      className="px-3 py-2 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors whitespace-nowrap">
+                      Generate
                     </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setForm({ ...form, password: generatePassword() })}
-                    className="px-3 py-2 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors whitespace-nowrap"
-                  >
-                    Generate
-                  </button>
+                  <p className="text-xs text-gray-400 mt-1">Employee should change this on first login.</p>
                 </div>
-                <p className="text-xs text-gray-400 mt-1">Employee should change this on first login.</p>
-              </div>
+              )}
               <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
-                <button type="button" onClick={() => setShowModal(false)}
+                <button type="button" onClick={() => setModalMode(null)}
                   className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
                 <button type="submit" disabled={saving}
                   className="px-5 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
-                  {saving ? 'Registering…' : 'Register Employee'}
+                  {saving ? 'Saving…' : modalMode === 'add' ? 'Register Employee' : 'Save Changes'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Skills Modal */}
+      {skillsMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={() => setSkillsForId(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="font-semibold text-gray-800">Skills — {skillsMember.full_name}</h2>
+              <button onClick={() => setSkillsForId(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-2">Assigned skills</label>
+                <div className="flex flex-wrap gap-2">
+                  {(skillsMember.skills || []).map((us) => (
+                    <span key={us.skill.skill_id} className="bg-gray-100 text-gray-700 text-xs px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                      {us.skill.skill_name}
+                      <button onClick={() => removeSkill(us.skill.skill_id)} className="text-gray-400 hover:text-red-500">&times;</button>
+                    </span>
+                  ))}
+                  {(!skillsMember.skills || skillsMember.skills.length === 0) && <span className="text-gray-300 text-xs">No skills yet.</span>}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Add a skill</label>
+                <div className="flex gap-2">
+                  <select value={skillAddId} onChange={(e) => setSkillAddId(e.target.value)}
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                    <option value="">— Select a skill —</option>
+                    {availableSkills.map((s) => <option key={s.skill_id} value={s.skill_id}>{s.skill_name}</option>)}
+                  </select>
+                  <button onClick={addSkill} disabled={!skillAddId}
+                    className="px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
+                    Add
+                  </button>
+                </div>
+                {availableSkills.length === 0 && <p className="text-xs text-gray-400 mt-1">All org skills already assigned.</p>}
+              </div>
+              <div className="flex justify-end pt-2 border-t border-gray-100">
+                <button onClick={() => setSkillsForId(null)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Done</button>
+              </div>
+            </div>
           </div>
         </div>
       )}

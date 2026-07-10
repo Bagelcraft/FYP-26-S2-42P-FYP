@@ -3,9 +3,9 @@ const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
 const workerController = require('../controllers/worker.controller');
 const updateRequestController = require('../controllers/task-update-request.controller');
-const availabilityController = require('../controllers/availability.controller');
 const attendanceController = require('../controllers/attendance.controller');
 const profileChangeController = require('../controllers/profileChangeRequest.controller');
+const shiftChangeController = require('../controllers/shiftChangeRequest.controller');
 
 const router = express.Router();
 
@@ -49,14 +49,16 @@ router.put('/skills', (req, res) => {
   res.json({ message: 'Update skills — to be implemented' });
 });
 
-router.get('/availability', availabilityController.getAvailability);
-router.post('/availability', availabilityController.availabilityRules, availabilityController.setAvailability);
-router.put('/availability/:id', availabilityController.availabilityRules, availabilityController.updateAvailability);
-router.delete('/availability/:id', availabilityController.removeAvailability);
-
 router.get('/attendance', attendanceController.getAttendance);
 router.post('/attendance/clock-in', attendanceController.clockIn);
 router.put('/attendance/clock-out', attendanceController.clockOut);
+
+// ─── Schedule (assigned shifts) ───────────────────────────────
+router.get('/schedule', workerController.getMySchedule);
+
+// ─── Shift-change requests ────────────────────────────────────
+router.get('/shift-change-requests', shiftChangeController.listMine);
+router.post('/shift-change-request', shiftChangeController.submitRules, shiftChangeController.submitRequest);
 
 // ─── Leave (worker self-service) ──────────────────────────────
 router.get('/leave', workerController.listMyLeave);

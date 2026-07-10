@@ -198,13 +198,45 @@ async function removeSkill(req, res, next) {
   } catch (e) { next(e); }
 }
 
+// ─── Shift Assignments (roster) ───────────────────────────────
+const shiftAssignRules = [
+  body('user_id').isInt({ min: 1 }).withMessage('user_id is required'),
+  body('shift_id').isInt({ min: 1 }).withMessage('shift_id is required'),
+  body('date').isISO8601().withMessage('date must be a valid date'),
+];
+async function listShiftAssignments(req, res, next) {
+  try { ok(res, await svc.listShiftAssignments(orgId(req))); } catch (e) { next(e); }
+}
+async function createShiftAssignment(req, res, next) {
+  try { ok(res, await svc.createShiftAssignment(orgId(req), req.body), 201); } catch (e) { next(e); }
+}
+async function deleteShiftAssignment(req, res, next) {
+  try { await svc.deleteShiftAssignment(orgId(req), id(req)); res.status(204).end(); } catch (e) { next(e); }
+}
+
+// ─── Subscription & Billing ───────────────────────────────────
+async function getSubscription(req, res, next) {
+  try { ok(res, await svc.getSubscription(orgId(req))); } catch (e) { next(e); }
+}
+async function listBilling(req, res, next) {
+  try { ok(res, await svc.listBilling(orgId(req))); } catch (e) { next(e); }
+}
+async function renewSubscription(req, res, next) {
+  try { ok(res, await svc.renewSubscription(orgId(req))); } catch (e) { next(e); }
+}
+async function cancelSubscription(req, res, next) {
+  try { ok(res, await svc.cancelSubscription(orgId(req))); } catch (e) { next(e); }
+}
+
 module.exports = {
   validate,
   getProfile, profileUpdateRules, updateProfile,
+  getSubscription, listBilling, renewSubscription, cancelSubscription,
   deptRules, deptUpdateRules, listDepts, createDept, updateDept, deleteDept, assignStaffRules, assignStaffToDept,
   roleRules, roleUpdateRules, listRoles, createRole, updateRole, deleteRole,
   skillRules, skillUpdateRules, listSkills, createSkill, updateSkill, deleteSkill,
   shiftRules, shiftUpdateRules, listShifts, createShift, updateShift, deleteShift,
+  shiftAssignRules, listShiftAssignments, createShiftAssignment, deleteShiftAssignment,
   staffRules, staffQueryRules, staffUpdateRules, listStaff, registerStaff, updateStaff, deactivateStaff, reactivateStaff,
   assignSkillRules, assignSkill, removeSkill,
 };

@@ -167,6 +167,16 @@ const cancelLeave = async (req, res, next) => {
   }
 };
 
+// GET /worker/schedule  (assigned shifts, today onward)
+const getMySchedule = async (req, res, next) => {
+  try {
+    const data = await workerService.getMySchedule(req.user.userId);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
 
 module.exports = {
   listMyTasks,
@@ -181,5 +191,6 @@ module.exports = {
   applyLeave,
   listMyLeave,
   cancelLeave,
+  getMySchedule,
 };
 
