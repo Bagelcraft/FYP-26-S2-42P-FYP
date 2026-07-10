@@ -10,6 +10,8 @@
     "test:orgadmin": "node scripts/test-orgadmin.js",
     "test:pm": "node scripts/test-pm.js",
     "test:permworker": "node scripts/test-permworker.js",
+    "test:tempworker": "node scripts/test-tempworker.js",
+    "test:public": "node scripts/test-public.js",
     "seed:test": "node prisma/seed-test-accounts.js",
     "lint": "eslint src/"
   },
