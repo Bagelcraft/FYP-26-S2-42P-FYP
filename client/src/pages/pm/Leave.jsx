@@ -5,27 +5,7 @@ import StatCard from '../../components/StatCard';
 import api from '../../utils/api';
 import { PM_NAV, PM_SECONDARY } from './nav';
 
-// Replace with GET /pm/leave, PATCH /pm/leave/:id, PATCH /pm/leave-balance/:userId.
-const STAFF = {
-  5: { name: 'Weishi Tan', type: 'Permanent' }, 6: { name: 'Rachel Ng', type: 'Temporary' },
-  7: { name: 'Chen Jie', type: 'Permanent' },   11: { name: 'Ryan Lim', type: 'Temporary' },
-  12: { name: 'May Tan', type: 'Temporary' },
-};
-const seedLeave = [
-  { id: 1, user: 5,  type: 'MEDICAL', from: '05 Jun', to: '05 Jun', days: 1, status: 'PENDING',  note: 'Doctor appointment', applied: '01 Jun' },
-  { id: 2, user: 6,  type: 'ANNUAL',  from: '10 Jun', to: '12 Jun', days: 3, status: 'PENDING',  note: 'Family trip',        applied: '30 May' },
-  { id: 3, user: 11, type: 'ANNUAL',  from: '02 Jun', to: '04 Jun', days: 3, status: 'PENDING',  note: 'Personal',           applied: '28 May' },
-  { id: 4, user: 7,  type: 'ANNUAL',  from: '18 Jun', to: '20 Jun', days: 3, status: 'APPROVED', note: 'Overseas',           applied: '24 May' },
-  { id: 5, user: 12, type: 'UNPAID',  from: '02 Jun', to: '02 Jun', days: 1, status: 'REJECTED', note: 'Errand',             applied: '27 May' },
-];
-const seedBalance = [
-  { user: 5,  annual: { entitled: 14, used: 2 }, medical: { entitled: 14, used: 0 } },
-  { user: 6,  annual: { entitled: 7,  used: 1 }, medical: { entitled: 14, used: 0 } },
-  { user: 7,  annual: { entitled: 14, used: 5 }, medical: { entitled: 14, used: 2 } },
-  { user: 11, annual: { entitled: 7,  used: 2 }, medical: { entitled: 14, used: 0 } },
-  { user: 12, annual: { entitled: 7,  used: 0 }, medical: { entitled: 14, used: 1 } },
-];
-const cap = (s) => s.charAt(0) + s.slice(1).toLowerCase();
+const cap = (s) => (s ? s.charAt(0) + s.slice(1).toLowerCase() : '');
 
 function AdjustBalanceModal({ balance, onClose, onSave }) {
   const [form, setForm] = useState({ annualEnt: balance.annual.entitled, annualUsed: balance.annual.used, medEnt: balance.medical.entitled, medUsed: balance.medical.used });
@@ -40,7 +20,7 @@ function AdjustBalanceModal({ balance, onClose, onSave }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-800">Adjust Leave Balance — {balance.userName ?? STAFF[balance.user]?.name ?? 'Staff'}</h2>
+          <h2 className="font-semibold text-gray-800">Adjust Leave Balance — {balance.userName ?? 'Staff'}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
         </div>
         <div className="px-6 py-5 space-y-4">
@@ -61,27 +41,25 @@ function AdjustBalanceModal({ balance, onClose, onSave }) {
 
 export default function Leave() {
   const [tab, setTab] = useState('approvals');
-  const [leave, setLeave] = useState(seedLeave);
-  const [balances, setBalances] = useState(seedBalance);
+  const [leave, setLeave] = useState([]);
+  const [balances, setBalances] = useState([]);
   const [editing, setEditing] = useState(null);
-  const [demo, setDemo] = useState(false);
+  const [error, setError] = useState('');
   const [toast, setToast] = useState('');
   const note = (m) => { setToast(m); setTimeout(() => setToast(''), 2400); };
 
-  // Backend (this bundle ships the stubs): GET /pm/leave, PATCH /pm/leave/:id,
-  // GET /pm/leave-balance, PATCH /pm/leave-balance/:userId.
-  // Falls back to sample data if the server isn't running.
+  // GET /pm/leave, PATCH /pm/leave/:id, GET /pm/leave-balance, PATCH /pm/leave-balance/:userId.
   useEffect(() => {
     api.get('/pm/leave')
-      .then((r) => setLeave(r.data.data))
-      .catch(() => setDemo(true));
+      .then((r) => setLeave(r.data.data ?? []))
+      .catch((e) => setError(e.response?.data?.message || 'Failed to load leave.'));
     api.get('/pm/leave-balance')
-      .then((r) => setBalances(r.data.data))
+      .then((r) => setBalances(r.data.data ?? []))
       .catch(() => {});
   }, []);
 
-  const nameOf = (uid, fallbackName) => fallbackName ?? STAFF[uid]?.name ?? 'Staff';
-  const typeOf = (userType, uid) => (userType ? (userType === 'PERMANENT_WORKER' ? 'Permanent Employee' : 'Temporary Employee') : (STAFF[uid]?.type ?? ''));
+  const nameOf = (uid, fallbackName) => fallbackName ?? 'Staff';
+  const typeOf = (userType) => (userType === 'PERMANENT_WORKER' ? 'Permanent Employee' : userType === 'TEMPORARY_WORKER' ? 'Temporary Employee' : '');
 
   const pending = leave.filter((l) => l.status === 'PENDING');
   function decide(id, status) {
@@ -107,13 +85,13 @@ export default function Leave() {
           <p className="text-gray-500 text-sm mt-0.5">Track leave, approve requests and adjust leave balances.</p>
         </div>
 
-        {demo && <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2.5 text-xs text-yellow-700">Showing sample data — <span className="font-medium">GET /pm/leave</span> is not implemented yet.</div>}
+        {error && <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-xs text-red-600">{error}</div>}
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard label="Pending Approvals" value={pending.length} icon="⏳" color="yellow" />
-          <StatCard label="Approved (month)" value={leave.filter((l) => l.status === 'APPROVED').length} icon="✅" color="green" />
-          <StatCard label="On Leave Today" value={1} icon="🌴" color="blue" />
-          <StatCard label="Team Members" value={8} icon="👥" color="purple" />
+          <StatCard label="Approved" value={leave.filter((l) => l.status === 'APPROVED').length} icon="✅" color="green" />
+          <StatCard label="Rejected" value={leave.filter((l) => l.status === 'REJECTED').length} icon="🚫" color="blue" />
+          <StatCard label="Total Requests" value={leave.length} icon="📋" color="purple" />
         </div>
 
         <div className="flex gap-1 border-b border-gray-200">
@@ -133,7 +111,7 @@ export default function Leave() {
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 text-sm font-bold">{name[0]}</div>
                       <div>
-                        <p className="text-sm font-medium text-gray-800">{name} <span className="text-xs font-normal text-gray-400">· {typeOf(l.userType, l.user)}</span></p>
+                        <p className="text-sm font-medium text-gray-800">{name} <span className="text-xs font-normal text-gray-400">· {typeOf(l.userType)}</span></p>
                         <p className="text-xs text-gray-400 mt-0.5">{cap(l.type)} Leave · {l.from}{l.from !== l.to ? ` → ${l.to}` : ''} · {l.days} day{l.days !== 1 ? 's' : ''}{l.note ? ` · ${l.note}` : ''}</p>
                       </div>
                     </div>

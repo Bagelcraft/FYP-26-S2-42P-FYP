@@ -21,24 +21,10 @@ function toEmbedUrl(url) {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
-const DEFAULT_FEATURES = [
-  { icon: '📋', title: 'Task Management', description: 'Create, assign, and track tasks across your entire organisation in real time.' },
-  { icon: '🤖', title: 'Auto Allocation', description: 'Automatically assign tasks to the best available staff based on skills and schedule.' },
-  { icon: '📅', title: 'Workforce Scheduling', description: 'Manage availability, shifts, and leave in one unified calendar.' },
-  { icon: '📊', title: 'Reports & Analytics', description: 'Monitor working hours, task completion rates, and team performance.' },
-  { icon: '🔔', title: 'Real-time Notifications', description: 'Keep your team informed with instant in-app notifications for every update.' },
-];
-
-const DEFAULT_TESTIMONIALS = [
-  { name: 'Sarah Lim', company: 'BuildTech Pte Ltd', rating: 5, review_text: 'SmartTask transformed how we manage our 80-person team. Auto-allocation alone saves us 3 hours every day.' },
-  { name: 'James Tan', company: 'LogiCore Solutions', rating: 5, review_text: 'The role-based dashboards are intuitive. Our project managers and workers both love using it.' },
-  { name: 'Priya Nair', company: 'NovaSoft Asia', rating: 4, review_text: 'Onboarding was seamless. We were fully set up in under an hour with all our staff registered.' },
-];
-
 export default function Home() {
   const [content, setContent] = useState(null);
-  const [features, setFeatures] = useState(DEFAULT_FEATURES);
-  const [testimonials, setTestimonials] = useState(DEFAULT_TESTIMONIALS);
+  const [features, setFeatures] = useState([]);
+  const [testimonials, setTestimonials] = useState([]);
 
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
   const [formStatus, setFormStatus] = useState(null);
