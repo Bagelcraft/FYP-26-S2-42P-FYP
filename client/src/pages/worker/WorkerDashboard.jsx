@@ -26,6 +26,7 @@ export default function WorkerDashboard() {
   const [todayRecord, setTodayRecord] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [schedule, setSchedule] = useState([]);
+  const [balance, setBalance] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -38,7 +39,10 @@ export default function WorkerDashboard() {
     }).catch(() => {});
     api.get('/worker/tasks').then((r) => setTasks(r.data.data ?? [])).catch(() => {});
     api.get('/worker/schedule').then((r) => setSchedule(r.data.data ?? [])).catch(() => {});
+    api.get('/worker/leave-balance').then((r) => setBalance(r.data.data)).catch(() => {});
   }, []);
+
+  const annualLeft = balance ? String(Math.max((balance.annual.entitled ?? 0) - (balance.annual.used ?? 0), 0)) : '—';
 
   const isClockedIn = Boolean(openSession);
 
@@ -85,12 +89,13 @@ export default function WorkerDashboard() {
         {error && <p className="text-red-500 text-sm">{error}</p>}
 
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           {[
             { label: 'ASSIGNED TASKS', value: String(assignedCount), color: 'text-blue-600' },
             { label: 'IN PROGRESS', value: String(inProgressCount), color: 'text-purple-600' },
             { label: 'UPCOMING SHIFTS', value: String(schedule.length), color: 'text-green-600' },
             { label: 'HOURS TODAY', value: hoursToday, color: isClockedIn ? 'text-green-600' : 'text-gray-400' },
+            { label: 'ANNUAL LEAVE LEFT', value: annualLeft, color: 'text-teal-600' },
           ].map((s) => (
             <div key={s.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{s.label}</p>

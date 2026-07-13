@@ -32,12 +32,10 @@ async function updateProfile(req, res, next) {
 
 const deptRules = [
   body('name').trim().notEmpty().withMessage('name is required').isLength({ max: 100 }),
-  body('head_user_id').optional({ nullable: true }).isInt({ min: 1 }),
 ];
 
 const deptUpdateRules = [
   body('name').optional().trim().notEmpty().isLength({ max: 100 }),
-  body('head_user_id').optional({ nullable: true }).isInt({ min: 1 }),
 ];
 
 async function listDepts(req, res, next) {
@@ -53,24 +51,22 @@ async function deleteDept(req, res, next) {
   try { await svc.deleteDepartment(orgId(req), id(req)); res.status(204).end(); } catch (e) { next(e); }
 }
 
-const assignStaffRules = [
-  body('user_id').isInt({ min: 1 }).withMessage('user_id is required'),
-];
-
-async function assignStaffToDept(req, res, next) {
-  try { ok(res, await svc.assignStaffToDept(orgId(req), id(req), req.body.user_id)); } catch (e) { next(e); }
-}
-
 // ─── Staff Roles ──────────────────────────────────────────────
 
 const roleRules = [
   body('role_name').trim().notEmpty().withMessage('role_name is required').isLength({ max: 100 }),
   body('max_working_hours').optional({ nullable: true }).isInt({ min: 1 }),
+  body('department_id').optional({ nullable: true }).isInt({ min: 1 }),
+  body('skill_ids').optional().isArray().withMessage('skill_ids must be an array'),
+  body('skill_ids.*').optional().isInt({ min: 1 }),
 ];
 
 const roleUpdateRules = [
   body('role_name').optional().trim().notEmpty().isLength({ max: 100 }),
   body('max_working_hours').optional({ nullable: true }).isInt({ min: 1 }),
+  body('department_id').optional({ nullable: true }).isInt({ min: 1 }),
+  body('skill_ids').optional().isArray().withMessage('skill_ids must be an array'),
+  body('skill_ids.*').optional().isInt({ min: 1 }),
 ];
 
 async function listRoles(req, res, next) {
@@ -150,6 +146,10 @@ const staffRules = [
   body('user_type').isIn(WORKER_TYPES).withMessage(`user_type must be one of: ${WORKER_TYPES.join(', ')}`),
   body('role_id').optional({ nullable: true }).isInt({ min: 1 }),
   body('password').optional().isLength({ min: 8 }).withMessage('password must be at least 8 characters'),
+  body('skill_ids').optional().isArray().withMessage('skill_ids must be an array'),
+  body('skill_ids.*').optional().isInt({ min: 1 }),
+  body('annual_entitled').optional({ nullable: true }).isInt({ min: 0 }),
+  body('medical_entitled').optional({ nullable: true }).isInt({ min: 0 }),
 ];
 
 const staffQueryRules = [
@@ -232,7 +232,7 @@ module.exports = {
   validate,
   getProfile, profileUpdateRules, updateProfile,
   getSubscription, listBilling, renewSubscription, cancelSubscription,
-  deptRules, deptUpdateRules, listDepts, createDept, updateDept, deleteDept, assignStaffRules, assignStaffToDept,
+  deptRules, deptUpdateRules, listDepts, createDept, updateDept, deleteDept,
   roleRules, roleUpdateRules, listRoles, createRole, updateRole, deleteRole,
   skillRules, skillUpdateRules, listSkills, createSkill, updateSkill, deleteSkill,
   shiftRules, shiftUpdateRules, listShifts, createShift, updateShift, deleteShift,

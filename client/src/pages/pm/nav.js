@@ -4,6 +4,7 @@ export const PM_NAV = [
   { path: '/pm/tasks', icon: '📋', label: 'Tasks' },
   { path: '/pm/team', icon: '👥', label: 'Team' },
   { path: '/pm/allocate', icon: '🤖', label: 'Allocate' },
+  { path: '/pm/calendar', icon: '📅', label: 'Calendar' },
   { path: '/pm/leave', icon: '🌴', label: 'Leave' },
   { path: '/pm/reports', icon: '📊', label: 'Reports' },
   { path: '/pm/notifications', icon: '🔔', label: 'Notifications' },

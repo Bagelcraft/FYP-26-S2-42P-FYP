@@ -20,7 +20,6 @@ router.get('/departments',                    c.listDepts);
 router.post('/departments',                   c.deptRules,        c.validate, c.createDept);
 router.patch('/departments/:id',              c.deptUpdateRules,  c.validate, c.updateDept);
 router.delete('/departments/:id',             c.deleteDept);
-router.post('/departments/:id/assign-staff',  c.assignStaffRules, c.validate, c.assignStaffToDept);
 
 // ─── Staff Roles ──────────────────────────────────────────────
 

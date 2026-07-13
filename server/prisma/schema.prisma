@@ -21,6 +21,7 @@ enum TaskStatus {
   PENDING
   ASSIGNED
   IN_PROGRESS
+  SUBMITTED
   COMPLETED
   CANCELLED
 }
@@ -128,11 +129,25 @@ model BillingRecord {
 model StaffRole {
   role_id           Int    @id @default(autoincrement())
   organisation_id   Int
+  department_id     Int?
   role_name         String @db.VarChar(100)
   max_working_hours Int?
 
   organisation      Organisation @relation(fields: [organisation_id], references: [organisation_id])
+  department        Department?  @relation(fields: [department_id], references: [department_id])
+  requiredSkills    RoleSkill[]
   users             User[]
+}
+
+model RoleSkill {
+  role_skill_id Int @id @default(autoincrement())
+  role_id       Int
+  skill_id      Int
+
+  role  StaffRole @relation(fields: [role_id], references: [role_id], onDelete: Cascade)
+  skill Skill     @relation(fields: [skill_id], references: [skill_id], onDelete: Cascade)
+
+  @@unique([role_id, skill_id])
 }
 
 // ─── Users ───────────────────────────────────────────────────
@@ -168,7 +183,6 @@ model User {
   sentUpdateRequests TaskUpdateRequest[]  @relation("UpdateRequestedBy")
   feedback           Feedback[]
   testimonials       Testimonial[]
-  headOfDepts        Department[]         @relation("DeptHead")
   notifications           Notification[]
   profileChangeRequests   ProfileChangeRequest[] @relation("ProfileChangeRequests")
   profileChangeReviews    ProfileChangeRequest[] @relation("ProfileChangeReviews")
@@ -179,11 +193,10 @@ model User {
 model Department {
   department_id   Int    @id @default(autoincrement())
   organisation_id Int
-  head_user_id    Int?
   name            String @db.VarChar(100)
 
   organisation    Organisation @relation(fields: [organisation_id], references: [organisation_id])
-  head            User?        @relation("DeptHead", fields: [head_user_id], references: [userId])
+  roles           StaffRole[]
   tasks           Task[]
 }
 
@@ -199,6 +212,7 @@ model Skill {
   userSkills      UserSkill[]
   tasks           Task[]
   taskSkills      TaskSkill[]
+  roleSkills      RoleSkill[]
 }
 
 model UserSkill {

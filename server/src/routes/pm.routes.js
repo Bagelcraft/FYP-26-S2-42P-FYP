@@ -90,6 +90,10 @@ router.post('/tasks/:id/assign',      allocationController.assignBodyRules, allo
 router.post('/tasks/:id/reallocate',  allocationController.assignBodyRules, allocationController.reallocate);
 router.post('/tasks/:id/auto-allocate', allocationController.autoAllocate);
 
+// Completion approval (freelancer flow): approve/reject a SUBMITTED task
+router.patch('/tasks/:id/approve-completion', taskController.approveCompletion);
+router.patch('/tasks/:id/reject-completion',  taskController.rejectCompletion);
+
 // ─── Manager portal ────────────────────────────────────────────────────────
 
 // Team — view all members with skills, weekly capacity, availability
@@ -103,6 +107,12 @@ router.patch('/leave-balance/:userId',       managerController.updateLeaveBalanc
 
 // Reports — working hours + task completion
 router.get('/reports', managerController.getReports);
+
+// Calendar — shifts, unavailability and task start/deadline across a date range
+router.get('/calendar', managerController.getCalendar);
+
+// Availability — per-day count of skill-matching workers (for the task date picker)
+router.get('/availability', managerController.getAvailability);
 
 // Lookups for Create/Edit Task dropdowns (manager-accessible, read-only)
 router.get('/org-info',        managerController.getOrgInfo);

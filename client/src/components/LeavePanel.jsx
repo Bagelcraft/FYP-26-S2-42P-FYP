@@ -20,6 +20,7 @@ export default function LeavePanel({ base }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ leave_type: 'ANNUAL', start_date: '', end_date: '' });
   const [saving, setSaving] = useState(false);
+  const [balance, setBalance] = useState(null); // permanent workers only
 
   const load = useCallback(() => {
     setLoading(true);
@@ -29,6 +30,12 @@ export default function LeavePanel({ base }) {
       .finally(() => setLoading(false));
   }, [base]);
   useEffect(() => { load(); }, [load]);
+
+  // Leave balance is set by the org admin and only applies to permanent workers.
+  useEffect(() => {
+    if (base !== '/worker') { setBalance(null); return; }
+    api.get(`${base}/leave-balance`).then((r) => setBalance(r.data.data)).catch(() => setBalance(null));
+  }, [base]);
 
   async function submit(e) {
     e.preventDefault();
@@ -65,6 +72,28 @@ export default function LeavePanel({ base }) {
       </div>
 
       {error && <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">{error}</div>}
+
+      {balance && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {[
+            { label: 'Annual Leave', b: balance.annual, color: 'text-blue-600' },
+            { label: 'Medical Leave', b: balance.medical, color: 'text-green-600' },
+          ].map(({ label, b, color }) => {
+            const remaining = Math.max((b.entitled ?? 0) - (b.used ?? 0), 0);
+            const pct = b.entitled ? Math.min((b.used / b.entitled) * 100, 100) : 0;
+            return (
+              <div key={label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+                <div className="flex items-baseline justify-between">
+                  <p className="text-sm font-semibold text-gray-700">{label}</p>
+                  <p className={`text-2xl font-bold ${color}`}>{remaining}<span className="text-sm font-normal text-gray-400"> days left</span></p>
+                </div>
+                <div className="bg-gray-100 rounded-full h-1.5 mt-3"><div className="bg-primary-500 h-1.5 rounded-full" style={{ width: `${pct}%` }} /></div>
+                <p className="text-xs text-gray-400 mt-1.5">{b.used ?? 0} used of {b.entitled ?? 0} entitled ({balance.year})</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {showForm && (
         <form onSubmit={submit} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">

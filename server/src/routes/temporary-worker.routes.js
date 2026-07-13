@@ -3,7 +3,6 @@ const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
 const workerController = require('../controllers/worker.controller');
 const updateRequestController = require('../controllers/task-update-request.controller');
-const attendanceController = require('../controllers/attendance.controller');
 const profileChangeController = require('../controllers/profileChangeRequest.controller');
 const shiftChangeController = require('../controllers/shiftChangeRequest.controller');
 
@@ -25,8 +24,12 @@ router.get('/tasks/:id', workerController.getMyTask);
 // PATCH /temp-worker/tasks/:id/acknowledge
 router.patch('/tasks/:id/acknowledge', workerController.acknowledge);
 
-// PATCH /temp-worker/tasks/:id/progress   body: { status: "IN_PROGRESS"|"COMPLETED" }
+// PATCH /temp-worker/tasks/:id/progress   body: { status: "IN_PROGRESS" }
 router.patch('/tasks/:id/progress', workerController.progressRules, workerController.updateProgress);
+
+// Freelancer flow: accept = acknowledge; then submit finished work for approval, or decline
+router.patch('/tasks/:id/submit',  workerController.submitTask);
+router.patch('/tasks/:id/decline', workerController.declineTask);
 
 // ─── Update requests ──────────────────────────────────────────────────────────
 
@@ -49,9 +52,8 @@ router.put('/skills', (req, res) => {
   res.json({ message: 'Update skills — to be implemented' });
 });
 
-router.get('/attendance', attendanceController.getAttendance);
-router.post('/attendance/clock-in', attendanceController.clockIn);
-router.put('/attendance/clock-out', attendanceController.clockOut);
+// Freelancer hours — approved (completed) work + total hours (replaces clock in/out)
+router.get('/hours', workerController.getMyHours);
 
 // ─── Schedule (assigned shifts) ───────────────────────────────
 router.get('/schedule', workerController.getMySchedule);

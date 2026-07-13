@@ -102,59 +102,11 @@ function UpdateRequestsPanel({ taskId, onClose }) {
   );
 }
 
-// ── Progress modal ─────────────────────────────────────────────────────────
-function ProgressModal({ task, onClose, onUpdated }) {
-  const [status, setStatus] = useState('IN_PROGRESS');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-
-  async function submit(e) {
-    e.preventDefault();
-    setSubmitting(true); setError('');
-    try {
-      await api.patch(`/temp-worker/tasks/${task.task_id}/progress`, { status });
-      onUpdated();
-      onClose();
-    } catch (err) {
-      setError(err.response?.data?.message || err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
-      <form onSubmit={submit} className="bg-white rounded-2xl shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-800">Update Progress</h2>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
-        </div>
-        <div className="px-6 py-5 space-y-4">
-          {error && <p className="text-sm text-red-500">{error}</p>}
-          <p className="text-sm text-gray-600">Task: <span className="font-medium text-gray-800">{task.title}</span></p>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">New Status</label>
-            <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-              <option value="IN_PROGRESS">In Progress</option>
-              <option value="COMPLETED">Completed</option>
-            </select>
-          </div>
-          <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
-            <button type="submit" disabled={submitting} className="px-5 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">{submitting ? 'Saving…' : 'Update'}</button>
-          </div>
-        </div>
-      </form>
-    </div>
-  );
-}
-
 export default function MyTasks() {
   const [assigned, setAssigned] = useState([]);
   const [pool, setPool] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [progressTask, setProgressTask] = useState(null);
   const [requestsTaskId, setRequestsTaskId] = useState(null);
   const [toast, setToast] = useState('');
 
@@ -178,11 +130,33 @@ export default function MyTasks() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function acknowledge(task) {
+  async function accept(task) {
     try {
       await api.patch(`/temp-worker/tasks/${task.task_id}/acknowledge`);
       load();
-      showToast('Task acknowledged — now In Progress');
+      showToast('Work accepted — now In Progress');
+    } catch (e) {
+      alert(e.response?.data?.message || e.message);
+    }
+  }
+
+  async function submitWork(task) {
+    if (!confirm(`Submit "${task.title}" as complete for manager approval?`)) return;
+    try {
+      await api.patch(`/temp-worker/tasks/${task.task_id}/submit`);
+      load();
+      showToast('Submitted for approval');
+    } catch (e) {
+      alert(e.response?.data?.message || e.message);
+    }
+  }
+
+  async function decline(task) {
+    if (!confirm(`Decline "${task.title}"? It will be returned to the pool.`)) return;
+    try {
+      await api.patch(`/temp-worker/tasks/${task.task_id}/decline`);
+      load();
+      showToast('Work declined');
     } catch (e) {
       alert(e.response?.data?.message || e.message);
     }
@@ -225,19 +199,22 @@ export default function MyTasks() {
                       </div>
                       <div className="flex flex-wrap gap-2 mt-3">
                         {t.status === 'ASSIGNED' && (
-                          <button onClick={() => acknowledge(t)} className="text-xs bg-primary-50 text-primary-600 hover:bg-primary-100 px-3 py-1.5 rounded-lg transition-colors font-medium">
-                            Acknowledge
-                          </button>
+                          <>
+                            <button onClick={() => accept(t)} className="text-xs bg-primary-600 text-white hover:bg-primary-700 px-3 py-1.5 rounded-lg transition-colors font-medium">
+                              Accept work
+                            </button>
+                            <button onClick={() => decline(t)} className="text-xs border border-gray-200 text-gray-600 hover:bg-gray-50 px-3 py-1.5 rounded-lg transition-colors">
+                              Decline
+                            </button>
+                          </>
                         )}
                         {t.status === 'IN_PROGRESS' && (
-                          <button onClick={() => setProgressTask(t)} className="text-xs bg-gray-50 text-gray-600 hover:bg-gray-100 px-3 py-1.5 rounded-lg transition-colors">
-                            Update Progress
+                          <button onClick={() => submitWork(t)} className="text-xs bg-green-500 text-white hover:bg-green-600 px-3 py-1.5 rounded-lg transition-colors font-medium">
+                            Submit for approval
                           </button>
                         )}
-                        {t.status === 'IN_PROGRESS' && (
-                          <button onClick={() => setProgressTask({ ...t, _markComplete: true })} className="text-xs bg-green-50 text-green-600 hover:bg-green-100 px-3 py-1.5 rounded-lg transition-colors font-medium">
-                            Mark Complete
-                          </button>
+                        {t.status === 'SUBMITTED' && (
+                          <span className="text-xs text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg">Awaiting manager approval…</span>
                         )}
                         {(t.status === 'ASSIGNED' || t.status === 'IN_PROGRESS') && (
                           <button onClick={() => setRequestsTaskId(t.task_id)} className="text-xs bg-amber-50 text-amber-600 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors">
@@ -277,9 +254,6 @@ export default function MyTasks() {
         )}
       </div>
 
-      {progressTask && (
-        <ProgressModal task={progressTask} onClose={() => setProgressTask(null)} onUpdated={() => { load(); showToast('Task status updated'); }} />
-      )}
       {requestsTaskId && (
         <UpdateRequestsPanel taskId={requestsTaskId} onClose={() => setRequestsTaskId(null)} />
       )}

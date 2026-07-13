@@ -18,24 +18,26 @@ export default function Login() {
     TEMPORARY_WORKER: '/temp-worker',
   };
 
-  // DEV ONLY — remove before production
-  const DEV_USERS = [
-    { label: 'System Admin',    icon: '🛡️', user_type: 'SYSTEM_ADMIN',     email: 'admin@system.com',       full_name: 'Daniel Tan',   userId: 1, organisationId: null },
-    { label: 'Org Admin',       icon: '🏢', user_type: 'ORG_ADMIN',         email: 'orgadmin@techcorp.com',  full_name: 'Alson Lim',    userId: 2, organisationId: 1 },
-    { label: 'Manager', icon: '📋', user_type: 'PROJECT_MANAGER',   email: 'pm@techcorp.com',        full_name: 'Basil Hia',    userId: 3, organisationId: 1 },
-    { label: 'Perm Employee',   icon: '👷', user_type: 'PERMANENT_WORKER',  email: 'worker@techcorp.com',    full_name: 'Weishi Tan',   userId: 5, organisationId: 1 },
-    { label: 'Temp Employee',   icon: '🔧', user_type: 'TEMPORARY_WORKER',  email: 'tempworker@techcorp.com',full_name: 'Rachel Ng',    userId: 6, organisationId: 1 },
+  // Test accounts (Appendix A) — all share the password below. These accounts
+  // own the seeded demo/test data; a normally-registered org sees a clean slate.
+  const TEST_PASSWORD = 'Passw0rd!';
+  const TEST_USERS = [
+    { label: 'System Admin',       icon: '🛡️', email: 'sysadmin@sta.test' },
+    { label: 'Org Admin · Acme',   icon: '🏢', email: 'admin@acme.test' },
+    { label: 'Manager · Acme',     icon: '📋', email: 'pm@acme.test' },
+    { label: 'Permanent Employee', icon: '👷', email: 'perm@acme.test' },
+    { label: 'Temporary Employee', icon: '🔧', email: 'temp@acme.test' },
+    { label: 'Org Admin · Globex', icon: '🏬', email: 'admin@globex.test' },
   ];
 
-  const quickLogin = async (devUser) => {
+  const quickLogin = async (u) => {
+    setError('');
     try {
-      const { data } = await api.post('/auth/dev-login', { email: devUser.email });
+      const { data } = await api.post('/auth/login', { email: u.email, password: TEST_PASSWORD });
       login(data.user, data.token);
-      navigate(roleRedirects[data.user.user_type]);
-    } catch {
-      // Fallback: use a mock token if server is down (won't reach protected API routes)
-      login({ userId: devUser.userId, full_name: devUser.full_name, email: devUser.email, user_type: devUser.user_type, organisationId: devUser.organisationId }, 'dev-token');
-      navigate(roleRedirects[devUser.user_type]);
+      navigate(roleRedirects[data.user.user_type] ?? '/');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Quick login failed — run "npm run seed:test" to create the test accounts.');
     }
   };
 
@@ -126,15 +128,15 @@ export default function Login() {
           </p>
         </div>
 
-        {/* DEV ONLY — quick role login shortcuts */}
+        {/* Test-account quick access (owns the seeded demo data) */}
         <div className="mt-4 rounded-xl border border-dashed border-yellow-300 bg-yellow-50 p-4">
           <p className="text-xs font-semibold text-yellow-700 uppercase tracking-wide mb-3">
-            Dev shortcuts — remove before production
+            Test accounts · password {TEST_PASSWORD}
           </p>
           <div className="grid grid-cols-1 gap-2">
-            {DEV_USERS.map((u) => (
+            {TEST_USERS.map((u) => (
               <button
-                key={u.user_type}
+                key={u.email}
                 onClick={() => quickLogin(u)}
                 className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg bg-white border border-yellow-200 hover:border-yellow-400 hover:bg-yellow-50 transition-colors text-left"
               >

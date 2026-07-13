@@ -315,8 +315,64 @@ async function getReports(organisationId) {
   };
 }
 
+// ─── GET /pm/calendar?from=&to= ───────────────────────────────
+// Aggregates, over a date range for the org: rostered shifts (who's on shift),
+// unavailability (leave / unavailable slots) and tasks (start + deadline).
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+async function getCalendar(organisationId, from, to) {
+  const [shiftRows, taskRows, unavailRows] = await Promise.all([
+    prisma.shiftAssignment.findMany({
+      where:   { organisation_id: organisationId, date: { gte: from, lte: to } },
+      include: { user: { select: { userId: true, full_name: true, user_type: true } }, shift: { select: { name: true, start_time: true, end_time: true } } },
+      orderBy: { date: 'asc' },
+    }),
+    prisma.task.findMany({
+      where:   { organisation_id: organisationId, OR: [{ start_datetime: { gte: from, lte: to } }, { end_datetime: { gte: from, lte: to } }] },
+      include: { department: { select: { name: true } }, assignments: { include: { assignedTo: { select: { full_name: true } } } } },
+      orderBy: { start_datetime: 'asc' },
+    }),
+    prisma.availability.findMany({
+      where:   { status: { in: ['UNAVAILABLE', 'ON_LEAVE'] }, start_datetime: { lte: to }, end_datetime: { gte: from }, user: { organisationId } },
+      include: { user: { select: { userId: true, full_name: true } } },
+    }),
+  ]);
+  return {
+    from: ymd(from), to: ymd(to),
+    shifts:      shiftRows.map((s) => ({ date: ymd(new Date(s.date)), userId: s.user.userId, userName: s.user.full_name, userType: s.user.user_type, shiftName: s.shift.name, startTime: s.shift.start_time, endTime: s.shift.end_time })),
+    tasks:       taskRows.map((t) => ({ task_id: t.task_id, title: t.title, status: t.status, start: ymd(new Date(t.start_datetime)), end: ymd(new Date(t.end_datetime)), department: t.department?.name ?? null, assignees: t.assignments.map((a) => a.assignedTo?.full_name).filter(Boolean) })),
+    unavailable: unavailRows.map((a) => ({ userId: a.user.userId, userName: a.user.full_name, status: a.status, start: ymd(new Date(a.start_datetime)), end: ymd(new Date(a.end_datetime)) })),
+  };
+}
+
+// ─── GET /pm/availability?from=&to=&skills= ───────────────────
+// Per-day count of active workers who hold ALL the given skills and are
+// AVAILABLE (and not on leave/unavailable) — used by the Create Task date picker.
+async function getAvailabilityByDay(organisationId, from, to, skillIds = []) {
+  const skillFilter = skillIds.length ? { AND: skillIds.map((id) => ({ skills: { some: { skill_id: id } } })) } : {};
+  const workers = await prisma.user.findMany({
+    where:   { organisationId, is_active: true, user_type: { in: ['PERMANENT_WORKER', 'TEMPORARY_WORKER'] }, ...skillFilter },
+    include: { availability: { where: { start_datetime: { lte: to }, end_datetime: { gte: from } } } },
+  });
+  const total = workers.length;
+  const days = [];
+  for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+    const s = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0);
+    const e = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
+    let available = 0;
+    for (const w of workers) {
+      const slots = w.availability.filter((a) => new Date(a.start_datetime) <= e && new Date(a.end_datetime) >= s);
+      const hasAvail = slots.some((a) => a.status === 'AVAILABLE');
+      const hasBlock = slots.some((a) => a.status === 'ON_LEAVE' || a.status === 'UNAVAILABLE');
+      if (hasAvail && !hasBlock) available++;
+    }
+    days.push({ date: ymd(s), available, total });
+  }
+  return { total, days };
+}
+
 module.exports = {
   getTeam, listLeave, decideLeave, listLeaveBalances, updateLeaveBalance, getSubscription, listBilling,
-  getOrgInfo, getShiftTemplates, getDepartments, getSkills, getReports,
+  getOrgInfo, getShiftTemplates, getDepartments, getSkills, getReports, getCalendar, getAvailabilityByDay,
   listTestimonials, createTestimonial, updateTestimonial, deleteTestimonial,
 };

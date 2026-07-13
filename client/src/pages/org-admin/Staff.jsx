@@ -15,7 +15,7 @@ function generatePassword() {
   return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
-const getEmptyForm = () => ({ userId: null, full_name: '', email: '', user_type: 'PERMANENT_WORKER', role_id: '', password: generatePassword() });
+const getEmptyForm = () => ({ userId: null, full_name: '', email: '', user_type: 'PERMANENT_WORKER', role_id: '', password: generatePassword(), skill_ids: [], annual_entitled: '', medical_entitled: '' });
 
 export default function Staff() {
   const [staff, setStaff]       = useState([]);
@@ -32,6 +32,8 @@ export default function Staff() {
   const [showPass, setShowPass] = useState(false);
   const [skillsForId, setSkillsForId] = useState(null); // userId whose skills modal is open
   const [skillAddId, setSkillAddId]   = useState('');
+  const [newSkillName, setNewSkillName] = useState('');   // inline skill creation in the register form
+  const [creatingSkill, setCreatingSkill] = useState(false);
 
   function load() {
     setLoading(true);
@@ -63,7 +65,7 @@ export default function Staff() {
   const skillsMember = staff.find((s) => s.userId === skillsForId) || null;
 
   function openAdd() {
-    setModalMode('add'); setFormError(''); setForm(getEmptyForm()); setShowPass(false);
+    setModalMode('add'); setFormError(''); setForm(getEmptyForm()); setShowPass(false); setNewSkillName('');
   }
   function openEdit(member) {
     setModalMode('edit'); setFormError('');
@@ -74,7 +76,38 @@ export default function Staff() {
       user_type: member.user_type,
       role_id: member.staffRole?.role_id ?? '',
       password: '',
+      skill_ids: [], annual_entitled: '', medical_entitled: '',
     });
+  }
+
+  function toggleFormSkill(id) {
+    setForm((f) => ({ ...f, skill_ids: f.skill_ids.includes(id) ? f.skill_ids.filter((x) => x !== id) : [...f.skill_ids, id] }));
+  }
+
+  // Selecting a role highlights (auto-selects) that role's required skills.
+  function onRoleChange(e) {
+    const role_id = e.target.value;
+    const role = roles.find((r) => String(r.role_id) === role_id);
+    const roleSkillIds = role ? (role.requiredSkills ?? []).map((rs) => rs.skill.skill_id) : [];
+    setForm((f) => ({ ...f, role_id, skill_ids: [...new Set([...f.skill_ids, ...roleSkillIds])] }));
+  }
+
+  // Create a skill from inside the register form and auto-select it.
+  async function createSkillInline() {
+    const name = newSkillName.trim();
+    if (!name) return;
+    setCreatingSkill(true); setFormError('');
+    try {
+      const r = await api.post('/org-admin/skills', { skill_name: name });
+      const sk = r.data.data;
+      setSkills((prev) => [...prev, sk].sort((a, b) => a.skill_name.localeCompare(b.skill_name)));
+      setForm((f) => ({ ...f, skill_ids: [...f.skill_ids, sk.skill_id] }));
+      setNewSkillName('');
+    } catch (e) {
+      setFormError(e.response?.data?.message || e.message);
+    } finally {
+      setCreatingSkill(false);
+    }
   }
 
   async function handleSubmit(e) {
@@ -83,7 +116,11 @@ export default function Staff() {
     try {
       const role_id = form.role_id !== '' ? Number(form.role_id) : null;
       if (modalMode === 'add') {
-        const body = { full_name: form.full_name.trim(), email: form.email.trim(), user_type: form.user_type, password: form.password, role_id };
+        const body = { full_name: form.full_name.trim(), email: form.email.trim(), user_type: form.user_type, password: form.password, role_id, skill_ids: form.skill_ids };
+        if (form.user_type === 'PERMANENT_WORKER') {
+          body.annual_entitled = form.annual_entitled !== '' ? Number(form.annual_entitled) : 0;
+          body.medical_entitled = form.medical_entitled !== '' ? Number(form.medical_entitled) : 0;
+        }
         const r = await api.post('/org-admin/staff', body);
         setStaff((prev) => [...prev, r.data.data].sort((a, b) => a.full_name.localeCompare(b.full_name)));
       } else {
@@ -241,7 +278,7 @@ export default function Staff() {
               <h2 className="font-semibold text-gray-800">{modalMode === 'add' ? 'Register Employee' : 'Edit Employee'}</h2>
               <button onClick={() => setModalMode(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
             </div>
-            <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+            <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4 max-h-[75vh] overflow-y-auto">
               {formError && <p className="text-red-500 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">{formError}</p>}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Full Name *</label>
@@ -266,7 +303,7 @@ export default function Staff() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Staff Role</label>
-                  <select value={form.role_id} onChange={(e) => setForm({ ...form, role_id: e.target.value })}
+                  <select value={form.role_id} onChange={onRoleChange}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
                     <option value="">— None —</option>
                     {roles.map((r) => (
@@ -275,6 +312,52 @@ export default function Staff() {
                   </select>
                 </div>
               </div>
+              {modalMode === 'add' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Skills</label>
+                  <p className="text-xs text-gray-400 mb-2">Pick what this employee can do. A role's required skills are added automatically.</p>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {skills.map((s) => {
+                      const on = form.skill_ids.includes(s.skill_id);
+                      return (
+                        <button type="button" key={s.skill_id} onClick={() => toggleFormSkill(s.skill_id)}
+                          className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${on ? 'bg-primary-600 border-primary-600 text-white' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                          {on ? '✓ ' : ''}{s.skill_name}
+                        </button>
+                      );
+                    })}
+                    {skills.length === 0 && <span className="text-xs text-gray-400">No skills yet — create one below.</span>}
+                  </div>
+                  <div className="flex gap-2">
+                    <input value={newSkillName} onChange={(e) => setNewSkillName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); createSkillInline(); } }}
+                      placeholder="Create a new skill…"
+                      className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                    <button type="button" onClick={createSkillInline} disabled={creatingSkill || !newSkillName.trim()}
+                      className="px-3 py-2 text-xs bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 rounded-lg transition-colors whitespace-nowrap">
+                      {creatingSkill ? 'Adding…' : '＋ Create'}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {modalMode === 'add' && form.user_type === 'PERMANENT_WORKER' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Annual leave (days)</label>
+                    <input type="number" min="0" value={form.annual_entitled}
+                      onChange={(e) => setForm({ ...form, annual_entitled: e.target.value })}
+                      placeholder="e.g. 14"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Medical leave (days)</label>
+                    <input type="number" min="0" value={form.medical_entitled}
+                      onChange={(e) => setForm({ ...form, medical_entitled: e.target.value })}
+                      placeholder="e.g. 14"
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                  </div>
+                </div>
+              )}
               {modalMode === 'add' && (
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Initial Password *</label>

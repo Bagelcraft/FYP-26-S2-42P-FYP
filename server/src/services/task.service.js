@@ -229,7 +229,69 @@ async function updateTaskStatus(taskId, userId, organisationId, status) {
   if (!allowed.includes(status)) {
     throw makeError(`Workers can only set status to: ${allowed.join(', ')}`, 422);
   }
+  // Temporary workers (freelancers) cannot self-complete — they submit for approval.
+  if (status === 'COMPLETED') {
+    const actor = await prisma.user.findUnique({ where: { userId }, select: { user_type: true } });
+    if (actor?.user_type === 'TEMPORARY_WORKER') {
+      throw makeError('Temporary workers must submit their work for manager approval', 422);
+    }
+  }
   return prisma.task.update({ where: { task_id: taskId }, data: { status } });
+}
+
+// ─── Freelancer completion flow (temporary workers) ───────────
+// Worker submits finished work → SUBMITTED (awaiting manager approval).
+async function submitTaskCompletion(taskId, userId, organisationId) {
+  const task = await getWorkerTask(taskId, userId, organisationId);
+  if (!['IN_PROGRESS', 'ASSIGNED'].includes(task.status)) {
+    throw makeError('Only an in-progress task can be submitted for approval', 422);
+  }
+  return prisma.task.update({ where: { task_id: taskId }, data: { status: 'SUBMITTED' } });
+}
+
+// Worker declines assigned work → drops their assignment; task returns to PENDING if unassigned.
+async function declineTask(taskId, userId, organisationId) {
+  await getWorkerTask(taskId, userId, organisationId);
+  await prisma.$transaction(async (tx) => {
+    await tx.taskAssignment.deleteMany({ where: { task_id: taskId, assigned_to: userId } });
+    const remaining = await tx.taskAssignment.count({ where: { task_id: taskId } });
+    if (remaining === 0) await tx.task.update({ where: { task_id: taskId }, data: { status: 'PENDING' } });
+  });
+  return { task_id: taskId, declined: true };
+}
+
+// Manager approves a submitted task → COMPLETED (worked hours = task duration, computed on read).
+async function approveTaskCompletion(taskId, organisationId) {
+  const task = await prisma.task.findFirst({ where: { task_id: taskId, organisation_id: organisationId } });
+  if (!task) throw makeError('Task not found', 404);
+  if (task.status !== 'SUBMITTED') throw makeError('Only submitted tasks can be approved', 422);
+  await prisma.task.update({ where: { task_id: taskId }, data: { status: 'COMPLETED' } });
+  return getTask(taskId, organisationId);
+}
+
+// Manager rejects a submitted task → back to IN_PROGRESS for rework.
+async function rejectTaskCompletion(taskId, organisationId) {
+  const task = await prisma.task.findFirst({ where: { task_id: taskId, organisation_id: organisationId } });
+  if (!task) throw makeError('Task not found', 404);
+  if (task.status !== 'SUBMITTED') throw makeError('Only submitted tasks can be rejected', 422);
+  await prisma.task.update({ where: { task_id: taskId }, data: { status: 'IN_PROGRESS' } });
+  return getTask(taskId, organisationId);
+}
+
+// A worker's approved (COMPLETED) work + total hours, derived from task durations.
+async function getWorkerHours(userId, organisationId) {
+  const tasks = await prisma.task.findMany({
+    where:   { organisation_id: organisationId, status: 'COMPLETED', assignments: { some: { assigned_to: userId } } },
+    select:  { task_id: true, title: true, start_datetime: true, end_datetime: true },
+    orderBy: { end_datetime: 'desc' },
+  });
+  let totalHours = 0;
+  const items = tasks.map((t) => {
+    const hours = Math.max((new Date(t.end_datetime) - new Date(t.start_datetime)) / 3600000, 0);
+    totalHours += hours;
+    return { task_id: t.task_id, title: t.title, start: t.start_datetime, end: t.end_datetime, hours: Math.round(hours * 100) / 100 };
+  });
+  return { totalHours: Math.round(totalHours * 100) / 100, count: items.length, tasks: items };
 }
 
 // Tasks that are PENDING and whose required skills the worker FULLY satisfies.
@@ -264,5 +326,10 @@ module.exports = {
   getWorkerTask,
   acknowledgeTask,
   updateTaskStatus,
+  submitTaskCompletion,
+  declineTask,
+  approveTaskCompletion,
+  rejectTaskCompletion,
+  getWorkerHours,
   listAvailableTasks,
 };

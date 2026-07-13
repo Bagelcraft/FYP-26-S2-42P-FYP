@@ -153,10 +153,10 @@ async function main() {
   // Operations  (4 staff): Alson, Rachel, Faisal, + 1 more perm below
 
   const engineeringDept = await prisma.department.create({
-    data: { organisation_id: techCorp.organisation_id, head_user_id: pm.userId, name: 'Engineering' },
+    data: { organisation_id: techCorp.organisation_id, name: 'Engineering' },
   });
   const operationsDept = await prisma.department.create({
-    data: { organisation_id: techCorp.organisation_id, head_user_id: orgAdmin.userId, name: 'Operations' },
+    data: { organisation_id: techCorp.organisation_id, name: 'Operations' },
   });
 
   // ─── TechCorp Skills (5 skills to match OrgAdmin dashboard) ──────────────

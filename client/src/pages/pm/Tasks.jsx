@@ -185,7 +185,7 @@ const skillsOf = (t) => {
   return [];
 };
 
-const STATUS_OPTIONS = ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+const STATUS_OPTIONS = ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'SUBMITTED', 'COMPLETED', 'CANCELLED'];
 const toDateInput = (iso) => (iso ? new Date(iso).toISOString().slice(0, 10) : '');
 
 // ── Multi-select dropdown for skills ────────────────────────────────────────
@@ -248,14 +248,27 @@ function TaskModal({ task, depts, skills, shifts, onClose, onSaved }) {
         department_id: task.department_id ? String(task.department_id) : '',
         required_skill_ids: initialSkillIds,
         status: task.status,
-        due: toDateInput(task.end_datetime),
+        due: toDateInput(task.start_datetime),
+        end: toDateInput(task.end_datetime),
         shift_id: '',
         description: task.description ?? '',
       }
-    : { title: '', department_id: '', required_skill_ids: [], status: 'PENDING', due: '', shift_id: '', description: '' });
+    : { title: '', department_id: '', required_skill_ids: [], status: 'PENDING', due: '', end: '', shift_id: '', description: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [avail, setAvail] = useState({ days: [], total: 0 });
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+
+  // Per-day availability of workers matching the selected required skills.
+  useEffect(() => {
+    const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const from = new Date(); from.setHours(0, 0, 0, 0);
+    const to = new Date(from); to.setDate(to.getDate() + 20);
+    const skillParam = form.required_skill_ids.join(',');
+    api.get(`/pm/availability?from=${ymd(from)}&to=${ymd(to)}${skillParam ? `&skills=${skillParam}` : ''}`)
+      .then((r) => setAvail(r.data.data ?? { days: [], total: 0 }))
+      .catch(() => setAvail({ days: [], total: 0 }));
+  }, [form.required_skill_ids]);
   const toggleSkill = (id) => setForm((f) => {
     const s = String(id);
     const has = f.required_skill_ids.includes(s);
@@ -268,14 +281,15 @@ function TaskModal({ task, depts, skills, shifts, onClose, onSaved }) {
     e.preventDefault();
     setSaving(true); setError('');
     try {
-      const day = form.due || new Date().toISOString().slice(0, 10);
+      const startDay = form.due || new Date().toISOString().slice(0, 10);
+      const endDay   = form.end || startDay; // deadline defaults to the start day
       const startTime = selectedShift ? selectedShift.start_time : '09:00';
       const endTime   = selectedShift ? selectedShift.end_time   : '18:00';
       const body = {
         title: form.title.trim(),
         description: form.description.trim() || null,
-        start_datetime: `${day}T${startTime}:00`,
-        end_datetime:   `${day}T${endTime}:00`,
+        start_datetime: `${startDay}T${startTime}:00`,
+        end_datetime:   `${endDay}T${endTime}:00`,
         department_id: form.department_id ? Number(form.department_id) : null,
         required_skill_ids: form.required_skill_ids.map(Number),
       };
@@ -323,20 +337,49 @@ function TaskModal({ task, depts, skills, shifts, onClose, onSaved }) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Task Date *</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Start Date *</label>
               <input type="date" required value={form.due} onChange={set('due')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Shift Template</label>
-              <select value={form.shift_id} onChange={set('shift_id')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-                <option value="">— Custom (9 AM–6 PM) —</option>
-                {shifts.map((s) => (
-                  <option key={s.shift_id} value={s.shift_id}>
-                    {s.name} ({fmtShiftTime(s.start_time)} – {fmtShiftTime(s.end_time)})
-                  </option>
-                ))}
-              </select>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Deadline</label>
+              <input type="date" min={form.due || undefined} value={form.end} onChange={set('end')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              <p className="text-xs text-gray-400 mt-1">Defaults to the start date.</p>
             </div>
+          </div>
+          {avail.days.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Availability {form.required_skill_ids.length ? '(workers with the required skills)' : '(all workers)'}
+              </label>
+              <div className="flex gap-1.5 overflow-x-auto pb-1">
+                {avail.days.map((d) => {
+                  const pd = new Date(d.date + 'T00:00:00');
+                  const selected = d.date === form.due;
+                  const none = d.available === 0;
+                  return (
+                    <button type="button" key={d.date} onClick={() => setForm({ ...form, due: d.date })}
+                      title={`${d.available} of ${d.total} qualified worker(s) available`}
+                      className={`flex-shrink-0 w-12 rounded-lg border px-1 py-1.5 text-center transition-colors ${selected ? 'ring-2 ring-primary-500 border-primary-400' : 'border-gray-200 hover:border-gray-300'} ${none ? 'bg-gray-50' : 'bg-green-50'}`}>
+                      <div className="text-[10px] text-gray-400 leading-none">{pd.toLocaleDateString('en-SG', { weekday: 'short' })}</div>
+                      <div className="text-sm font-semibold text-gray-700 leading-tight">{pd.getDate()}</div>
+                      <div className={`text-[10px] font-medium leading-none ${none ? 'text-gray-400' : 'text-green-600'}`}>{d.available}/{d.total}</div>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Qualified workers available each day — click a day to set the start date.</p>
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Shift Template</label>
+            <select value={form.shift_id} onChange={set('shift_id')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <option value="">— Custom (9 AM–6 PM) —</option>
+              {shifts.map((s) => (
+                <option key={s.shift_id} value={s.shift_id}>
+                  {s.name} ({fmtShiftTime(s.start_time)} – {fmtShiftTime(s.end_time)})
+                </option>
+              ))}
+            </select>
           </div>
           {selectedShift && (
             <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-xs text-blue-700">
@@ -425,6 +468,16 @@ export default function Tasks() {
     }
   }
 
+  async function decideCompletion(t, action) {
+    try {
+      const r = await api.patch(`/pm/tasks/${t.task_id}/${action}-completion`);
+      setTasks((prev) => prev.map((x) => (x.task_id === t.task_id ? r.data.data : x)));
+      showToast(action === 'approve' ? `Approved “${t.title}”` : `Sent “${t.title}” back for rework`);
+    } catch (e) {
+      alert(e.response?.data?.message || e.message);
+    }
+  }
+
   return (
     <DashboardLayout navItems={PM_NAV} secondaryNav={PM_SECONDARY} roleLabel="Manager">
       <div className="space-y-6">
@@ -447,6 +500,7 @@ export default function Tasks() {
             <option value="PENDING">Pending</option>
             <option value="ASSIGNED">Assigned</option>
             <option value="IN_PROGRESS">In Progress</option>
+            <option value="SUBMITTED">Submitted</option>
             <option value="COMPLETED">Completed</option>
           </select>
         </div>
@@ -486,6 +540,12 @@ export default function Tasks() {
                       <td className="px-5 py-3"><Badge status={t.status} /></td>
                       <td className="px-5 py-3">
                         <div className="flex flex-wrap gap-2">
+                          {t.status === 'SUBMITTED' && (
+                            <>
+                              <button onClick={() => decideCompletion(t, 'approve')} className="text-xs font-medium text-green-600 hover:underline">Approve</button>
+                              <button onClick={() => decideCompletion(t, 'reject')} className="text-xs text-amber-600 hover:underline">Reject</button>
+                            </>
+                          )}
                           <button onClick={() => setEditingTask(t)} className="text-xs text-primary-600 hover:underline">Edit</button>
                           <button onClick={() => delTask(t)} className="text-xs text-red-500 hover:underline">Delete</button>
                           <button onClick={() => setHistoryTask(t)} className="text-xs text-gray-500 hover:underline">History</button>

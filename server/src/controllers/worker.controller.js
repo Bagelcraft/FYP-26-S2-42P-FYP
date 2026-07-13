@@ -72,6 +72,30 @@ const updateProgress = async (req, res, next) => {
   }
 };
 
+// PATCH /temp-worker/tasks/:id/submit — submit finished work for manager approval
+const submitTask = async (req, res, next) => {
+  try {
+    const data = await taskService.submitTaskCompletion(parseInt(req.params.id, 10), req.user.userId, req.user.organisationId);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
+// PATCH /temp-worker/tasks/:id/decline — decline assigned work
+const declineTask = async (req, res, next) => {
+  try {
+    const data = await taskService.declineTask(parseInt(req.params.id, 10), req.user.userId, req.user.organisationId);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
+// GET /temp-worker/hours — approved (completed) work + total hours
+const getMyHours = async (req, res, next) => {
+  try {
+    const data = await taskService.getWorkerHours(req.user.userId, req.user.organisationId);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
 // GET /temp-worker/tasks/available
 // Temp workers see PENDING tasks that match their skills (the task pool)
 const listAvailableTasks = async (req, res, next) => {
@@ -167,10 +191,34 @@ const cancelLeave = async (req, res, next) => {
   }
 };
 
+// GET /worker/leave-balance  (current-year annual + medical, self)
+const getMyLeaveBalance = async (req, res, next) => {
+  try {
+    const data = await workerService.getMyLeaveBalance(req.user.userId);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // GET /worker/schedule  (assigned shifts, today onward)
 const getMySchedule = async (req, res, next) => {
   try {
     const data = await workerService.getMySchedule(req.user.userId);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /worker/calendar?from=&to=  (self: shifts, tasks, unavailability)
+const getMyCalendar = async (req, res, next) => {
+  try {
+    const { from, to } = req.query;
+    let f, t;
+    if (from && to) { f = new Date(`${from}T00:00:00`); t = new Date(`${to}T23:59:59`); }
+    else { const n = new Date(); f = new Date(n.getFullYear(), n.getMonth(), 1); t = new Date(n.getFullYear(), n.getMonth() + 1, 0, 23, 59, 59); }
+    const data = await workerService.getMyCalendar(req.user.userId, req.user.organisationId, f, t);
     res.json({ success: true, data });
   } catch (err) {
     next(err);
@@ -183,6 +231,9 @@ module.exports = {
   getMyTask,
   acknowledge,
   updateProgress,
+  submitTask,
+  declineTask,
+  getMyHours,
   listAvailableTasks,
   progressRules,
   profileUpdateRules,
@@ -191,6 +242,8 @@ module.exports = {
   applyLeave,
   listMyLeave,
   cancelLeave,
+  getMyLeaveBalance,
   getMySchedule,
+  getMyCalendar,
 };
 

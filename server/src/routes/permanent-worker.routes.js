@@ -54,7 +54,9 @@ router.get('/shift-change-requests', shiftChangeController.listMine);
 router.post('/shift-change-request', shiftChangeController.submitRules, shiftChangeController.submitRequest);
 
 // ─── Leave (worker self-service) ──────────────────────────────
+router.get('/calendar', workerController.getMyCalendar);
 router.get('/leave', workerController.listMyLeave);
+router.get('/leave-balance', workerController.getMyLeaveBalance);
 router.post('/leave', workerController.leaveRules, workerController.applyLeave);
 router.delete('/leave/:id', workerController.cancelLeave);
 

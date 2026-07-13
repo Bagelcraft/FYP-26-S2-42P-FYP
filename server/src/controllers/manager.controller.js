@@ -68,6 +68,35 @@ const getReports = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// Parse ?from=&to= (YYYY-MM-DD); default to the current calendar month.
+function monthRange(fromQ, toQ) {
+  if (fromQ && toQ) return { from: new Date(`${fromQ}T00:00:00`), to: new Date(`${toQ}T23:59:59`) };
+  const now = new Date();
+  return {
+    from: new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0),
+    to:   new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59),
+  };
+}
+
+// GET /pm/calendar?from=&to=
+const getCalendar = async (req, res, next) => {
+  try {
+    const { from, to } = monthRange(req.query.from, req.query.to);
+    const data = await managerService.getCalendar(req.user.organisationId, from, to);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
+// GET /pm/availability?from=&to=&skills=1,2
+const getAvailability = async (req, res, next) => {
+  try {
+    const { from, to } = monthRange(req.query.from, req.query.to);
+    const skillIds = (req.query.skills ? String(req.query.skills).split(',') : []).map(Number).filter(Boolean);
+    const data = await managerService.getAvailabilityByDay(req.user.organisationId, from, to, skillIds);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
 // GET /pm/org-info
 const getOrgInfo = async (req, res, next) => {
   try {
@@ -133,7 +162,7 @@ const deleteTestimonial = async (req, res, next) => {
 };
 
 module.exports = {
-  getTeam, listLeave, decideLeave, listLeaveBalances, updateLeaveBalance, getReports,
+  getTeam, listLeave, decideLeave, listLeaveBalances, updateLeaveBalance, getReports, getCalendar, getAvailability,
   getOrgInfo, getShiftTemplates, getDepartments, getSkills,
   listTestimonials, createTestimonial, updateTestimonial, deleteTestimonial,
 };

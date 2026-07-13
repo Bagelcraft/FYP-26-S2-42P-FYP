@@ -45,6 +45,18 @@ const cancelLeave = async (userId, leaveId) => {
   await prisma.leaveRequest.delete({ where: { leave_id: leaveId } });
 };
 
+// ─── Leave balance (current year, self) ──────────────────────
+const getMyLeaveBalance = async (userId) => {
+  const year = new Date().getFullYear();
+  const rows = await prisma.leaveBalance.findMany({ where: { user_id: userId, year } });
+  const out = { year, annual: { entitled: 0, used: 0 }, medical: { entitled: 0, used: 0 } };
+  for (const b of rows) {
+    if (b.leave_type === 'ANNUAL')  out.annual  = { entitled: b.entitled_days, used: b.used_days };
+    if (b.leave_type === 'MEDICAL') out.medical = { entitled: b.entitled_days, used: b.used_days };
+  }
+  return out;
+};
+
 // ─── Schedule (assigned shifts, today onward) ─────────────────
 const getMySchedule = async (userId) => {
   const start = new Date(); start.setHours(0, 0, 0, 0);
@@ -55,10 +67,39 @@ const getMySchedule = async (userId) => {
   });
 };
 
+// ─── Calendar (self: own shifts, tasks, unavailability) ──────
+const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const getMyCalendar = async (userId, organisationId, from, to) => {
+  const [shiftRows, taskRows, unavailRows] = await Promise.all([
+    prisma.shiftAssignment.findMany({
+      where:   { user_id: userId, date: { gte: from, lte: to } },
+      include: { shift: { select: { name: true, start_time: true, end_time: true } } },
+      orderBy: { date: 'asc' },
+    }),
+    prisma.task.findMany({
+      where:   { organisation_id: organisationId, assignments: { some: { assigned_to: userId } }, OR: [{ start_datetime: { gte: from, lte: to } }, { end_datetime: { gte: from, lte: to } }] },
+      include: { department: { select: { name: true } } },
+      orderBy: { start_datetime: 'asc' },
+    }),
+    prisma.availability.findMany({
+      where:   { user_id: userId, status: { in: ['UNAVAILABLE', 'ON_LEAVE'] }, start_datetime: { lte: to }, end_datetime: { gte: from } },
+    }),
+  ]);
+  return {
+    from: ymd(from), to: ymd(to),
+    shifts:      shiftRows.map((s) => ({ date: ymd(new Date(s.date)), shiftName: s.shift.name, startTime: s.shift.start_time, endTime: s.shift.end_time })),
+    tasks:       taskRows.map((t) => ({ task_id: t.task_id, title: t.title, status: t.status, start: ymd(new Date(t.start_datetime)), end: ymd(new Date(t.end_datetime)), department: t.department?.name ?? null })),
+    unavailable: unavailRows.map((a) => ({ status: a.status, start: ymd(new Date(a.start_datetime)), end: ymd(new Date(a.end_datetime)) })),
+  };
+};
+
 module.exports = {
   updateMyProfile,
   applyLeave,
   listMyLeave,
   cancelLeave,
+  getMyLeaveBalance,
   getMySchedule,
+  getMyCalendar,
 };

@@ -75,4 +75,20 @@ const remove = async (req, res, next) => {
   }
 };
 
-module.exports = { list, getOne, create, update, remove };
+// PATCH /pm/tasks/:id/approve-completion — approve a submitted task → COMPLETED
+const approveCompletion = async (req, res, next) => {
+  try {
+    const data = await taskService.approveTaskCompletion(parseInt(req.params.id, 10), req.user.organisationId);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
+// PATCH /pm/tasks/:id/reject-completion — reject a submitted task → IN_PROGRESS
+const rejectCompletion = async (req, res, next) => {
+  try {
+    const data = await taskService.rejectTaskCompletion(parseInt(req.params.id, 10), req.user.organisationId);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
+module.exports = { list, getOne, create, update, remove, approveCompletion, rejectCompletion };

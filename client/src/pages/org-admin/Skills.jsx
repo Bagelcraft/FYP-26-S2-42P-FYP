@@ -72,6 +72,13 @@ export default function Skills() {
               className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
 
+            <label className="flex items-center gap-2 text-sm text-gray-600 whitespace-nowrap select-none">
+              <input type="checkbox" checked={certRequired}
+                onChange={(e) => setCertRequired(e.target.checked)}
+                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+              Cert required
+            </label>
+
             <button onClick={addSkill} disabled={adding}
               className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
               {adding ? 'Adding…' : 'Add Skill'}

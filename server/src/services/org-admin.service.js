@@ -42,7 +42,7 @@ async function listDepartments(organisationId) {
   return prisma.department.findMany({
     where: { organisation_id: organisationId },
     include: {
-      head: { select: { userId: true, full_name: true } },
+      roles:  { select: { role_id: true, role_name: true }, orderBy: { role_name: 'asc' } },
       _count: { select: { tasks: true } },
     },
     orderBy: { name: 'asc' },
@@ -54,9 +54,8 @@ async function createDepartment(organisationId, data) {
     data: {
       organisation_id: organisationId,
       name:            data.name,
-      head_user_id:    data.head_user_id ?? null,
     },
-    include: { head: { select: { userId: true, full_name: true } } },
+    include: { roles: { select: { role_id: true, role_name: true } }, _count: { select: { tasks: true } } },
   });
 }
 
@@ -66,10 +65,9 @@ async function updateDepartment(organisationId, deptId, data) {
   return prisma.department.update({
     where: { department_id: deptId },
     data: {
-      name:         data.name         !== undefined ? data.name         : undefined,
-      head_user_id: data.head_user_id !== undefined ? data.head_user_id : undefined,
+      name: data.name !== undefined ? data.name : undefined,
     },
-    include: { head: { select: { userId: true, full_name: true } } },
+    include: { roles: { select: { role_id: true, role_name: true } }, _count: { select: { tasks: true } } },
   });
 }
 
@@ -79,49 +77,74 @@ async function deleteDepartment(organisationId, deptId) {
   await prisma.department.delete({ where: { department_id: deptId } });
 }
 
-async function assignStaffToDept(organisationId, deptId, userId) {
-  const dept = await prisma.department.findFirst({ where: { department_id: deptId, organisation_id: organisationId } });
-  if (!dept) throw makeError('Department not found', 404);
+// ─── Staff Roles ──────────────────────────────────────────────
 
-  const user = await prisma.user.findFirst({ where: { userId, organisationId, is_active: true } });
-  if (!user) throw makeError('Staff member not found in this organisation', 404);
+const ROLE_INCLUDE = {
+  department:     { select: { department_id: true, name: true } },
+  requiredSkills: { include: { skill: { select: { skill_id: true, skill_name: true } } } },
+  _count:         { select: { users: true } },
+};
 
-  return prisma.department.update({
-    where: { department_id: deptId },
-    data:  { head_user_id: userId },
-    include: { head: { select: { userId: true, full_name: true } } },
-  });
+// Verify every skill id belongs to this organisation (422 otherwise).
+async function assertSkillsInOrg(organisationId, skillIds) {
+  if (!skillIds.length) return;
+  const count = await prisma.skill.count({ where: { skill_id: { in: skillIds }, organisation_id: organisationId } });
+  if (count !== skillIds.length) throw makeError('One or more skills do not belong to your organisation', 422);
 }
 
-// ─── Staff Roles ──────────────────────────────────────────────
+async function assertDeptInOrg(organisationId, departmentId) {
+  if (departmentId == null) return;
+  const dept = await prisma.department.findFirst({ where: { department_id: departmentId, organisation_id: organisationId } });
+  if (!dept) throw makeError('Department not found in this organisation', 404);
+}
 
 async function listRoles(organisationId) {
   return prisma.staffRole.findMany({
     where:   { organisation_id: organisationId },
-    include: { _count: { select: { users: true } } },
+    include: ROLE_INCLUDE,
     orderBy: { role_name: 'asc' },
   });
 }
 
 async function createRole(organisationId, data) {
+  await assertDeptInOrg(organisationId, data.department_id ?? null);
+  const skillIds = Array.isArray(data.skill_ids) ? [...new Set(data.skill_ids)] : [];
+  await assertSkillsInOrg(organisationId, skillIds);
   return prisma.staffRole.create({
     data: {
-      organisation_id:  organisationId,
-      role_name:        data.role_name,
+      organisation_id:   organisationId,
+      department_id:     data.department_id ?? null,
+      role_name:         data.role_name,
       max_working_hours: data.max_working_hours ?? null,
+      requiredSkills:    skillIds.length ? { create: skillIds.map((id) => ({ skill_id: id })) } : undefined,
     },
+    include: ROLE_INCLUDE,
   });
 }
 
 async function updateRole(organisationId, roleId, data) {
   const role = await prisma.staffRole.findFirst({ where: { role_id: roleId, organisation_id: organisationId } });
   if (!role) throw makeError('Staff role not found', 404);
-  return prisma.staffRole.update({
-    where: { role_id: roleId },
-    data: {
-      role_name:         data.role_name         !== undefined ? data.role_name         : undefined,
-      max_working_hours: data.max_working_hours !== undefined ? data.max_working_hours : undefined,
-    },
+  if (data.department_id !== undefined) await assertDeptInOrg(organisationId, data.department_id);
+
+  const hasSkills = data.skill_ids !== undefined;
+  const skillIds = hasSkills && Array.isArray(data.skill_ids) ? [...new Set(data.skill_ids)] : [];
+  if (hasSkills) await assertSkillsInOrg(organisationId, skillIds);
+
+  return prisma.$transaction(async (tx) => {
+    if (hasSkills) {
+      await tx.roleSkill.deleteMany({ where: { role_id: roleId } });
+      if (skillIds.length) await tx.roleSkill.createMany({ data: skillIds.map((id) => ({ role_id: roleId, skill_id: id })) });
+    }
+    return tx.staffRole.update({
+      where: { role_id: roleId },
+      data: {
+        role_name:         data.role_name         !== undefined ? data.role_name         : undefined,
+        max_working_hours: data.max_working_hours !== undefined ? data.max_working_hours : undefined,
+        department_id:     data.department_id      !== undefined ? data.department_id      : undefined,
+      },
+      include: ROLE_INCLUDE,
+    });
   });
 }
 
@@ -252,12 +275,27 @@ async function registerStaff(organisationId, data) {
   const existing = await prisma.user.findUnique({ where: { email: data.email } });
   if (existing) throw makeError('Email already in use', 409);
 
+  // Role (optional) + its required skills, which are auto-added to the employee.
+  let roleSkillIds = [];
   if (data.role_id) {
-    const role = await prisma.staffRole.findFirst({ where: { role_id: data.role_id, organisation_id: organisationId } });
+    const role = await prisma.staffRole.findFirst({
+      where: { role_id: data.role_id, organisation_id: organisationId },
+      include: { requiredSkills: { select: { skill_id: true } } },
+    });
     if (!role) throw makeError('Staff role not found in this organisation', 404);
+    roleSkillIds = role.requiredSkills.map((rs) => rs.skill_id);
   }
 
+  // Employee-selected skills (validated against the org).
+  const selectedSkillIds = Array.isArray(data.skill_ids) ? data.skill_ids : [];
+  await assertSkillsInOrg(organisationId, [...new Set(selectedSkillIds)]);
+
+  // Union of chosen skills + the role's required skills (auto-add rule).
+  const skillIds = [...new Set([...selectedSkillIds, ...roleSkillIds])];
+
   const password_hash = await bcrypt.hash(data.password || 'Password123!', 10);
+  const year = new Date().getFullYear();
+  const isPermanent = data.user_type === 'PERMANENT_WORKER';
 
   return prisma.user.create({
     data: {
@@ -268,10 +306,19 @@ async function registerStaff(organisationId, data) {
       password_hash,
       user_type:     data.user_type,
       is_active:     true,
+      skills: skillIds.length ? { create: skillIds.map((id) => ({ skill_id: id })) } : undefined,
+      // Permanent workers get a leave balance set by the org admin at registration.
+      leaveBalance: isPermanent ? {
+        create: [
+          { leave_type: 'ANNUAL',  entitled_days: Number(data.annual_entitled)  || 0, used_days: 0, year },
+          { leave_type: 'MEDICAL', entitled_days: Number(data.medical_entitled) || 0, used_days: 0, year },
+        ],
+      } : undefined,
     },
     select: {
       userId: true, full_name: true, email: true, user_type: true, is_active: true, createdAt: true,
       staffRole: { select: { role_id: true, role_name: true } },
+      skills: { include: { skill: { select: { skill_id: true, skill_name: true } } } },
     },
   });
 }
@@ -447,7 +494,7 @@ async function deleteShiftAssignment(organisationId, assignmentId) {
 
 module.exports = {
   getOrgProfile, updateOrgProfile,
-  listDepartments, createDepartment, updateDepartment, deleteDepartment, assignStaffToDept,
+  listDepartments, createDepartment, updateDepartment, deleteDepartment,
   listRoles, createRole, updateRole, deleteRole,
   listSkills, createSkill, updateSkill, deleteSkill,
   listShiftTemplates, createShiftTemplate, updateShiftTemplate, deleteShiftTemplate,
