@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
@@ -16,6 +16,9 @@ export default function Profile() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
+  const [skills, setSkills] = useState([]);
+
+  useEffect(() => { api.get('/temp-worker/skills').then((r) => setSkills(r.data.data ?? [])).catch(() => {}); }, []);
 
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 3000); };
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
@@ -118,14 +121,22 @@ export default function Profile() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Requested new value *</label>
-                <input
-                  required
-                  value={form.requested_value}
-                  onChange={set('requested_value')}
-                  placeholder={form.field === 'Skills' ? 'e.g. Add Python, Remove React' : 'Enter the new value'}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
+                <label className="block text-xs font-medium text-gray-600 mb-1">{form.field === 'Skills' ? 'Skill to add *' : 'Requested new value *'}</label>
+                {form.field === 'Skills' ? (
+                  <select required value={form.requested_value} onChange={set('requested_value')}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                    <option value="">— Select a skill —</option>
+                    {skills.map((s) => <option key={s.skill_id} value={s.skill_name}>{s.skill_name}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    required
+                    value={form.requested_value}
+                    onChange={set('requested_value')}
+                    placeholder="Enter the new value"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Reason (optional)</label>

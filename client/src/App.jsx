@@ -55,7 +55,6 @@ import WorkerProfile from './pages/worker/Profile';
 import TempWorkerDashboard from './pages/temp-worker/TempWorkerDashboard';
 import TempMyTasks from './pages/temp-worker/MyTasks';
 import TempSchedule from './pages/temp-worker/Schedule';
-import TempLeave from './pages/temp-worker/Leave';
 import TempNotifications from './pages/temp-worker/Notifications';
 import TempProfile from './pages/temp-worker/Profile';
 
@@ -119,7 +118,6 @@ export default function App() {
           <Route path="/temp-worker" element={<TempWorkerDashboard />} />
           <Route path="/temp-worker/tasks" element={<TempMyTasks />} />
           <Route path="/temp-worker/schedule" element={<TempSchedule />} />
-          <Route path="/temp-worker/leave" element={<TempLeave />} />
           <Route path="/temp-worker/notifications" element={<TempNotifications />} />
           <Route path="/temp-worker/profile" element={<TempProfile />} />
         </Routes>

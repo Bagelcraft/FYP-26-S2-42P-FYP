@@ -135,7 +135,7 @@ export default function AdminLandingContent() {
                   <label className={labelCls}>Subheadline</label>
                   <textarea className={inputCls} rows={3} value={hero.hero_subtitle} onChange={(e) => setHero((p) => ({ ...p, hero_subtitle: e.target.value }))} placeholder="Your workforce, intelligently managed..." />
                 </div>
-                <button type="submit" className={saveBtnCls}>Save Hero</button>
+                <button type="submit" className={saveBtnCls}>Save Headline</button>
               </form>
             )}
 

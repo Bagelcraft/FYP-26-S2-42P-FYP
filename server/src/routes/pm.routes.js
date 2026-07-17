@@ -5,6 +5,7 @@ const { requireRole } = require('../middleware/rbac.middleware');
 const taskController = require('../controllers/task.controller');
 const allocationController = require('../controllers/allocation.controller');
 const managerController = require('../controllers/manager.controller');
+const updateRequestController = require('../controllers/task-update-request.controller');
 
 const router = express.Router();
 
@@ -89,6 +90,11 @@ router.get('/tasks/:id/eligible-staff', allocationController.getEligibleStaff);
 router.post('/tasks/:id/assign',      allocationController.assignBodyRules, allocationController.manualAssign);
 router.post('/tasks/:id/reallocate',  allocationController.assignBodyRules, allocationController.reallocate);
 router.post('/tasks/:id/auto-allocate', allocationController.autoAllocate);
+router.get('/tasks/:id/allocation-history', allocationController.getHistory);
+
+// Task update requests (manager → worker "please update"): create + list
+router.post('/tasks/:id/update-requests', updateRequestController.createRules, updateRequestController.create);
+router.get('/tasks/:id/update-requests',  updateRequestController.list);
 
 // Completion approval (freelancer flow): approve/reject a SUBMITTED task
 router.patch('/tasks/:id/approve-completion', taskController.approveCompletion);

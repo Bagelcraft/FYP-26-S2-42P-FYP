@@ -68,7 +68,9 @@ export default function Reports() {
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <h3 className="font-semibold text-gray-800">Working Hours — This Week</h3>
                 <button onClick={() => downloadCsv(perStaff)} disabled={perStaff.length === 0}
-                  className="text-sm text-primary-600 hover:underline disabled:opacity-40">Export CSV</button>
+                  className="inline-flex items-center gap-1.5 text-sm font-medium bg-primary-600 hover:bg-primary-700 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg transition-colors">
+                  ⬇ Export CSV
+                </button>
               </div>
               <table className="w-full text-sm">
                 <thead>

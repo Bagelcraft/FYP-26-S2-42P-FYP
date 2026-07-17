@@ -149,7 +149,6 @@ export default function TempWorkerDashboard() {
                 {[
                   { label: 'My Tasks', to: '/temp-worker/tasks' },
                   { label: 'My Schedule', to: '/temp-worker/schedule' },
-                  { label: 'Request Leave', to: '/temp-worker/leave' },
                 ].map((a) => (
                   <Link key={a.label} to={a.to} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-blue-50 text-blue-700 hover:bg-blue-100">
                     {a.label}

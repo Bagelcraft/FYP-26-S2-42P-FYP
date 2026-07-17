@@ -48,9 +48,7 @@ router.post('/profile', (req, res) => {
 // POST /temp-worker/profile/change-request
 router.post('/profile/change-request', profileChangeController.submitRules, profileChangeController.submitRequest);
 
-router.put('/skills', (req, res) => {
-  res.json({ message: 'Update skills — to be implemented' });
-});
+router.get('/skills', workerController.listOrgSkills);
 
 // Freelancer hours — approved (completed) work + total hours (replaces clock in/out)
 router.get('/hours', workerController.getMyHours);
@@ -62,9 +60,6 @@ router.get('/schedule', workerController.getMySchedule);
 router.get('/shift-change-requests', shiftChangeController.listMine);
 router.post('/shift-change-request', shiftChangeController.submitRules, shiftChangeController.submitRequest);
 
-// ─── Leave (worker self-service) ──────────────────────────────
-router.get('/leave', workerController.listMyLeave);
-router.post('/leave', workerController.leaveRules, workerController.applyLeave);
-router.delete('/leave/:id', workerController.cancelLeave);
+// Note: temporary workers (freelancers) have no leave entitlement — no leave routes.
 
 module.exports = router;

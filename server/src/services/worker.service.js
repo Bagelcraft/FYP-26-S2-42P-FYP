@@ -45,6 +45,10 @@ const cancelLeave = async (userId, leaveId) => {
   await prisma.leaveRequest.delete({ where: { leave_id: leaveId } });
 };
 
+// ─── Org skill catalogue (for the profile change-request dropdown) ──
+const listOrgSkills = async (organisationId) =>
+  prisma.skill.findMany({ where: { organisation_id: organisationId }, select: { skill_id: true, skill_name: true }, orderBy: { skill_name: 'asc' } });
+
 // ─── Leave balance (current year, self) ──────────────────────
 const getMyLeaveBalance = async (userId) => {
   const year = new Date().getFullYear();
@@ -102,4 +106,5 @@ module.exports = {
   getMyLeaveBalance,
   getMySchedule,
   getMyCalendar,
+  listOrgSkills,
 };

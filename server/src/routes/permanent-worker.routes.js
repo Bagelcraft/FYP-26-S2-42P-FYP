@@ -42,9 +42,7 @@ router.get('/profile', (req, res) => {
 // POST /worker/profile/change-request
 router.post('/profile/change-request', profileChangeController.submitRules, profileChangeController.submitRequest);
 
-router.get('/skills', (req, res) => {
-  res.json({ message: 'Get skills — to be implemented' });
-});
+router.get('/skills', workerController.listOrgSkills);
 
 // ─── Schedule (assigned shifts) ───────────────────────────────
 router.get('/schedule', workerController.getMySchedule);
