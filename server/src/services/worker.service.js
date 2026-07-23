@@ -45,6 +45,16 @@ const cancelLeave = async (userId, leaveId) => {
   await prisma.leaveRequest.delete({ where: { leave_id: leaveId } });
 };
 
+// ─── Worker's own assigned skills (read-only view on their profile) ──
+const getMySkills = async (userId) => {
+  const rows = await prisma.userSkill.findMany({
+    where:   { user_id: userId },
+    include: { skill: { select: { skill_id: true, skill_name: true, cert_required: true } } },
+    orderBy: { skill: { skill_name: 'asc' } },
+  });
+  return rows.map((r) => r.skill);
+};
+
 // ─── Org skill catalogue (for the profile change-request dropdown) ──
 const listOrgSkills = async (organisationId) =>
   prisma.skill.findMany({ where: { organisation_id: organisationId }, select: { skill_id: true, skill_name: true }, orderBy: { skill_name: 'asc' } });
@@ -106,5 +116,6 @@ module.exports = {
   getMyLeaveBalance,
   getMySchedule,
   getMyCalendar,
+  getMySkills,
   listOrgSkills,
 };

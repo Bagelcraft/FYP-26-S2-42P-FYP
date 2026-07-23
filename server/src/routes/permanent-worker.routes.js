@@ -4,6 +4,7 @@ const { requireRole } = require('../middleware/rbac.middleware');
 const workerController = require('../controllers/worker.controller');
 const updateRequestController = require('../controllers/task-update-request.controller');
 const attendanceController = require('../controllers/attendance.controller');
+const availabilityController = require('../controllers/availability.controller');
 const profileChangeController = require('../controllers/profileChangeRequest.controller');
 const shiftChangeController = require('../controllers/shiftChangeRequest.controller');
 
@@ -42,7 +43,13 @@ router.get('/profile', (req, res) => {
 // POST /worker/profile/change-request
 router.post('/profile/change-request', profileChangeController.submitRules, profileChangeController.submitRequest);
 
-router.get('/skills', workerController.listOrgSkills);
+router.get('/skills', workerController.getMySkills);
+
+// ─── Availability (time-slot based) ──────────────────────────
+router.get('/availability',        availabilityController.getAvailability);
+router.post('/availability',       availabilityController.availabilityRules, availabilityController.setAvailability);
+router.patch('/availability/:id',  availabilityController.availabilityRules, availabilityController.updateAvailability);
+router.delete('/availability/:id', availabilityController.removeAvailability);
 
 // ─── Schedule (assigned shifts) ───────────────────────────────
 router.get('/schedule', workerController.getMySchedule);

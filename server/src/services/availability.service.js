@@ -13,12 +13,25 @@ const listAvailability = async (userId) => {
   });
 };
 
+async function checkOverlap(userId, start, end, excludeId = null) {
+  const overlap = await prisma.availability.findFirst({
+    where: {
+      user_id: userId,
+      ...(excludeId && { NOT: { availability_id: excludeId } }),
+      start_datetime: { lt: end },
+      end_datetime:   { gt: start },
+    },
+  });
+  if (overlap) throw makeError('This slot overlaps with an existing availability slot', 409);
+}
+
 const createAvailability = async (userId, { start_datetime, end_datetime, status = 'AVAILABLE' }) => {
   const start = new Date(start_datetime);
   const end = new Date(end_datetime);
   if (start >= end) {
     throw makeError('start_datetime must be before end_datetime', 400);
   }
+  await checkOverlap(userId, start, end);
   return prisma.availability.create({
     data: {
       user_id: userId,
@@ -38,6 +51,7 @@ const updateAvailability = async (availabilityId, userId, { start_datetime, end_
   const start = new Date(start_datetime);
   const end = new Date(end_datetime);
   if (start >= end) throw makeError('start_datetime must be before end_datetime', 400);
+  await checkOverlap(userId, start, end, availabilityId);
   return prisma.availability.update({
     where: { availability_id: availabilityId },
     data: { start_datetime: start, end_datetime: end, ...(status && { status }) },

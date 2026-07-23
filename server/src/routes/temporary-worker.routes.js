@@ -48,7 +48,7 @@ router.post('/profile', (req, res) => {
 // POST /temp-worker/profile/change-request
 router.post('/profile/change-request', profileChangeController.submitRules, profileChangeController.submitRequest);
 
-router.get('/skills', workerController.listOrgSkills);
+router.get('/skills', workerController.getMySkills);
 
 // Freelancer hours — approved (completed) work + total hours (replaces clock in/out)
 router.get('/hours', workerController.getMyHours);

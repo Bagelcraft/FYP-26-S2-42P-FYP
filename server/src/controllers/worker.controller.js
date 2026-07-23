@@ -191,7 +191,15 @@ const cancelLeave = async (req, res, next) => {
   }
 };
 
-// GET /worker/skills | /temp-worker/skills — the org skill catalogue (read-only)
+// GET /worker/skills | /temp-worker/skills — skills assigned to this worker (read-only)
+const getMySkills = async (req, res, next) => {
+  try {
+    const data = await workerService.getMySkills(req.user.userId);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
+// GET /worker/org-skills — the org catalogue (used by profile change-request dropdowns)
 const listOrgSkills = async (req, res, next) => {
   try {
     const data = await workerService.listOrgSkills(req.user.organisationId);
@@ -250,6 +258,7 @@ module.exports = {
   applyLeave,
   listMyLeave,
   cancelLeave,
+  getMySkills,
   listOrgSkills,
   getMyLeaveBalance,
   getMySchedule,

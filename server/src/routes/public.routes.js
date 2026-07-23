@@ -66,4 +66,59 @@ router.post('/organisations/register', async (req, res) => {
   }
 });
 
+// POST /api/v1/public/organisations/:id/subscription
+// Records a subscription plan choice against an existing organisation.
+// Called from the onboarding wizard after the admin's account is approved.
+router.post('/organisations/:id/subscription', async (req, res, next) => {
+  try {
+    const orgId = parseInt(req.params.id, 10);
+    const { plan_id } = req.body;
+
+    if (!plan_id) {
+      return res.status(400).json({ success: false, message: 'plan_id is required' });
+    }
+
+    const [org, plan] = await Promise.all([
+      prisma.organisation.findUnique({ where: { organisation_id: orgId } }),
+      prisma.subscriptionPlan.findFirst({ where: { plan_id: parseInt(plan_id, 10), is_active: true } }),
+    ]);
+
+    if (!org)  return res.status(404).json({ success: false, message: 'Organisation not found' });
+    if (!plan) return res.status(404).json({ success: false, message: 'Plan not found or inactive' });
+
+    const start_date = new Date();
+    const end_date   = new Date(start_date);
+    end_date.setFullYear(end_date.getFullYear() + 1);
+
+    const sub = await prisma.$transaction(async (tx) => {
+      const created = await tx.subscription.create({
+        data: {
+          organisation_id: orgId,
+          amount:     plan.price_monthly,
+          start_date,
+          end_date,
+          status:     'ACTIVE',
+        },
+      });
+      await tx.organisation.update({
+        where: { organisation_id: orgId },
+        data:  { active_subscription_id: created.subscription_id },
+      });
+      return created;
+    });
+
+    res.json({
+      success: true,
+      data: {
+        subscription_id: sub.subscription_id,
+        plan:            plan.name,
+        amount:          Number(plan.price_monthly),
+        status:          sub.status,
+        start_date:      sub.start_date,
+        end_date:        sub.end_date,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
