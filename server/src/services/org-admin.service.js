@@ -168,7 +168,7 @@ async function listSkills(organisationId) {
 
 async function createSkill(organisationId, data) {
   const existing = await prisma.skill.findFirst({
-    where: { organisation_id: organisationId, skill_name: { equals: data.skill_name } },
+    where: { organisation_id: organisationId, skill_name: { equals: data.skill_name, mode: 'insensitive' } },
   });
   if (existing) throw makeError('A skill with that name already exists', 409);
   return prisma.skill.create({
@@ -209,7 +209,7 @@ async function listShiftTemplates(organisationId) {
 
 async function createShiftTemplate(organisationId, data) {
   const existing = await prisma.shiftTemplate.findFirst({
-    where: { organisation_id: organisationId, name: { equals: data.name } },
+    where: { organisation_id: organisationId, name: { equals: data.name, mode: 'insensitive' } },
   });
   if (existing) throw makeError('A shift with that name already exists', 409);
   return prisma.shiftTemplate.create({
@@ -250,8 +250,8 @@ async function listStaff(organisationId, filters = {}) {
     ...(filters.user_type ? { user_type: filters.user_type } : {}),
     ...(filters.search ? {
       OR: [
-        { full_name: { contains: filters.search } },
-        { email:     { contains: filters.search } },
+        { full_name: { contains: filters.search, mode: 'insensitive' } },
+        { email:     { contains: filters.search, mode: 'insensitive' } },
       ],
     } : {}),
   };
