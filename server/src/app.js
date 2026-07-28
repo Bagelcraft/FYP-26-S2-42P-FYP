@@ -25,7 +25,17 @@ app.use(helmet({
     },
   },
 }));
-app.use(cors({ origin: process.env.CLIENT_URL || /^http:\/\/localhost:\d+$/ }));
+// Allow the configured client URL, any Vercel deployment (prod + previews), and localhost.
+const allowedOrigins = (process.env.CLIENT_URL || '').split(',').map((s) => s.trim()).filter(Boolean);
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);                       // curl / same-origin / server-to-server
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    if (/\.vercel\.app$/.test(origin)) return cb(null, true); // Vercel production + preview URLs
+    if (/^http:\/\/localhost:\d+$/.test(origin)) return cb(null, true);
+    return cb(new Error('Not allowed by CORS'));
+  },
+}));
 app.use(express.json());
 
 app.get('/api/health', (req, res) => {
