@@ -18,29 +18,6 @@ export default function Login() {
     TEMPORARY_WORKER: '/temp-worker',
   };
 
-  // Test accounts (Appendix A) — all share the password below. These accounts
-  // own the seeded demo/test data; a normally-registered org sees a clean slate.
-  const TEST_PASSWORD = 'Passw0rd!';
-  const TEST_USERS = [
-    { label: 'System Admin',       icon: '🛡️', email: 'sysadmin@sta.test' },
-    { label: 'Org Admin · Acme',   icon: '🏢', email: 'admin@acme.test' },
-    { label: 'Manager · Acme',     icon: '📋', email: 'pm@acme.test' },
-    { label: 'Permanent Employee', icon: '👷', email: 'perm@acme.test' },
-    { label: 'Temporary Employee', icon: '🔧', email: 'temp@acme.test' },
-    { label: 'Org Admin · Globex', icon: '🏬', email: 'admin@globex.test' },
-  ];
-
-  const quickLogin = async (u) => {
-    setError('');
-    try {
-      const { data } = await api.post('/auth/login', { email: u.email, password: TEST_PASSWORD });
-      login(data.user, data.token);
-      navigate(roleRedirects[data.user.user_type] ?? '/');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Quick login failed — run "npm run seed:test" to create the test accounts.');
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -127,32 +104,6 @@ export default function Login() {
             </Link>
           </p>
         </div>
-
-        {/* Test-account quick access — shown in local dev, hidden on the live
-            site by default. Set VITE_SHOW_TEST_LOGIN=true to re-enable it. */}
-        {(import.meta.env.DEV || import.meta.env.VITE_SHOW_TEST_LOGIN === 'true') && (
-          <div className="mt-4 rounded-xl border border-dashed border-yellow-300 bg-yellow-50 p-4">
-            <p className="text-xs font-semibold text-yellow-700 uppercase tracking-wide mb-3">
-              Test accounts · password {TEST_PASSWORD}
-            </p>
-            <div className="grid grid-cols-1 gap-2">
-              {TEST_USERS.map((u) => (
-                <button
-                  key={u.email}
-                  onClick={() => quickLogin(u)}
-                  className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg bg-white border border-yellow-200 hover:border-yellow-400 hover:bg-yellow-50 transition-colors text-left"
-                >
-                  <span className="text-lg">{u.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800">{u.label}</p>
-                    <p className="text-xs text-gray-400 truncate">{u.email}</p>
-                  </div>
-                  <span className="text-xs text-yellow-600 font-medium">Enter →</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
       </div>
     </div>
