@@ -86,6 +86,8 @@ model Organisation {
   active_subscription_id Int?     @unique
   name                   String   @db.VarChar(150)
   isActive               Boolean  @default(true)
+  // Month the leave / financial year starts in (1 = Jan … 12 = Dec). Drives leave proration.
+  fiscal_year_start_month Int     @default(1)
   createdAt              DateTime @default(now())
 
   activeSubscription Subscription?  @relation("ActiveSubscription", fields: [active_subscription_id], references: [subscription_id])
@@ -161,6 +163,7 @@ model User {
   password_hash  String    @db.VarChar(255)
   user_type      UserType
   is_active      Boolean   @default(true)
+  join_date      DateTime? @db.Date
   createdAt      DateTime  @default(now())
   lastLogin      DateTime?
 

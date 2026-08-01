@@ -16,6 +16,7 @@ async function getOrgProfile(organisationId) {
       organisation_id:  true,
       name:             true,
       isActive:         true,
+      fiscal_year_start_month: true,
       createdAt:        true,
       activeSubscription: {
         select: { subscription_id: true, status: true, start_date: true, end_date: true, amount: true },
@@ -29,10 +30,13 @@ async function getOrgProfile(organisationId) {
 async function updateOrgProfile(organisationId, data) {
   const org = await prisma.organisation.findUnique({ where: { organisation_id: organisationId } });
   if (!org) throw makeError('Organisation not found', 404);
+  const update = {};
+  if (data.name !== undefined) update.name = data.name;
+  if (data.fiscal_year_start_month !== undefined) update.fiscal_year_start_month = Number(data.fiscal_year_start_month);
   return prisma.organisation.update({
     where: { organisation_id: organisationId },
-    data:  { name: data.name },
-    select: { organisation_id: true, name: true, isActive: true, createdAt: true },
+    data:  update,
+    select: { organisation_id: true, name: true, isActive: true, fiscal_year_start_month: true, createdAt: true },
   });
 }
 
@@ -294,8 +298,29 @@ async function registerStaff(organisationId, data) {
   const skillIds = [...new Set([...selectedSkillIds, ...roleSkillIds])];
 
   const password_hash = await bcrypt.hash(data.password || 'Password123!', 10);
-  const year = new Date().getFullYear();
+  const now = new Date();
+  const year = now.getFullYear();
   const isPermanent = data.user_type === 'PERMANENT_WORKER';
+
+  // Employee's join date (defaults to today) and the org's financial-year start month.
+  const joinDate = data.join_date ? new Date(data.join_date) : now;
+  if (isNaN(joinDate)) throw makeError('Invalid join date', 400);
+  const org = await prisma.organisation.findUnique({
+    where: { organisation_id: organisationId },
+    select: { fiscal_year_start_month: true },
+  });
+  const fiscalStart = (org?.fiscal_year_start_month || 1) - 1;  // 0-indexed month
+
+  // Prorate leave for staff who join mid financial cycle. Entitlement is scaled by
+  // the whole months remaining in the cycle, inclusive of the join month, measured
+  // from the org's financial-year start (Jan-start → join Jul = 6/12; Apr-start →
+  // join Jul = 9/12).
+  const monthsElapsed   = ((joinDate.getMonth() - fiscalStart) + 12) % 12;  // 0-11
+  const monthsRemaining = 12 - monthsElapsed;                                // 1-12
+  const prorate = data.prorate_leave === true || data.prorate_leave === 'true';
+  const proratedDays = (full) => Math.round(((Number(full) || 0) * monthsRemaining) / 12);
+  const annualEntitled  = prorate ? proratedDays(data.annual_entitled)  : (Number(data.annual_entitled)  || 0);
+  const medicalEntitled = prorate ? proratedDays(data.medical_entitled) : (Number(data.medical_entitled) || 0);
 
   return prisma.user.create({
     data: {
@@ -306,12 +331,13 @@ async function registerStaff(organisationId, data) {
       password_hash,
       user_type:     data.user_type,
       is_active:     true,
+      join_date:     joinDate,
       skills: skillIds.length ? { create: skillIds.map((id) => ({ skill_id: id })) } : undefined,
       // Permanent workers get a leave balance set by the org admin at registration.
       leaveBalance: isPermanent ? {
         create: [
-          { leave_type: 'ANNUAL',  entitled_days: Number(data.annual_entitled)  || 0, used_days: 0, year },
-          { leave_type: 'MEDICAL', entitled_days: Number(data.medical_entitled) || 0, used_days: 0, year },
+          { leave_type: 'ANNUAL',  entitled_days: annualEntitled,  used_days: 0, year },
+          { leave_type: 'MEDICAL', entitled_days: medicalEntitled, used_days: 0, year },
         ],
       } : undefined,
     },
@@ -492,13 +518,68 @@ async function deleteShiftAssignment(organisationId, assignmentId) {
   await prisma.shiftAssignment.delete({ where: { assignment_id: assignmentId } });
 }
 
+// Bulk / recurring roster: one shift template applied to many staff on the chosen
+// weekdays across a date range (i.e. "reflected each week" for that range).
+// weekdays use JS getUTCDay() values: 0=Sun … 6=Sat.
+const ymdUTC = (d) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+
+async function bulkCreateShiftAssignments(organisationId, data) {
+  const userIds  = [...new Set((data.user_ids || []).map(Number))].filter((n) => Number.isInteger(n) && n > 0);
+  const weekdays = [...new Set((data.weekdays  || []).map(Number))].filter((n) => n >= 0 && n <= 6);
+  const shiftId  = Number(data.shift_id);
+  if (!userIds.length)  throw makeError('Select at least one employee', 400);
+  if (!weekdays.length) throw makeError('Select at least one working day', 400);
+
+  const from = new Date(data.from); // date-only ISO → UTC midnight
+  const to   = new Date(data.to);
+  if (isNaN(from) || isNaN(to)) throw makeError('Invalid date range', 400);
+  if (to < from) throw makeError('End date must be on or after the start date', 400);
+
+  const users = await prisma.user.findMany({ where: { userId: { in: userIds }, organisationId }, select: { userId: true } });
+  if (users.length !== userIds.length) throw makeError('One or more staff not found in this organisation', 404);
+  const shift = await prisma.shiftTemplate.findFirst({ where: { shift_id: shiftId, organisation_id: organisationId } });
+  if (!shift) throw makeError('Shift template not found in this organisation', 404);
+
+  // Enumerate matching dates (capped to ~1 year to avoid runaway ranges).
+  const dates = [];
+  const cur = new Date(from);
+  let guard = 0;
+  while (cur <= to && guard++ < 400) {
+    if (weekdays.includes(cur.getUTCDay())) dates.push(new Date(cur));
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+  if (!dates.length) throw makeError('No matching working days in the selected range', 400);
+
+  // Skip rows that already exist (same user + shift + date).
+  const existing = await prisma.shiftAssignment.findMany({
+    where: { organisation_id: organisationId, shift_id: shiftId, user_id: { in: userIds }, date: { gte: dates[0], lte: dates[dates.length - 1] } },
+    select: { user_id: true, date: true },
+  });
+  const seen = new Set(existing.map((e) => `${e.user_id}|${ymdUTC(new Date(e.date))}`));
+
+  const rows = [];
+  for (const uid of userIds) {
+    for (const d of dates) {
+      const key = `${uid}|${ymdUTC(d)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rows.push({ organisation_id: organisationId, user_id: uid, shift_id: shiftId, date: d });
+    }
+  }
+
+  let created = 0;
+  if (rows.length) created = (await prisma.shiftAssignment.createMany({ data: rows })).count;
+  const requested = userIds.length * dates.length;
+  return { created, skipped: requested - created, employees: userIds.length, days: dates.length };
+}
+
 module.exports = {
   getOrgProfile, updateOrgProfile,
   listDepartments, createDepartment, updateDepartment, deleteDepartment,
   listRoles, createRole, updateRole, deleteRole,
   listSkills, createSkill, updateSkill, deleteSkill,
   listShiftTemplates, createShiftTemplate, updateShiftTemplate, deleteShiftTemplate,
-  listShiftAssignments, createShiftAssignment, deleteShiftAssignment,
+  listShiftAssignments, createShiftAssignment, bulkCreateShiftAssignments, deleteShiftAssignment,
   listStaff, registerStaff, updateStaff, deactivateStaff, reactivateStaff,
   assignSkillToStaff, removeSkillFromStaff,
   getSubscription, listBilling, renewSubscription, cancelSubscription,

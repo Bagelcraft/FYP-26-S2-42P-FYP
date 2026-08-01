@@ -13,6 +13,12 @@ function fmt(time) {
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-SG', { weekday: 'short', day: '2-digit', month: 'short' }) : '—');
 
 const EMPTY = { name: '', start_time: '', end_time: '' };
+// getDay() values: Sun=0 … Sat=6. Rostering weeks start Monday.
+const WEEKDAYS = [
+  { v: 1, label: 'Mon' }, { v: 2, label: 'Tue' }, { v: 3, label: 'Wed' },
+  { v: 4, label: 'Thu' }, { v: 5, label: 'Fri' }, { v: 6, label: 'Sat' }, { v: 0, label: 'Sun' },
+];
+const EMPTY_BULK = { user_ids: [], shift_id: '', weekdays: [1, 2, 3, 4, 5], from: '', to: '' };
 
 export default function Shifts() {
   const [shifts, setShifts]   = useState([]);
@@ -27,6 +33,9 @@ export default function Shifts() {
   const [formError, setFormError] = useState('');
   const [assignForm, setAssignForm] = useState({ user_id: '', shift_id: '', date: '' });
   const [assigning, setAssigning]   = useState(false);
+  const [assignMode, setAssignMode] = useState('single'); // 'single' | 'recurring'
+  const [bulkForm, setBulkForm]     = useState(EMPTY_BULK);
+  const [bulkMsg, setBulkMsg]       = useState('');
 
   function load() {
     setLoading(true);
@@ -82,6 +91,39 @@ export default function Shifts() {
       });
       setAssignments((prev) => [...prev, r.data.data].sort((a, b) => new Date(a.date) - new Date(b.date)));
       setAssignForm({ user_id: '', shift_id: '', date: '' });
+    } catch (e) {
+      setError(e.response?.data?.message || e.response?.data?.errors?.[0]?.msg || e.message);
+    } finally { setAssigning(false); }
+  }
+
+  function toggleBulk(key, value) {
+    setBulkForm((f) => {
+      const set = new Set(f[key]);
+      set.has(value) ? set.delete(value) : set.add(value);
+      return { ...f, [key]: [...set] };
+    });
+  }
+
+  async function handleBulkAssign(e) {
+    e.preventDefault();
+    setBulkMsg(''); setError('');
+    if (!bulkForm.user_ids.length) { setError('Select at least one employee.'); return; }
+    if (!bulkForm.weekdays.length) { setError('Select at least one working day.'); return; }
+    setAssigning(true);
+    try {
+      const r = await api.post('/org-admin/shift-assignments/bulk', {
+        user_ids: bulkForm.user_ids.map(Number),
+        shift_id: Number(bulkForm.shift_id),
+        weekdays: bulkForm.weekdays.map(Number),
+        from: bulkForm.from,
+        to: bulkForm.to,
+      });
+      const { created, skipped, employees, days } = r.data.data;
+      setBulkMsg(`Rostered ${created} shift${created === 1 ? '' : 's'} (${employees} staff × ${days} day${days === 1 ? '' : 's'})${skipped ? `, ${skipped} already existed` : ''}.`);
+      setBulkForm({ ...EMPTY_BULK, shift_id: bulkForm.shift_id });
+      // Refresh the roster table.
+      const as = await api.get('/org-admin/shift-assignments');
+      setAssignments(as.data.data);
     } catch (e) {
       setError(e.response?.data?.message || e.response?.data?.errors?.[0]?.msg || e.message);
     } finally { setAssigning(false); }
@@ -150,7 +192,87 @@ export default function Shifts() {
 
         {/* Roster: assign staff to shifts */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-100"><h3 className="text-sm font-semibold text-gray-800">Roster — Assign Staff to Shifts</h3></div>
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-gray-800">Roster — Assign Staff to Shifts</h3>
+            <div className="inline-flex rounded-lg border border-gray-200 p-0.5 text-xs">
+              <button type="button" onClick={() => { setAssignMode('single'); setBulkMsg(''); }}
+                className={`px-3 py-1 rounded-md transition-colors ${assignMode === 'single' ? 'bg-primary-600 text-white' : 'text-gray-600 hover:text-gray-800'}`}>Single day</button>
+              <button type="button" onClick={() => { setAssignMode('recurring'); setError(''); }}
+                className={`px-3 py-1 rounded-md transition-colors ${assignMode === 'recurring' ? 'bg-primary-600 text-white' : 'text-gray-600 hover:text-gray-800'}`}>Recurring / bulk</button>
+            </div>
+          </div>
+
+          {bulkMsg && <div className="mx-5 mt-4 px-4 py-2.5 bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg">{bulkMsg}</div>}
+
+          {assignMode === 'recurring' && (
+            <form onSubmit={handleBulkAssign} className="px-5 py-4 space-y-4 border-b border-gray-50">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1.5">Employees</label>
+                  <div className="max-h-36 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
+                    {staff.length === 0 && <p className="text-xs text-gray-400 px-1 py-1">No staff yet.</p>}
+                    {staff.map((s) => (
+                      <label key={s.userId} className="flex items-center gap-2 text-sm text-gray-700 px-1 py-0.5 hover:bg-gray-50 rounded cursor-pointer">
+                        <input type="checkbox" checked={bulkForm.user_ids.includes(s.userId)} onChange={() => toggleBulk('user_ids', s.userId)}
+                          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                        {s.full_name}
+                      </label>
+                    ))}
+                  </div>
+                  {staff.length > 0 && (
+                    <div className="mt-1.5 flex gap-3 text-xs">
+                      <button type="button" onClick={() => setBulkForm((f) => ({ ...f, user_ids: staff.map((s) => s.userId) }))} className="text-primary-600 hover:underline">Select all</button>
+                      <button type="button" onClick={() => setBulkForm((f) => ({ ...f, user_ids: [] }))} className="text-gray-500 hover:underline">Clear</button>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Shift</label>
+                    <select required value={bulkForm.shift_id} onChange={(e) => setBulkForm({ ...bulkForm, shift_id: e.target.value })}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                      <option value="">— Select —</option>
+                      {shifts.map((s) => <option key={s.shift_id} value={s.shift_id}>{s.name} ({fmt(s.start_time)}–{fmt(s.end_time)})</option>)}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">From</label>
+                      <input required type="date" value={bulkForm.from} onChange={(e) => setBulkForm({ ...bulkForm, from: e.target.value })}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">To</label>
+                      <input required type="date" value={bulkForm.to} min={bulkForm.from || undefined} onChange={(e) => setBulkForm({ ...bulkForm, to: e.target.value })}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Working days (applied every week in the range)</label>
+                <div className="flex flex-wrap gap-2">
+                  {WEEKDAYS.map((d) => {
+                    const on = bulkForm.weekdays.includes(d.v);
+                    return (
+                      <button key={d.v} type="button" onClick={() => toggleBulk('weekdays', d.v)}
+                        className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${on ? 'bg-primary-600 border-primary-600 text-white' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                        {d.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button type="submit" disabled={assigning}
+                  className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors">
+                  {assigning ? 'Rostering…' : 'Roster shifts'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {assignMode === 'single' && (
           <form onSubmit={handleAssign} className="px-5 py-4 flex flex-wrap items-end gap-3 border-b border-gray-50">
             <div className="flex-1 min-w-[160px]">
               <label className="block text-xs font-medium text-gray-600 mb-1">Employee</label>
@@ -178,6 +300,7 @@ export default function Shifts() {
               {assigning ? 'Assigning…' : 'Assign'}
             </button>
           </form>
+          )}
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">

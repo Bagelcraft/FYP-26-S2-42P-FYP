@@ -52,6 +52,7 @@ router.delete('/shifts/:id', c.deleteShift);
 // ─── Shift Assignments (roster) ───────────────────────────────
 router.get('/shift-assignments',        c.listShiftAssignments);
 router.post('/shift-assignments',       c.shiftAssignRules, c.validate, c.createShiftAssignment);
+router.post('/shift-assignments/bulk',  c.shiftBulkAssignRules, c.validate, c.bulkCreateShiftAssignments);
 router.delete('/shift-assignments/:id', c.deleteShiftAssignment);
 
 // ─── Shift-change requests (review) ───────────────────────────

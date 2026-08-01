@@ -340,7 +340,7 @@ async function main() {
   const buildTechSub = await prisma.subscription.create({
     data: {
       organisation_id: buildTech.organisation_id,
-      amount: 49.99,
+      amount: 9,
       start_date: new Date('2026-02-01'),
       end_date: new Date('2027-02-01'),
       status: 'ACTIVE',
@@ -377,7 +377,7 @@ async function main() {
   const logiCoreSub = await prisma.subscription.create({
     data: {
       organisation_id: logiCore.organisation_id,
-      amount: 49.99,
+      amount: 9,
       start_date: new Date('2026-03-01'),
       end_date: new Date('2027-03-01'),
       status: 'SUSPENDED',

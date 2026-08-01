@@ -199,6 +199,15 @@ const listOrgSkills = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// GET /worker/shift-templates | /temp-worker/shift-templates — org shift catalogue
+// (read-only, for the shift-change request "requested shift" dropdown)
+const listOrgShifts = async (req, res, next) => {
+  try {
+    const data = await workerService.listOrgShifts(req.user.organisationId);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
 // GET /worker/leave-balance  (current-year annual + medical, self)
 const getMyLeaveBalance = async (req, res, next) => {
   try {
@@ -251,6 +260,7 @@ module.exports = {
   listMyLeave,
   cancelLeave,
   listOrgSkills,
+  listOrgShifts,
   getMyLeaveBalance,
   getMySchedule,
   getMyCalendar,

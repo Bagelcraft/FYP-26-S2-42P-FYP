@@ -49,6 +49,7 @@ router.post('/profile', (req, res) => {
 router.post('/profile/change-request', profileChangeController.submitRules, profileChangeController.submitRequest);
 
 router.get('/skills', workerController.listOrgSkills);
+router.get('/shift-templates', workerController.listOrgShifts);
 
 // Freelancer hours — approved (completed) work + total hours (replaces clock in/out)
 router.get('/hours', workerController.getMyHours);

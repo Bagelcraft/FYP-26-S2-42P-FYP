@@ -43,6 +43,7 @@ router.get('/profile', (req, res) => {
 router.post('/profile/change-request', profileChangeController.submitRules, profileChangeController.submitRequest);
 
 router.get('/skills', workerController.listOrgSkills);
+router.get('/shift-templates', workerController.listOrgShifts);
 
 // ─── Schedule (assigned shifts) ───────────────────────────────
 router.get('/schedule', workerController.getMySchedule);

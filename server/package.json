@@ -7,6 +7,7 @@
     "test": "jest --coverage",
     "test:features": "node scripts/test-features.js",
     "seed:test": "node prisma/seed-test-accounts.js",
+    "purge:test": "node prisma/purge-test-data.js",
     "lint": "eslint src/"
   },
   "prisma": {

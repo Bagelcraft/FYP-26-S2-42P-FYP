@@ -21,6 +21,21 @@ const prisma = new PrismaClient();
 const PASSWORD = 'Passw0rd!';
 const DEMO_ORG_NAMES = ['TechCorp Pte Ltd', 'BuildTech Solutions', 'LogiCore Asia'];
 
+// Test accounts are for LOCAL development only — production (Neon) must stay clean.
+// Refuse to seed unless the database host is local, so this can never populate prod.
+function assertLocalDatabase() {
+  const url = process.env.DATABASE_URL || '';
+  const m = url.match(/@([^:/?]+)/);           // host between '@' and ':' or '/'
+  const host = m ? m[1] : '';
+  const isLocal = ['localhost', '127.0.0.1', '::1', '0.0.0.0'].includes(host);
+  if (!isLocal && process.env.ALLOW_REMOTE_SEED !== '1') {
+    console.error(`\n✋ Refusing to seed TEST data into a non-local database (host: ${host || 'unknown'}).`);
+    console.error('   Test accounts are localhost-only so the production site stays clean.');
+    console.error('   If you truly intend this, re-run with ALLOW_REMOTE_SEED=1.\n');
+    process.exit(1);
+  }
+}
+
 const day = (off, h = 9, m = 0) => { const d = new Date(); d.setDate(d.getDate() + off); d.setHours(h, m, 0, 0); return d; };
 const dateOnly = (off) => { const d = new Date(); d.setDate(d.getDate() + off); d.setHours(0, 0, 0, 0); return d; };
 
@@ -28,7 +43,7 @@ async function getOrCreateOrg(name) {
   let org = await prisma.organisation.findFirst({ where: { name } });
   if (!org) org = await prisma.organisation.create({ data: { name, isActive: true } });
   if (!org.active_subscription_id) {
-    const sub = await prisma.subscription.create({ data: { organisation_id: org.organisation_id, amount: 49.99, start_date: new Date('2026-01-01'), end_date: new Date('2027-01-01'), status: 'ACTIVE' } });
+    const sub = await prisma.subscription.create({ data: { organisation_id: org.organisation_id, amount: 9, start_date: new Date('2026-01-01'), end_date: new Date('2027-01-01'), status: 'ACTIVE' } });
     org = await prisma.organisation.update({ where: { organisation_id: org.organisation_id }, data: { active_subscription_id: sub.subscription_id } });
   }
   return org;
@@ -196,6 +211,7 @@ async function seedAcmeData(orgId, core, password_hash) {
 }
 
 async function main() {
+  assertLocalDatabase();
   const password_hash = await bcrypt.hash(PASSWORD, 10);
   const acme = await getOrCreateOrg('Acme');
   const globex = await getOrCreateOrg('Globex');
