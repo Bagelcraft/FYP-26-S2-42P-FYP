@@ -299,18 +299,6 @@ async function main() {
     ],
   });
 
-  // ─── Notifications ────────────────────────────────────────────────────────
-
-  await prisma.notification.createMany({
-    data: [
-      { recipientId: permWorker.userId, type: 'TASK_ASSIGNED', message: 'You have been assigned a new task: Build Login API',                       isRead: false },
-      { recipientId: tempWorker.userId, type: 'TASK_ASSIGNED', message: 'You have been assigned a new task: Database Performance Review',           isRead: false },
-      { recipientId: pm.userId,         type: 'TASK_UPDATED',  message: 'Task "Database Performance Review" status changed to IN_PROGRESS',        isRead: true  },
-      { recipientId: perm5.userId,      type: 'TASK_ASSIGNED', message: 'You have been assigned a new task: UI Redesign Sprint',                    isRead: false },
-      { recipientId: perm3.userId,      type: 'TASK_ASSIGNED', message: 'You have been assigned a new task: API Integration Testing',               isRead: false },
-    ],
-  });
-
   // ─── Testimonial ──────────────────────────────────────────────────────────
 
   await prisma.testimonial.create({
@@ -340,7 +328,7 @@ async function main() {
   const buildTechSub = await prisma.subscription.create({
     data: {
       organisation_id: buildTech.organisation_id,
-      amount: 49.99,
+      amount: 9,
       start_date: new Date('2026-02-01'),
       end_date: new Date('2027-02-01'),
       status: 'ACTIVE',
@@ -377,7 +365,7 @@ async function main() {
   const logiCoreSub = await prisma.subscription.create({
     data: {
       organisation_id: logiCore.organisation_id,
-      amount: 49.99,
+      amount: 9,
       start_date: new Date('2026-03-01'),
       end_date: new Date('2027-03-01'),
       status: 'SUSPENDED',

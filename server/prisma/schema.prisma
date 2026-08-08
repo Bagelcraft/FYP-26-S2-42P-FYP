@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -82,14 +82,19 @@ enum UpdateRequestStatus {
 // ─── Organisation & Subscription ─────────────────────────────
 
 model Organisation {
-  organisation_id        Int      @id @default(autoincrement())
-  active_subscription_id Int?     @unique
-  name                   String   @db.VarChar(150)
-  isActive               Boolean  @default(true)
-  createdAt              DateTime @default(now())
+  organisation_id         Int      @id @default(autoincrement())
+  active_subscription_id  Int?     @unique
+  name                    String   @db.VarChar(150)
+  // Singapore Unique Entity Number, captured at registration and verified by the
+  // system admin before the organisation is approved.
+  uen                     String?  @unique @db.VarChar(20)
+  isActive                Boolean  @default(true)
+  // Month the leave / financial year starts in (1 = Jan … 12 = Dec). Drives leave proration.
+  fiscal_year_start_month Int      @default(1)
+  createdAt               DateTime @default(now())
 
-  activeSubscription Subscription?  @relation("ActiveSubscription", fields: [active_subscription_id], references: [subscription_id])
-  subscriptions      Subscription[] @relation("OrgSubscriptions")
+  activeSubscription Subscription?      @relation("ActiveSubscription", fields: [active_subscription_id], references: [subscription_id])
+  subscriptions      Subscription[]     @relation("OrgSubscriptions")
   users              User[]
   departments        Department[]
   skills             Skill[]
@@ -108,8 +113,8 @@ model Subscription {
   end_date        DateTime           @db.Date
   status          SubscriptionStatus @default(ACTIVE)
 
-  organisation          Organisation @relation("OrgSubscriptions", fields: [organisation_id], references: [organisation_id])
-  activeForOrganisation Organisation? @relation("ActiveSubscription")
+  organisation          Organisation    @relation("OrgSubscriptions", fields: [organisation_id], references: [organisation_id])
+  activeForOrganisation Organisation?   @relation("ActiveSubscription")
   billingRecords        BillingRecord[]
 }
 
@@ -121,7 +126,7 @@ model BillingRecord {
   receipt_url     String?       @db.VarChar(500)
   status          BillingStatus @default(UNPAID)
 
-  subscription    Subscription  @relation(fields: [subscription_id], references: [subscription_id])
+  subscription Subscription @relation(fields: [subscription_id], references: [subscription_id])
 }
 
 // ─── Staff Roles ──────────────────────────────────────────────
@@ -133,10 +138,10 @@ model StaffRole {
   role_name         String @db.VarChar(100)
   max_working_hours Int?
 
-  organisation      Organisation @relation(fields: [organisation_id], references: [organisation_id])
-  department        Department?  @relation(fields: [department_id], references: [department_id])
-  requiredSkills    RoleSkill[]
-  users             User[]
+  organisation   Organisation @relation(fields: [organisation_id], references: [organisation_id])
+  department     Department?  @relation(fields: [department_id], references: [department_id])
+  requiredSkills RoleSkill[]
+  users          User[]
 }
 
 model RoleSkill {
@@ -161,31 +166,35 @@ model User {
   password_hash  String    @db.VarChar(255)
   user_type      UserType
   is_active      Boolean   @default(true)
+  // Accounts created by an org admin are trusted on creation; self-registered org
+  // admins are only flipped to true once they click the emailed verification link.
+  // Login is refused while this is false.
+  email_verified Boolean   @default(true)
+  join_date      DateTime? @db.Date
   createdAt      DateTime  @default(now())
   lastLogin      DateTime?
 
-  organisation       Organisation?        @relation(fields: [organisationId], references: [organisation_id])
-  staffRole          StaffRole?           @relation(fields: [role_id], references: [role_id])
-  skills             UserSkill[]
-  attendance         Attendance[]
-  availability       Availability[]
-  createdTasks       Task[]               @relation("CreatedTasks")
-  assignedTasks      TaskAssignment[]     @relation("AssignedTo")
-  taskAssignedBy     TaskAssignment[]     @relation("AssignedBy")
-  leaveRequests      LeaveRequest[]       @relation("UserLeave")
-  approvedLeave      LeaveRequest[]       @relation("ApprovedLeave")
-  leaveBalance       LeaveBalance[]
-  shiftRequests      ShiftChangeRequest[] @relation("UserShiftChange")
-  shiftAssignments   ShiftAssignment[]
-  reviewedShifts     ShiftChangeRequest[] @relation("ReviewedShiftChange")
-  allocationHistory  AllocationHistory[]  @relation("UserAllocation")
-  changedAllocations AllocationHistory[]  @relation("ChangedByAllocation")
-  sentUpdateRequests TaskUpdateRequest[]  @relation("UpdateRequestedBy")
-  feedback           Feedback[]
-  testimonials       Testimonial[]
-  notifications           Notification[]
-  profileChangeRequests   ProfileChangeRequest[] @relation("ProfileChangeRequests")
-  profileChangeReviews    ProfileChangeRequest[] @relation("ProfileChangeReviews")
+  organisation          Organisation?          @relation(fields: [organisationId], references: [organisation_id])
+  staffRole             StaffRole?             @relation(fields: [role_id], references: [role_id])
+  skills                UserSkill[]
+  attendance            Attendance[]
+  availability          Availability[]
+  createdTasks          Task[]                 @relation("CreatedTasks")
+  assignedTasks         TaskAssignment[]       @relation("AssignedTo")
+  taskAssignedBy        TaskAssignment[]       @relation("AssignedBy")
+  leaveRequests         LeaveRequest[]         @relation("UserLeave")
+  approvedLeave         LeaveRequest[]         @relation("ApprovedLeave")
+  leaveBalance          LeaveBalance[]
+  shiftRequests         ShiftChangeRequest[]   @relation("UserShiftChange")
+  shiftAssignments      ShiftAssignment[]
+  reviewedShifts        ShiftChangeRequest[]   @relation("ReviewedShiftChange")
+  allocationHistory     AllocationHistory[]    @relation("UserAllocation")
+  changedAllocations    AllocationHistory[]    @relation("ChangedByAllocation")
+  sentUpdateRequests    TaskUpdateRequest[]    @relation("UpdateRequestedBy")
+  feedback              Feedback[]
+  testimonials          Testimonial[]
+  profileChangeRequests ProfileChangeRequest[] @relation("ProfileChangeRequests")
+  profileChangeReviews  ProfileChangeRequest[] @relation("ProfileChangeReviews")
 }
 
 // ─── Department ───────────────────────────────────────────────
@@ -195,9 +204,9 @@ model Department {
   organisation_id Int
   name            String @db.VarChar(100)
 
-  organisation    Organisation @relation(fields: [organisation_id], references: [organisation_id])
-  roles           StaffRole[]
-  tasks           Task[]
+  organisation Organisation @relation(fields: [organisation_id], references: [organisation_id])
+  roles        StaffRole[]
+  tasks        Task[]
 }
 
 // ─── Skills ───────────────────────────────────────────────────
@@ -208,11 +217,11 @@ model Skill {
   skill_name      String  @db.VarChar(100)
   cert_required   Boolean @default(false)
 
-  organisation    Organisation @relation(fields: [organisation_id], references: [organisation_id])
-  userSkills      UserSkill[]
-  tasks           Task[]
-  taskSkills      TaskSkill[]
-  roleSkills      RoleSkill[]
+  organisation Organisation @relation(fields: [organisation_id], references: [organisation_id])
+  userSkills   UserSkill[]
+  tasks        Task[]
+  taskSkills   TaskSkill[]
+  roleSkills   RoleSkill[]
 }
 
 model UserSkill {
@@ -221,8 +230,8 @@ model UserSkill {
   skill_id          Int
   certification_url String? @db.VarChar(500)
 
-  user              User  @relation(fields: [user_id], references: [userId])
-  skill             Skill @relation(fields: [skill_id], references: [skill_id])
+  user  User  @relation(fields: [user_id], references: [userId])
+  skill Skill @relation(fields: [skill_id], references: [skill_id])
 }
 
 // ─── Attendance & Availability ────────────────────────────────
@@ -234,7 +243,7 @@ model Attendance {
   clock_out     DateTime?
   working_hours Decimal?  @db.Decimal(5, 2)
 
-  user          User      @relation(fields: [user_id], references: [userId])
+  user User @relation(fields: [user_id], references: [userId])
 }
 
 model Availability {
@@ -244,7 +253,7 @@ model Availability {
   end_datetime    DateTime
   status          AvailabilityStatus
 
-  user            User               @relation(fields: [user_id], references: [userId])
+  user User @relation(fields: [user_id], references: [userId])
 }
 
 // ─── Leave ───────────────────────────────────────────────────
@@ -258,8 +267,8 @@ model LeaveRequest {
   end_date    DateTime    @db.Date
   status      LeaveStatus @default(PENDING)
 
-  user        User        @relation("UserLeave", fields: [user_id], references: [userId])
-  approver    User?       @relation("ApprovedLeave", fields: [approved_by], references: [userId])
+  user     User  @relation("UserLeave", fields: [user_id], references: [userId])
+  approver User? @relation("ApprovedLeave", fields: [approved_by], references: [userId])
 }
 
 model LeaveBalance {
@@ -270,7 +279,7 @@ model LeaveBalance {
   used_days     Int       @default(0)
   year          Int
 
-  user          User      @relation(fields: [user_id], references: [userId])
+  user User @relation(fields: [user_id], references: [userId])
 }
 
 // ─── Tasks & Allocation ───────────────────────────────────────
@@ -288,10 +297,10 @@ model Task {
   end_datetime      DateTime
   createdAt         DateTime   @default(now())
 
-  organisation      Organisation     @relation(fields: [organisation_id], references: [organisation_id])
-  department        Department?      @relation(fields: [department_id], references: [department_id])
-  createdBy         User             @relation("CreatedTasks", fields: [created_by], references: [userId])
-  requiredSkill     Skill?           @relation(fields: [required_skill_id], references: [skill_id])
+  organisation      Organisation        @relation(fields: [organisation_id], references: [organisation_id])
+  department        Department?         @relation(fields: [department_id], references: [department_id])
+  createdBy         User                @relation("CreatedTasks", fields: [created_by], references: [userId])
+  requiredSkill     Skill?              @relation(fields: [required_skill_id], references: [skill_id])
   requiredSkills    TaskSkill[]
   assignments       TaskAssignment[]
   allocationHistory AllocationHistory[]
@@ -299,11 +308,11 @@ model Task {
 }
 
 model TaskSkill {
-  task_skill_id Int   @id @default(autoincrement())
+  task_skill_id Int @id @default(autoincrement())
   task_id       Int
   skill_id      Int
 
-  task  Task  @relation(fields: [task_id],  references: [task_id], onDelete: Cascade)
+  task  Task  @relation(fields: [task_id], references: [task_id], onDelete: Cascade)
   skill Skill @relation(fields: [skill_id], references: [skill_id])
 
   @@unique([task_id, skill_id])
@@ -352,15 +361,15 @@ model TaskUpdateRequest {
 // ─── Shift Templates ──────────────────────────────────────────
 
 model ShiftTemplate {
-  shift_id        Int          @id @default(autoincrement())
+  shift_id        Int      @id @default(autoincrement())
   organisation_id Int
-  name            String       @db.VarChar(100)
-  start_time      String       @db.VarChar(5)
-  end_time        String       @db.VarChar(5)
-  created_at      DateTime     @default(now())
+  name            String   @db.VarChar(100)
+  start_time      String   @db.VarChar(5)
+  end_time        String   @db.VarChar(5)
+  created_at      DateTime @default(now())
 
-  organisation    Organisation      @relation(fields: [organisation_id], references: [organisation_id])
-  assignments     ShiftAssignment[]
+  organisation Organisation      @relation(fields: [organisation_id], references: [organisation_id])
+  assignments  ShiftAssignment[]
 }
 
 // A specific worker rostered to a shift template on a given date.
@@ -395,17 +404,24 @@ model ShiftChangeRequest {
 // ─── Public / Unregistered ────────────────────────────────────
 
 model UnregisteredUser {
-  marketing_user_id Int      @id @default(autoincrement())
-  organisation_id   Int?
-  full_name         String?  @db.VarChar(150)
-  email             String   @db.VarChar(150)
-  password          String   @db.VarChar(255)
-  role              String?  @db.VarChar(50)
-  company_name      String?  @db.VarChar(150)
-  position          String?  @db.VarChar(100)
-  created_at        DateTime @default(now())
+  marketing_user_id    Int       @id @default(autoincrement())
+  organisation_id      Int?
+  full_name            String?   @db.VarChar(150)
+  email                String    @db.VarChar(150)
+  password             String    @db.VarChar(255)
+  role                 String?   @db.VarChar(50)
+  company_name         String?   @db.VarChar(150)
+  // Singapore UEN supplied by the applicant for the admin to verify.
+  uen                  String?   @db.VarChar(20)
+  position             String?   @db.VarChar(100)
+  // Email ownership proof. The admin cannot approve a request until the applicant
+  // has clicked the emailed link and email_verified flips to true.
+  email_verified       Boolean   @default(false)
+  verification_token   String?   @unique @db.VarChar(255)
+  verification_expires DateTime?
+  created_at           DateTime  @default(now())
 
-  organisation      Organisation? @relation(fields: [organisation_id], references: [organisation_id])
+  organisation Organisation? @relation(fields: [organisation_id], references: [organisation_id])
 }
 
 model ContactEnquiry {
@@ -429,10 +445,10 @@ model Testimonial {
   profile_image  String?  @db.VarChar(500)
   created_at     DateTime @default(now())
 
-  user           User     @relation(fields: [user_id], references: [userId])
+  user User @relation(fields: [user_id], references: [userId])
 }
 
-// ─── Feedback & Notifications ────────────────────────────────
+// ─── Feedback ────────────────────────────────────────────────
 
 model Feedback {
   feedback_id  Int            @id @default(autoincrement())
@@ -441,18 +457,7 @@ model Feedback {
   status       FeedbackStatus @default(OPEN)
   submitted_at DateTime       @default(now())
 
-  user         User           @relation(fields: [user_id], references: [userId])
-}
-
-model Notification {
-  id          Int      @id @default(autoincrement())
-  recipientId Int
-  type        String   @db.VarChar(50)
-  message     String   @db.Text
-  isRead      Boolean  @default(false)
-  createdAt   DateTime @default(now())
-
-  recipient   User     @relation(fields: [recipientId], references: [userId])
+  user User @relation(fields: [user_id], references: [userId])
 }
 
 // ─── Landing Page Content ────────────────────────────────────
@@ -468,7 +473,7 @@ model LandingContent {
   plan_name        String?  @db.VarChar(100)
   plan_price       String?  @db.VarChar(50)
   plan_description String?  @db.Text
-  updated_at       DateTime @updatedAt @default(now())
+  updated_at       DateTime @default(now()) @updatedAt
 }
 
 model LandingFeature {
@@ -482,13 +487,19 @@ model LandingFeature {
 }
 
 model LandingTestimonial {
-  testimonial_id Int      @id @default(autoincrement())
-  name           String   @db.VarChar(100)
-  company        String?  @db.VarChar(150)
-  rating         Int      @default(5)
-  review_text    String   @db.Text
-  is_active      Boolean  @default(true)
-  created_at     DateTime @default(now())
+  testimonial_id Int       @id @default(autoincrement())
+  name           String    @db.VarChar(100)
+  company        String?   @db.VarChar(150)
+  rating         Int       @default(5)
+  review_text    String    @db.Text
+  // Publication is decided by the automated moderation rules, never by hand.
+  // is_active mirrors auto_status === 'APPROVED' and is what the landing page reads.
+  is_active      Boolean   @default(false)
+  auto_status    String    @default("PENDING") @db.VarChar(20)
+  auto_score     Int       @default(0)
+  auto_reasons   String?   @db.Text
+  moderated_at   DateTime?
+  created_at     DateTime  @default(now())
 }
 
 // ─── Profile Change Requests ─────────────────────────────────
@@ -505,8 +516,8 @@ model ProfileChangeRequest {
   reviewed_at     DateTime?
   created_at      DateTime  @default(now())
 
-  user            User      @relation("ProfileChangeRequests", fields: [user_id], references: [userId])
-  reviewer        User?     @relation("ProfileChangeReviews", fields: [reviewed_by], references: [userId])
+  user     User  @relation("ProfileChangeRequests", fields: [user_id], references: [userId])
+  reviewer User? @relation("ProfileChangeReviews", fields: [reviewed_by], references: [userId])
 }
 
 // ─── Subscription Plans (Phase 3) ────────────────────────────
@@ -520,7 +531,7 @@ model SubscriptionPlan {
   max_users     Int?
   is_active     Boolean @default(true)
 
-  features      PlanFeature[]
+  features PlanFeature[]
 }
 
 model PlanFeature {
@@ -528,5 +539,5 @@ model PlanFeature {
   plan_id      Int
   feature_name String @db.VarChar(200)
 
-  plan         SubscriptionPlan @relation(fields: [plan_id], references: [plan_id])
+  plan SubscriptionPlan @relation(fields: [plan_id], references: [plan_id])
 }

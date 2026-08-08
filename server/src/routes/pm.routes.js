@@ -2,6 +2,7 @@ const express = require('express');
 const { body, query } = require('express-validator');
 const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
+const { requireFeature } = require('../middleware/feature.middleware');
 const taskController = require('../controllers/task.controller');
 const allocationController = require('../controllers/allocation.controller');
 const managerController = require('../controllers/manager.controller');
@@ -111,8 +112,8 @@ router.patch('/leave/:id',  leaveDecisionRules, managerController.decideLeave);
 router.get('/leave-balance',                 managerController.listLeaveBalances);
 router.patch('/leave-balance/:userId',       managerController.updateLeaveBalance);
 
-// Reports — working hours + task completion
-router.get('/reports', managerController.getReports);
+// Reports — working hours + task completion (gated: plan must include "Advanced Reports")
+router.get('/reports', requireFeature('Advanced Reports'), managerController.getReports);
 
 // Calendar — shifts, unavailability and task start/deadline across a date range
 router.get('/calendar', managerController.getCalendar);

@@ -14,7 +14,7 @@ A SaaS platform for organisations to manage staff and automate task allocation.
 ## Tech Stack
 - Frontend: React + Vite + Tailwind CSS
 - Backend: Node.js + Express.js
-- Database: MySQL + Prisma ORM
+- Database: PostgreSQL + Prisma ORM
 - Auth: JWT + bcrypt
 - CI/CD: GitHub Actions
 - Hosting: Render (backend) + Vercel (frontend)
@@ -23,12 +23,19 @@ A SaaS platform for organisations to manage staff and automate task allocation.
 
 ### Prerequisites
 - Node.js v18+
-- XAMPP (for MySQL) — start the **Apache** and **MySQL** services
+- PostgreSQL 14+ — either a local install, or a free hosted database
+  (e.g. [Neon](https://neon.tech), [Supabase](https://supabase.com), Railway)
 - Git
 
 ### Database Setup
-1. Open **phpMyAdmin** (`http://localhost/phpmyadmin`)
-2. Create a new database named **`smart_task_allocation`**
+**Option A — hosted (easiest):** create a free Postgres database (Neon/Supabase/Railway)
+and copy the connection string it gives you.
+
+**Option B — local:** install PostgreSQL, then create the database:
+```bash
+createdb smart_task_allocation
+```
+(or via pgAdmin: right-click *Databases* → *Create* → name it `smart_task_allocation`)
 
 ### Backend Setup
 
@@ -46,9 +53,13 @@ npm install
 cp .env.example .env
 ```
 
-Then open `.env` and set:
+Then open `.env` and set your Postgres connection string:
 ```
-DATABASE_URL="mysql://root:@localhost:3306/smart_task_allocation"
+# local Postgres
+DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/smart_task_allocation"
+
+# or a hosted one (Neon/Supabase usually require SSL)
+# DATABASE_URL="postgresql://user:pass@host/dbname?sslmode=require"
 ```
 
 Then apply the schema and seed the database:
@@ -58,7 +69,9 @@ npx prisma db seed
 npm run dev
 ```
 
-> **Do not run `npx prisma migrate dev` or `npx prisma migrate reset`** — the migrations are out of sync with the schema. Always use `prisma db push` to set up the database.
+> **Use `npx prisma db push` — not `prisma migrate`.** This project syncs the schema
+> directly with `db push` and does not keep a migration history. After pulling any
+> change to `schema.prisma`, run `npx prisma db push` again to stay in sync.
 
 ### Frontend Setup
 

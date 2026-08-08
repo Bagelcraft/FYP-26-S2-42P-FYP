@@ -1,7 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/prisma');
-const sgMail = require('@sendgrid/mail');
+const { sendMail } = require('./email.service');
 
 function makeError(message, statusCode) {
   const err = new Error(message);
@@ -30,6 +30,12 @@ async function login(email, password) {
 
   const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid) throw makeError('Invalid email or password', 401);
+
+  // Checked only after the password, so an unverified-account response can never
+  // be used to probe which addresses are registered.
+  if (!user.email_verified) {
+    throw makeError('Please verify your email address before signing in. Check your inbox for the verification link.', 403);
+  }
 
   await prisma.user.update({
     where: { userId: user.userId },
@@ -60,26 +66,19 @@ async function forgotPassword(email) {
     { expiresIn: '15m' },
   );
 
-  const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+  const clientUrl = (process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim();
   const resetUrl = `${clientUrl}/reset-password?token=${token}`;
 
-  if (process.env.SENDGRID_API_KEY) {
-    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-    await sgMail.send({
-      to: email,
-      from: process.env.FROM_EMAIL || 'noreply@smarttask.com',
-      subject: 'SmartTask — Reset your password',
-      html: `
-        <p>Hi ${user.full_name},</p>
-        <p>You requested a password reset. Click the link below — it expires in <strong>15 minutes</strong>.</p>
-        <p><a href="${resetUrl}">${resetUrl}</a></p>
-        <p>If you didn't request this, you can safely ignore this email.</p>
-      `,
-    });
-  } else {
-    // Dev fallback: print to console when SendGrid is not configured
-    console.log(`[DEV] Password reset link for ${email}:\n${resetUrl}`);
-  }
+  await sendMail({
+    to: email,
+    subject: 'SmartTask — Reset your password',
+    html: `
+      <p>Hi ${user.full_name},</p>
+      <p>You requested a password reset. Click the link below — it expires in <strong>15 minutes</strong>.</p>
+      <p><a href="${resetUrl}">${resetUrl}</a></p>
+      <p>If you didn't request this, you can safely ignore this email.</p>
+    `,
+  });
 }
 
 async function resetPasswordWithToken(token, newPassword) {

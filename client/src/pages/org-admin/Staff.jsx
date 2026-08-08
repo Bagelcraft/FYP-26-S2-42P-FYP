@@ -15,7 +15,9 @@ function generatePassword() {
   return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
-const getEmptyForm = () => ({ userId: null, full_name: '', email: '', user_type: 'PERMANENT_WORKER', role_id: '', password: generatePassword(), skill_ids: [], annual_entitled: '', medical_entitled: '' });
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const todayISO = () => new Date().toISOString().slice(0, 10);
+const getEmptyForm = () => ({ userId: null, full_name: '', email: '', user_type: 'PERMANENT_WORKER', role_id: '', password: generatePassword(), skill_ids: [], annual_entitled: '', medical_entitled: '', prorate_leave: false, join_date: todayISO() });
 
 export default function Staff() {
   const [staff, setStaff]       = useState([]);
@@ -34,6 +36,7 @@ export default function Staff() {
   const [skillAddId, setSkillAddId]   = useState('');
   const [newSkillName, setNewSkillName] = useState('');   // inline skill creation in the register form
   const [creatingSkill, setCreatingSkill] = useState(false);
+  const [fiscalMonth, setFiscalMonth] = useState(1); // org financial-year start (1-12), for the proration preview
 
   function load() {
     setLoading(true);
@@ -41,11 +44,13 @@ export default function Staff() {
       api.get('/org-admin/staff'),
       api.get('/org-admin/roles'),
       api.get('/org-admin/skills'),
+      api.get('/org-admin/profile'),
     ])
-      .then(([sRes, rRes, skRes]) => {
+      .then(([sRes, rRes, skRes, pRes]) => {
         setStaff(sRes.data.data);
         setRoles(rRes.data.data);
         setSkills(skRes.data.data);
+        setFiscalMonth(pRes.data.data?.fiscal_year_start_month ?? 1);
       })
       .catch((e) => setError(e.response?.data?.message || e.message))
       .finally(() => setLoading(false));
@@ -76,7 +81,7 @@ export default function Staff() {
       user_type: member.user_type,
       role_id: member.staffRole?.role_id ?? '',
       password: '',
-      skill_ids: [], annual_entitled: '', medical_entitled: '',
+      skill_ids: [], annual_entitled: '', medical_entitled: '', prorate_leave: false,
     });
   }
 
@@ -116,10 +121,11 @@ export default function Staff() {
     try {
       const role_id = form.role_id !== '' ? Number(form.role_id) : null;
       if (modalMode === 'add') {
-        const body = { full_name: form.full_name.trim(), email: form.email.trim(), user_type: form.user_type, password: form.password, role_id, skill_ids: form.skill_ids };
+        const body = { full_name: form.full_name.trim(), email: form.email.trim(), user_type: form.user_type, password: form.password, role_id, skill_ids: form.skill_ids, join_date: form.join_date || undefined };
         if (form.user_type === 'PERMANENT_WORKER') {
           body.annual_entitled = form.annual_entitled !== '' ? Number(form.annual_entitled) : 0;
           body.medical_entitled = form.medical_entitled !== '' ? Number(form.medical_entitled) : 0;
+          body.prorate_leave = form.prorate_leave;
         }
         const r = await api.post('/org-admin/staff', body);
         setStaff((prev) => [...prev, r.data.data].sort((a, b) => a.full_name.localeCompare(b.full_name)));
@@ -340,6 +346,14 @@ export default function Staff() {
                   </div>
                 </div>
               )}
+              {modalMode === 'add' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Date joined</label>
+                  <input type="date" value={form.join_date}
+                    onChange={(e) => setForm({ ...form, join_date: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </div>
+              )}
               {modalMode === 'add' && form.user_type === 'PERMANENT_WORKER' && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -357,6 +371,26 @@ export default function Staff() {
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
                   </div>
                 </div>
+              )}
+              {modalMode === 'add' && form.user_type === 'PERMANENT_WORKER' && (
+                <label className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input type="checkbox" checked={form.prorate_leave}
+                    onChange={(e) => setForm({ ...form, prorate_leave: e.target.checked })}
+                    className="mt-0.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                  <span>
+                    Prorate leave for mid-cycle join
+                    <span className="block text-xs text-gray-400">
+                      Scales the entitlement by the months left in the financial year (starting {MONTHS_SHORT[fiscalMonth - 1]}) from the join date.
+                      {form.prorate_leave && (() => {
+                        const joinMonth = form.join_date ? new Date(form.join_date).getMonth() : new Date().getMonth();
+                        const monthsElapsed = ((joinMonth - (fiscalMonth - 1)) + 12) % 12;
+                        const monthsRemaining = 12 - monthsElapsed;
+                        const pro = (v) => Math.round(((Number(v) || 0) * monthsRemaining) / 12);
+                        return <span className="text-gray-600"> {monthsRemaining}/12 of the year → Annual {pro(form.annual_entitled)} · Medical {pro(form.medical_entitled)} day(s).</span>;
+                      })()}
+                    </span>
+                  </span>
+                </label>
               )}
               {modalMode === 'add' && (
                 <div>

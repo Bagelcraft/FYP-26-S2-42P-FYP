@@ -121,7 +121,9 @@ export default function AuditLogs() {
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-800">Audit Logs</h2>
-            <p className="text-gray-500 text-sm mt-0.5">Full activity trail across the platform.</p>
+            <p className="text-gray-500 text-sm mt-0.5">
+              User and activity trail across the platform. Organisation records live on the Organisations page.
+            </p>
           </div>
           <button
             onClick={() => exportPDF(filtered, { category, search, dateFrom, dateTo })}
@@ -152,7 +154,6 @@ export default function AuditLogs() {
             <option value="AUTH">Auth</option>
             <option value="TASK">Task</option>
             <option value="BILLING">Billing</option>
-            <option value="SYSTEM">System</option>
             <option value="STAFF">Staff</option>
           </select>
           <div className="flex items-center gap-2">

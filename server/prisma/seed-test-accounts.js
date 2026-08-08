@@ -3,7 +3,7 @@
  *
  * Creates the fixed test identities and populates the **Acme** tenant with rich
  * demo/test data (skills, departments, roles, staff, tasks, shifts, availability,
- * leave, notifications) so the test accounts have something to work with for
+ * leave) so the test accounts have something to work with for
  * debugging. Also removes the legacy standalone demo orgs (TechCorp / BuildTech /
  * LogiCore) so the platform behaves like a normal product: a normally-registered
  * organisation starts with a clean slate — only the test accounts see seeded data.
@@ -21,6 +21,21 @@ const prisma = new PrismaClient();
 const PASSWORD = 'Passw0rd!';
 const DEMO_ORG_NAMES = ['TechCorp Pte Ltd', 'BuildTech Solutions', 'LogiCore Asia'];
 
+// Test accounts are for LOCAL development only — production (Neon) must stay clean.
+// Refuse to seed unless the database host is local, so this can never populate prod.
+function assertLocalDatabase() {
+  const url = process.env.DATABASE_URL || '';
+  const m = url.match(/@([^:/?]+)/);           // host between '@' and ':' or '/'
+  const host = m ? m[1] : '';
+  const isLocal = ['localhost', '127.0.0.1', '::1', '0.0.0.0'].includes(host);
+  if (!isLocal && process.env.ALLOW_REMOTE_SEED !== '1') {
+    console.error(`\n✋ Refusing to seed TEST data into a non-local database (host: ${host || 'unknown'}).`);
+    console.error('   Test accounts are localhost-only so the production site stays clean.');
+    console.error('   If you truly intend this, re-run with ALLOW_REMOTE_SEED=1.\n');
+    process.exit(1);
+  }
+}
+
 const day = (off, h = 9, m = 0) => { const d = new Date(); d.setDate(d.getDate() + off); d.setHours(h, m, 0, 0); return d; };
 const dateOnly = (off) => { const d = new Date(); d.setDate(d.getDate() + off); d.setHours(0, 0, 0, 0); return d; };
 
@@ -28,7 +43,7 @@ async function getOrCreateOrg(name) {
   let org = await prisma.organisation.findFirst({ where: { name } });
   if (!org) org = await prisma.organisation.create({ data: { name, isActive: true } });
   if (!org.active_subscription_id) {
-    const sub = await prisma.subscription.create({ data: { organisation_id: org.organisation_id, amount: 49.99, start_date: new Date('2026-01-01'), end_date: new Date('2027-01-01'), status: 'ACTIVE' } });
+    const sub = await prisma.subscription.create({ data: { organisation_id: org.organisation_id, amount: 9, start_date: new Date('2026-01-01'), end_date: new Date('2027-01-01'), status: 'ACTIVE' } });
     org = await prisma.organisation.update({ where: { organisation_id: org.organisation_id }, data: { active_subscription_id: sub.subscription_id } });
   }
   return org;
@@ -52,7 +67,6 @@ async function deleteOrgCascade(orgId) {
   const subs = await prisma.subscription.findMany({ where: { organisation_id: orgId }, select: { subscription_id: true } });
   const del = async (fn) => { try { await fn(); } catch {} };
 
-  await del(() => prisma.notification.deleteMany({ where: { recipientId: { in: uids } } }));
   await del(() => prisma.allocationHistory.deleteMany({ where: { OR: [{ task_id: { in: tids } }, { user_id: { in: uids } }, { changed_by: { in: uids } }] } }));
   await del(() => prisma.taskUpdateRequest.deleteMany({ where: { OR: [{ task_id: { in: tids } }, { requested_by: { in: uids } }] } }));
   await del(() => prisma.taskAssignment.deleteMany({ where: { OR: [{ task_id: { in: tids } }, { assigned_to: { in: uids } }, { assigned_by: { in: uids } }] } }));
@@ -89,7 +103,6 @@ async function clearAcmeData(orgId, coreEmails) {
   const tids = tasks.map((t) => t.task_id);
   const roles = await prisma.staffRole.findMany({ where: { organisation_id: orgId }, select: { role_id: true } });
   const del = async (fn) => { try { await fn(); } catch {} };
-  await del(() => prisma.notification.deleteMany({ where: { recipientId: { in: uids } } }));
   await del(() => prisma.allocationHistory.deleteMany({ where: { OR: [{ task_id: { in: tids } }, { user_id: { in: uids } }] } }));
   await del(() => prisma.taskUpdateRequest.deleteMany({ where: { task_id: { in: tids } } }));
   await del(() => prisma.taskAssignment.deleteMany({ where: { task_id: { in: tids } } }));
@@ -184,21 +197,34 @@ async function seedAcmeData(orgId, core, password_hash) {
   // Leave requests (pending — show up on the manager dashboard for approval)
   await prisma.leaveRequest.create({ data: { user_id: core.perm.userId, leave_type: 'ANNUAL', start_date: dateOnly(10), end_date: dateOnly(12), status: 'PENDING' } });
   await prisma.leaveRequest.create({ data: { user_id: dana.userId, leave_type: 'MEDICAL', start_date: dateOnly(5), end_date: dateOnly(5), status: 'PENDING' } });
+}
 
-  // Notifications (real unread counts for the bell; list matches)
-  const notif = (recipientId, type, message, isRead = false) => prisma.notification.create({ data: { recipientId, type, message, isRead } });
-  await notif(core.admin.userId, 'STAFF', 'Dana Lee requested a profile change.');
-  await notif(core.admin.userId, 'SYSTEM', 'Your subscription renews in 14 days.', true);
-  await notif(core.pm.userId, 'TASK_UPDATED', 'Warehouse Audit was submitted for your approval.');
-  await notif(core.pm.userId, 'STAFF', 'Perm Worker applied for annual leave.');
-  await notif(core.perm.userId, 'TASK_ASSIGNED', 'You were assigned: Build Login API.');
-  await notif(core.temp.userId, 'TASK_UPDATED', 'Your Monthly Stocktake was approved (8h logged).', true);
+// Subscription plans + their gated features (matched to a subscription by price).
+async function seedPlans() {
+  await prisma.planFeature.deleteMany({});
+  await prisma.subscriptionPlan.deleteMany({});
+  const mk = async (name, price_monthly, price_annual, max_users, features) => {
+    const plan = await prisma.subscriptionPlan.create({
+      data: { name, description: `${name} plan`, price_monthly, price_annual, max_users, is_active: true },
+    });
+    await prisma.planFeature.createMany({ data: features.map((f) => ({ plan_id: plan.plan_id, feature_name: f })) });
+  };
+  // Basic ($9) lacks "Advanced Reports"; Pro ($29) includes it — this is what feature gating checks.
+  await mk('Basic', 9, 90, 25, ['Task Management', 'Workforce Scheduling', 'Auto Allocation', 'Basic Reports']);
+  await mk('Pro', 29, 290, 100, ['Task Management', 'Workforce Scheduling', 'Auto Allocation', 'Basic Reports', 'Advanced Reports', 'Priority Support']);
 }
 
 async function main() {
+  assertLocalDatabase();
   const password_hash = await bcrypt.hash(PASSWORD, 10);
   const acme = await getOrCreateOrg('Acme');
   const globex = await getOrCreateOrg('Globex');
+
+  // Plan catalogue; put Acme on Pro (Advanced Reports enabled), leave Globex on Basic.
+  await seedPlans();
+  if (acme.active_subscription_id) {
+    await prisma.subscription.update({ where: { subscription_id: acme.active_subscription_id }, data: { amount: 29 } });
+  }
 
   const core = {
     admin: await upsertUser({ email: 'admin@acme.test', full_name: 'Acme Org Admin', user_type: 'ORG_ADMIN', password_hash, organisationId: acme.organisation_id }),

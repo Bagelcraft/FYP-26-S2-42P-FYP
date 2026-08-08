@@ -59,6 +59,10 @@ const getMySkills = async (userId) => {
 const listOrgSkills = async (organisationId) =>
   prisma.skill.findMany({ where: { organisation_id: organisationId }, select: { skill_id: true, skill_name: true }, orderBy: { skill_name: 'asc' } });
 
+// ─── Org shift templates (for the shift-change request dropdown) ──
+const listOrgShifts = async (organisationId) =>
+  prisma.shiftTemplate.findMany({ where: { organisation_id: organisationId }, select: { shift_id: true, name: true, start_time: true, end_time: true }, orderBy: { start_time: 'asc' } });
+
 // ─── Leave balance (current year, self) ──────────────────────
 const getMyLeaveBalance = async (userId) => {
   const year = new Date().getFullYear();
@@ -118,4 +122,5 @@ module.exports = {
   getMyCalendar,
   getMySkills,
   listOrgSkills,
+  listOrgShifts,
 };

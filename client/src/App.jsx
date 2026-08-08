@@ -7,12 +7,13 @@ import Register from './pages/Register';
 import Unauthorized from './pages/Unauthorized';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import VerifyEmail from './pages/VerifyEmail';
+import NotFound from './pages/NotFound';
 
 // Admin
 import AdminDashboard from './pages/admin/AdminDashboard';
 import Organisations from './pages/admin/Organisations';
 import AuditLogs from './pages/admin/AuditLogs';
-import AdminNotifications from './pages/admin/AdminNotifications';
 import AdminEnquiries from './pages/admin/AdminEnquiries';
 import AdminLandingContent from './pages/admin/AdminLandingContent';
 
@@ -21,7 +22,6 @@ import OrgAdminDashboard from './pages/org-admin/OrgAdminDashboard';
 import Staff from './pages/org-admin/Staff';
 import Departments from './pages/org-admin/Departments';
 import Skills from './pages/org-admin/Skills';
-import OrgAdminNotifications from './pages/org-admin/OrgAdminNotifications';
 import StaffRoles from './pages/org-admin/StaffRoles';
 import Shifts from './pages/org-admin/Shifts';
 import OrgSubscription from './pages/org-admin/Subscription';
@@ -38,7 +38,6 @@ import PMCalendar from './pages/pm/Calendar';
 import PMLeave from './pages/pm/Leave';
 import Testimonials from './pages/pm/Testimonials';
 import Reports from './pages/pm/Reports';
-import PMNotifications from './pages/pm/PMNotifications';
 // NOTE: Subscription import removed — page no longer mounted under the Manager portal.
 
 // Permanent Worker
@@ -48,14 +47,12 @@ import WorkerSchedule from './pages/worker/Schedule';
 import WorkerCalendar from './pages/worker/Calendar';
 import Leave from './pages/worker/Leave';
 import WorkerAttendance from './pages/worker/Attendance';
-import WorkerNotifications from './pages/worker/Notifications';
 import WorkerProfile from './pages/worker/Profile';
 
 // Temporary Worker
 import TempWorkerDashboard from './pages/temp-worker/TempWorkerDashboard';
 import TempMyTasks from './pages/temp-worker/MyTasks';
 import TempSchedule from './pages/temp-worker/Schedule';
-import TempNotifications from './pages/temp-worker/Notifications';
 import TempProfile from './pages/temp-worker/Profile';
 
 export default function App() {
@@ -70,6 +67,7 @@ export default function App() {
           <Route path="/unauthorized" element={<Unauthorized />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
 
           {/* System Admin */}
           <Route path="/admin" element={<AdminDashboard />} />
@@ -77,7 +75,6 @@ export default function App() {
           <Route path="/admin/enquiries" element={<AdminEnquiries />} />
           <Route path="/admin/landing-content" element={<AdminLandingContent />} />
           <Route path="/admin/logs" element={<AuditLogs />} />
-          <Route path="/admin/notifications" element={<AdminNotifications />} />
 
           {/* Organisation Admin */}
           <Route path="/org-admin" element={<OrgAdminDashboard />} />
@@ -90,7 +87,6 @@ export default function App() {
           <Route path="/org-admin/profile" element={<OrgProfile />} />
           <Route path="/org-admin/profile-change-requests" element={<ProfileChangeRequests />} />
           <Route path="/org-admin/shift-change-requests" element={<ShiftChangeRequests />} />
-          <Route path="/org-admin/notifications" element={<OrgAdminNotifications />} />
 
           {/* Manager */}
           <Route path="/pm" element={<PMDashboard />} />
@@ -101,7 +97,6 @@ export default function App() {
           <Route path="/pm/leave" element={<PMLeave />} />
           <Route path="/pm/testimonials" element={<Testimonials />} />
           <Route path="/pm/reports" element={<Reports />} />
-          <Route path="/pm/notifications" element={<PMNotifications />} />
           {/* NOTE: /pm/subscription route removed. */}
 
           {/* Permanent Worker */}
@@ -111,15 +106,16 @@ export default function App() {
           <Route path="/worker/calendar" element={<WorkerCalendar />} />
           <Route path="/worker/leave" element={<Leave />} />
           <Route path="/worker/attendance" element={<WorkerAttendance />} />
-          <Route path="/worker/notifications" element={<WorkerNotifications />} />
           <Route path="/worker/profile" element={<WorkerProfile />} />
 
           {/* Temporary Worker */}
           <Route path="/temp-worker" element={<TempWorkerDashboard />} />
           <Route path="/temp-worker/tasks" element={<TempMyTasks />} />
           <Route path="/temp-worker/schedule" element={<TempSchedule />} />
-          <Route path="/temp-worker/notifications" element={<TempNotifications />} />
           <Route path="/temp-worker/profile" element={<TempProfile />} />
+
+          {/* Catch-all: an unmatched path must never render a blank page. */}
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

@@ -6,6 +6,11 @@ import { useAuth } from '../../context/AuthContext';
 
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-SG', { day: '2-digit', month: 'short', year: 'numeric' }) : '');
 
+// Mirrors server/src/services/testimonialModeration.service.js — shown as guidance
+// so submitters know what the automated selector is looking for.
+const MIN_LENGTH = 40;
+const MAX_LENGTH = 400;
+
 function Stars({ n, onChange }) {
   return (
     <div className="flex gap-0.5">
@@ -43,7 +48,7 @@ function TestimonialModal({ item, onClose, onSaved, defaultName, defaultCompany 
         const r = await api.post('/admin/content/testimonials', body);
         result = r.data;
       }
-      onSaved(result, editing);
+      onSaved(result);
       onClose();
     } catch {
       // keep modal open on error
@@ -92,7 +97,10 @@ function TestimonialModal({ item, onClose, onSaved, defaultName, defaultCompany 
             <textarea rows={4} required value={form.review_text} onChange={set('review_text')} placeholder="Share your experience with Smart Task Allocation…"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
           </div>
-          <p className="text-xs text-gray-400">Submitted testimonials are reviewed by the system admin before appearing on the public site.</p>
+          <p className="text-xs text-gray-400">
+            Testimonials are selected automatically: 4★ or higher, {MIN_LENGTH}–{MAX_LENGTH} characters,
+            no links or contact details. You&apos;ll see the outcome as soon as you submit.
+          </p>
           <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
             <button type="submit" disabled={saving || !form.review_text.trim()} className="px-5 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
@@ -135,22 +143,22 @@ export default function Testimonials() {
 
   useEffect(() => { load(); }, [load]);
 
-  function handleSaved(saved, wasEdit) {
-    setItems((prev) => {
-      const next = wasEdit
-        ? prev.map((t) => (t.testimonial_id === saved.testimonial_id ? saved : t))
-        : [saved, ...prev];
-      return next.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    });
-    note(wasEdit ? 'Testimonial updated' : 'Testimonial submitted for review');
+  function handleSaved(saved) {
+    // The rules run on submit, so the outcome is known immediately. A save can also
+    // shuffle which other testimonials hold a landing-page slot, so reload the list.
+    note(saved.is_active
+      ? 'Published to the landing page'
+      : `Not published — ${saved.moderation?.reasons?.[0] ?? 'it did not meet the publication rules'}`);
+    load();
   }
 
   async function remove(t) {
     if (!confirm('Delete this testimonial?')) return;
     try {
       await api.delete(`/admin/content/testimonials/${t.testimonial_id}`);
-      setItems((prev) => prev.filter((x) => x.testimonial_id !== t.testimonial_id));
       note('Testimonial deleted');
+      // Deleting a published one frees a slot that a queued testimonial may now take.
+      load();
     } catch {
       note('Failed to delete testimonial.');
     }
@@ -162,7 +170,10 @@ export default function Testimonials() {
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-800">Testimonials</h2>
-            <p className="text-gray-500 text-sm mt-0.5">Submit testimonials for review. The system admin controls which ones appear on the public site.</p>
+            <p className="text-gray-500 text-sm mt-0.5">
+              Submit a testimonial and it is scored against the publication rules straight away —
+              no one approves it by hand.
+            </p>
           </div>
           <button onClick={() => setModal(null)} className="bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">+ New Testimonial</button>
         </div>
@@ -176,11 +187,16 @@ export default function Testimonials() {
                 <div className="px-5 py-4 flex-1">
                   <div className="flex items-center justify-between">
                     <Stars n={t.rating} />
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${t.is_active ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                      {t.is_active ? 'Published' : 'Pending review'}
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${t.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {t.is_active ? 'Published' : 'Not published'}
                     </span>
                   </div>
                   <p className="text-sm text-gray-700 mt-3 leading-relaxed">"{t.review_text}"</p>
+                  {!t.is_active && t.auto_reasons && (
+                    <p className="text-xs text-gray-500 mt-2.5 leading-relaxed">
+                      <span className="font-medium text-gray-600">Why:</span> {t.auto_reasons}
+                    </p>
+                  )}
                 </div>
                 <div className="px-5 py-3 border-t border-gray-50">
                   <p className="text-sm font-medium text-gray-800">{t.name}</p>

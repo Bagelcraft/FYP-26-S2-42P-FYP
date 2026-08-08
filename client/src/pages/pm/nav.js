@@ -7,7 +7,6 @@ export const PM_NAV = [
   { path: '/pm/calendar', icon: '📅', label: 'Calendar' },
   { path: '/pm/leave', icon: '🌴', label: 'Leave' },
   { path: '/pm/reports', icon: '📊', label: 'Reports' },
-  { path: '/pm/notifications', icon: '🔔', label: 'Notifications' },
 ];
 
 // Account / peripheral — rendered as a subordinate "Account" group at the

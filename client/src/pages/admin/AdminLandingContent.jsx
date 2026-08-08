@@ -24,6 +24,8 @@ export default function AdminLandingContent() {
   const [video, setVideo]     = useState({ video_title: '', video_subtitle: '', video_url: '' });
   const [pricing, setPricing] = useState({ plan_name: '', plan_price: '', plan_description: '' });
   const [testimonials, setTestimonials] = useState([]);
+  const [rules, setRules] = useState(null);
+  const [rerunning, setRerunning] = useState(false);
 
   const token   = localStorage.getItem('token');
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
@@ -33,9 +35,10 @@ export default function AdminLandingContent() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [contentRes, testimRes] = await Promise.all([
+      const [contentRes, testimRes, rulesRes] = await Promise.all([
         fetch(`${API_BASE}/admin/content`, { headers }),
         fetch(`${API_BASE}/admin/content/testimonials`, { headers }),
+        fetch(`${API_BASE}/admin/content/testimonials/rules`, { headers }),
       ]);
       const { content } = await contentRes.json();
       if (content) {
@@ -44,6 +47,7 @@ export default function AdminLandingContent() {
         setPricing({ plan_name: content.plan_name || '', plan_price: content.plan_price || '', plan_description: content.plan_description || '' });
       }
       setTestimonials(await testimRes.json());
+      setRules((await rulesRes.json()).rules ?? null);
     } catch {
       showToast('Failed to load content.', true);
     } finally {
@@ -76,19 +80,22 @@ export default function AdminLandingContent() {
     try { await put('pricing', pricing); showToast('Pricing section saved.'); } catch { showToast('Failed to save.', true); }
   };
 
-  const toggleTestimonial = async (t) => {
+  // There is deliberately no publish/hide control — the rules engine decides.
+  // This just re-runs it, which is what refills a slot freed by a deletion or
+  // picks up a newly submitted review.
+  const rerunSelection = async () => {
+    setRerunning(true);
     try {
-      const res = await fetch(`${API_BASE}/admin/content/testimonials/${t.testimonial_id}`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify({ is_active: !t.is_active }),
-      });
+      const res = await fetch(`${API_BASE}/admin/content/testimonials/reevaluate`, { method: 'POST', headers });
       if (!res.ok) throw new Error();
-      setTestimonials((prev) =>
-        prev.map((x) => x.testimonial_id === t.testimonial_id ? { ...x, is_active: !x.is_active } : x)
-      );
-      showToast(t.is_active ? 'Testimonial hidden from landing page.' : 'Testimonial shown on landing page.');
-    } catch { showToast('Failed to update testimonial.', true); }
+      const data = await res.json();
+      setTestimonials(data.testimonials ?? []);
+      showToast(`Rules applied to ${data.evaluated} testimonials — ${data.approved} published, ${data.rejected} held back.`);
+    } catch {
+      showToast('Failed to re-run the selection rules.', true);
+    } finally {
+      setRerunning(false);
+    }
   };
 
   const inputCls = 'w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent';
@@ -184,12 +191,37 @@ export default function AdminLandingContent() {
             {/* ── Testimonials ── */}
             {tab === 'Testimonials' && (
               <div className="space-y-4">
-                <div>
-                  <h3 className="font-semibold text-gray-800">Customer Testimonials</h3>
-                  <p className="text-sm text-gray-500 mt-0.5">
-                    These testimonials are submitted by customers. Toggle which ones appear on the landing page.
-                  </p>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="font-semibold text-gray-800">Customer Testimonials</h3>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      Selection is automatic. Every submitted testimonial is scored against the rules
+                      below and published only if it passes all of them — there is no manual override.
+                    </p>
+                  </div>
+                  <button
+                    onClick={rerunSelection}
+                    disabled={rerunning || testimonials.length === 0}
+                    className="flex-shrink-0 border border-gray-200 hover:bg-gray-50 disabled:opacity-50 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                  >
+                    {rerunning ? 'Re-running…' : 'Re-run selection'}
+                  </button>
                 </div>
+
+                {rules && (
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+                    <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-2">Publication rules</p>
+                    <ul className="text-xs text-blue-900/80 space-y-1">
+                      <li>• Rated {rules.MIN_RATING}★ or higher</li>
+                      <li>• Between {rules.MIN_LENGTH} and {rules.MAX_LENGTH} characters, at least {rules.MIN_WORDS} words</li>
+                      <li>• No profanity, promotional spam, links, emails, or phone numbers</li>
+                      <li>• Under {Math.round(rules.MAX_CAPS_RATIO * 100)}% uppercase, no excessive punctuation</li>
+                      <li>• Not a near-duplicate of an already published review</li>
+                      <li>• Top {rules.MAX_PUBLISHED} by quality score — the rest queue for the next free slot</li>
+                    </ul>
+                  </div>
+                )}
+
                 {testimonials.length === 0 ? (
                   <p className="text-gray-400 text-sm">No testimonials submitted yet.</p>
                 ) : (
@@ -203,17 +235,19 @@ export default function AdminLandingContent() {
                             <span className="text-yellow-400 text-xs">{'★'.repeat(t.rating)}{'☆'.repeat(5 - t.rating)}</span>
                           </div>
                           <p className="text-xs text-gray-500 mt-1 line-clamp-2">"{t.review_text}"</p>
+                          {!t.is_active && t.auto_reasons && (
+                            <p className="text-xs text-gray-500 mt-1.5">
+                              <span className="font-medium text-gray-600">Held back:</span> {t.auto_reasons}
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-3 ml-4 flex-shrink-0">
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${t.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                            {t.is_active ? 'Shown' : 'Hidden'}
+                          <span className="text-xs text-gray-400" title="Automated quality score out of 100">
+                            {t.auto_score}/100
                           </span>
-                          <button
-                            onClick={() => toggleTestimonial(t)}
-                            className={`text-xs font-medium hover:underline ${t.is_active ? 'text-red-500' : 'text-green-600'}`}
-                          >
-                            {t.is_active ? 'Hide' : 'Show'}
-                          </button>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${t.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                            {t.is_active ? 'Published' : 'Not published'}
+                          </span>
                         </div>
                       </div>
                     ))}

@@ -4,9 +4,14 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
+    "build": "prisma generate && prisma migrate deploy",
     "test": "jest --coverage",
     "test:features": "node scripts/test-features.js",
+    "test:xm": "node scripts/test-cross-module.js",
     "seed:test": "node prisma/seed-test-accounts.js",
+    "verify:links": "node scripts/verification-links.js",
+    "test:email": "node scripts/test-email.js",
+    "purge:test": "node prisma/purge-test-data.js",
     "lint": "eslint src/"
   },
   "prisma": {
@@ -23,12 +28,12 @@
     "express-validator": "^7.0.1",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "node-cron": "^3.0.3"
+    "node-cron": "^3.0.3",
+    "prisma": "^5.0.0"
   },
   "devDependencies": {
     "jest": "^29.7.0",
     "nodemon": "^3.1.14",
-    "prisma": "^5.0.0",
     "supertest": "^6.3.4"
   }
 }

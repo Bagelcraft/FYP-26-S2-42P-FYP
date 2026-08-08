@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const jwt = require('jsonwebtoken');
 const authService = require('../services/auth.service');
 const { verifyToken } = require('../middleware/auth.middleware');
+const { normaliseEmailSanitizer } = require('../utils/emailValidator');
 
 const router = express.Router();
 const prisma = require('../config/prisma');
@@ -17,7 +18,7 @@ function validate(req, res, next) {
 router.post(
   '/login',
   [
-    body('email').isEmail().withMessage('Valid email required').normalizeEmail(),
+    body('email').trim().isEmail().withMessage('Valid email required').customSanitizer(normaliseEmailSanitizer),
     body('password').notEmpty().withMessage('Password required'),
   ],
   validate,
@@ -61,7 +62,7 @@ router.post(
 // POST /api/v1/auth/forgot-password  — send reset link to email
 router.post(
   '/forgot-password',
-  [body('email').isEmail().withMessage('Valid email required').normalizeEmail()],
+  [body('email').trim().isEmail().withMessage('Valid email required').customSanitizer(normaliseEmailSanitizer)],
   validate,
   async (req, res, next) => {
     try {

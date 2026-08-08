@@ -1,5 +1,6 @@
 const { body, query, validationResult } = require('express-validator');
 const svc = require('../services/org-admin.service');
+const { normaliseEmailSanitizer } = require('../utils/emailValidator');
 
 function validate(req, res, next) {
   const errors = validationResult(req);
@@ -21,7 +22,8 @@ async function getProfile(req, res, next) {
 }
 
 const profileUpdateRules = [
-  body('name').trim().notEmpty().withMessage('name is required').isLength({ max: 150 }),
+  body('name').optional().trim().notEmpty().withMessage('name is required').isLength({ max: 150 }),
+  body('fiscal_year_start_month').optional().isInt({ min: 1, max: 12 }).withMessage('fiscal_year_start_month must be 1–12'),
 ];
 
 async function updateProfile(req, res, next) {
@@ -142,7 +144,7 @@ const WORKER_TYPES = ['PERMANENT_WORKER', 'TEMPORARY_WORKER', 'PROJECT_MANAGER',
 
 const staffRules = [
   body('full_name').trim().notEmpty().withMessage('full_name is required').isLength({ max: 100 }),
-  body('email').isEmail().withMessage('Valid email required').normalizeEmail(),
+  body('email').trim().isEmail().withMessage('Valid email required').customSanitizer(normaliseEmailSanitizer),
   body('user_type').isIn(WORKER_TYPES).withMessage(`user_type must be one of: ${WORKER_TYPES.join(', ')}`),
   body('role_id').optional({ nullable: true }).isInt({ min: 1 }),
   body('password').optional().isLength({ min: 8 }).withMessage('password must be at least 8 characters'),
@@ -150,6 +152,8 @@ const staffRules = [
   body('skill_ids.*').optional().isInt({ min: 1 }),
   body('annual_entitled').optional({ nullable: true }).isInt({ min: 0 }),
   body('medical_entitled').optional({ nullable: true }).isInt({ min: 0 }),
+  body('prorate_leave').optional().isBoolean(),
+  body('join_date').optional({ nullable: true }).isISO8601().withMessage('join_date must be a valid date'),
 ];
 
 const staffQueryRules = [
@@ -159,7 +163,7 @@ const staffQueryRules = [
 
 const staffUpdateRules = [
   body('full_name').optional().trim().notEmpty().isLength({ max: 100 }),
-  body('email').optional().isEmail().withMessage('Valid email required').normalizeEmail(),
+  body('email').optional().trim().isEmail().withMessage('Valid email required').customSanitizer(normaliseEmailSanitizer),
   body('user_type').optional().isIn(WORKER_TYPES).withMessage(`user_type must be one of: ${WORKER_TYPES.join(', ')}`),
   body('role_id').optional({ nullable: true }).isInt({ min: 1 }),
 ];
@@ -210,6 +214,18 @@ async function listShiftAssignments(req, res, next) {
 async function createShiftAssignment(req, res, next) {
   try { ok(res, await svc.createShiftAssignment(orgId(req), req.body), 201); } catch (e) { next(e); }
 }
+const shiftBulkAssignRules = [
+  body('user_ids').isArray({ min: 1 }).withMessage('Select at least one employee'),
+  body('user_ids.*').isInt({ min: 1 }),
+  body('shift_id').isInt({ min: 1 }).withMessage('shift_id is required'),
+  body('weekdays').isArray({ min: 1 }).withMessage('Select at least one working day'),
+  body('weekdays.*').isInt({ min: 0, max: 6 }),
+  body('from').isISO8601().withMessage('from must be a valid date'),
+  body('to').isISO8601().withMessage('to must be a valid date'),
+];
+async function bulkCreateShiftAssignments(req, res, next) {
+  try { ok(res, await svc.bulkCreateShiftAssignments(orgId(req), req.body), 201); } catch (e) { next(e); }
+}
 async function deleteShiftAssignment(req, res, next) {
   try { await svc.deleteShiftAssignment(orgId(req), id(req)); res.status(204).end(); } catch (e) { next(e); }
 }
@@ -227,16 +243,23 @@ async function renewSubscription(req, res, next) {
 async function cancelSubscription(req, res, next) {
   try { ok(res, await svc.cancelSubscription(orgId(req))); } catch (e) { next(e); }
 }
+async function listPlans(req, res, next) {
+  try { ok(res, await svc.listPlans()); } catch (e) { next(e); }
+}
+async function changePlan(req, res, next) {
+  try { ok(res, await svc.changePlan(orgId(req), req.body.plan_id)); } catch (e) { next(e); }
+}
 
 module.exports = {
   validate,
   getProfile, profileUpdateRules, updateProfile,
-  getSubscription, listBilling, renewSubscription, cancelSubscription,
+  getSubscription, listBilling, renewSubscription, cancelSubscription, listPlans, changePlan,
   deptRules, deptUpdateRules, listDepts, createDept, updateDept, deleteDept,
   roleRules, roleUpdateRules, listRoles, createRole, updateRole, deleteRole,
   skillRules, skillUpdateRules, listSkills, createSkill, updateSkill, deleteSkill,
   shiftRules, shiftUpdateRules, listShifts, createShift, updateShift, deleteShift,
   shiftAssignRules, listShiftAssignments, createShiftAssignment, deleteShiftAssignment,
+  shiftBulkAssignRules, bulkCreateShiftAssignments,
   staffRules, staffQueryRules, staffUpdateRules, listStaff, registerStaff, updateStaff, deactivateStaff, reactivateStaff,
   assignSkillRules, assignSkill, removeSkill,
 };

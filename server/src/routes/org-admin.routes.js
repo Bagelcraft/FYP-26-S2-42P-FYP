@@ -37,10 +37,12 @@ router.delete('/skills/:id',  c.deleteSkill);
 
 // ─── Subscription & Billing ───────────────────────────────────
 
-router.get('/subscription',         c.getSubscription);
-router.get('/billing',              c.listBilling);
-router.post('/subscription/renew',  c.renewSubscription);
-router.post('/subscription/cancel', c.cancelSubscription);
+router.get('/subscription',           c.getSubscription);
+router.get('/billing',                c.listBilling);
+router.get('/plans',                  c.listPlans);
+router.post('/subscription/renew',    c.renewSubscription);
+router.post('/subscription/cancel',   c.cancelSubscription);
+router.post('/subscription/change-plan', c.changePlan);
 
 // ─── Shift Templates ──────────────────────────────────────────
 
@@ -52,6 +54,7 @@ router.delete('/shifts/:id', c.deleteShift);
 // ─── Shift Assignments (roster) ───────────────────────────────
 router.get('/shift-assignments',        c.listShiftAssignments);
 router.post('/shift-assignments',       c.shiftAssignRules, c.validate, c.createShiftAssignment);
+router.post('/shift-assignments/bulk',  c.shiftBulkAssignRules, c.validate, c.bulkCreateShiftAssignments);
 router.delete('/shift-assignments/:id', c.deleteShiftAssignment);
 
 // ─── Shift-change requests (review) ───────────────────────────
