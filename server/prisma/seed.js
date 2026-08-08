@@ -299,18 +299,6 @@ async function main() {
     ],
   });
 
-  // ─── Notifications ────────────────────────────────────────────────────────
-
-  await prisma.notification.createMany({
-    data: [
-      { recipientId: permWorker.userId, type: 'TASK_ASSIGNED', message: 'You have been assigned a new task: Build Login API',                       isRead: false },
-      { recipientId: tempWorker.userId, type: 'TASK_ASSIGNED', message: 'You have been assigned a new task: Database Performance Review',           isRead: false },
-      { recipientId: pm.userId,         type: 'TASK_UPDATED',  message: 'Task "Database Performance Review" status changed to IN_PROGRESS',        isRead: true  },
-      { recipientId: perm5.userId,      type: 'TASK_ASSIGNED', message: 'You have been assigned a new task: UI Redesign Sprint',                    isRead: false },
-      { recipientId: perm3.userId,      type: 'TASK_ASSIGNED', message: 'You have been assigned a new task: API Integration Testing',               isRead: false },
-    ],
-  });
-
   // ─── Testimonial ──────────────────────────────────────────────────────────
 
   await prisma.testimonial.create({

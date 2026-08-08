@@ -1,5 +1,6 @@
 const bcrypt = require('bcrypt');
 const prisma = require('../config/prisma');
+const { checkEmailDeliverable } = require('../utils/emailValidator');
 
 function makeError(message, statusCode) {
   const err = new Error(message);
@@ -276,7 +277,13 @@ async function listStaff(organisationId, filters = {}) {
 }
 
 async function registerStaff(organisationId, data) {
-  const existing = await prisma.user.findUnique({ where: { email: data.email } });
+  // Staff can only sign in with an address that can actually receive mail (password
+  // resets go there), so the same deliverability gate as public registration applies.
+  const emailCheck = await checkEmailDeliverable(data.email);
+  if (!emailCheck.valid) throw makeError(emailCheck.reason, 400);
+  const email = emailCheck.email;
+
+  const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) throw makeError('Email already in use', 409);
 
   // Role (optional) + its required skills, which are auto-added to the employee.
@@ -327,7 +334,7 @@ async function registerStaff(organisationId, data) {
       organisationId,
       role_id:       data.role_id ?? null,
       full_name:     data.full_name,
-      email:         data.email,
+      email,
       password_hash,
       user_type:     data.user_type,
       is_active:     true,
@@ -353,8 +360,13 @@ async function updateStaff(organisationId, userId, data) {
   const user = await prisma.user.findFirst({ where: { userId, organisationId } });
   if (!user) throw makeError('Staff member not found', 404);
 
+  let email;
   if (data.email && data.email !== user.email) {
-    const existing = await prisma.user.findUnique({ where: { email: data.email } });
+    const emailCheck = await checkEmailDeliverable(data.email);
+    if (!emailCheck.valid) throw makeError(emailCheck.reason, 400);
+    email = emailCheck.email;
+
+    const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) throw makeError('Email already in use', 409);
   }
   if (data.role_id) {
@@ -366,7 +378,7 @@ async function updateStaff(organisationId, userId, data) {
     where: { userId },
     data: {
       full_name: data.full_name !== undefined ? data.full_name : undefined,
-      email:     data.email     !== undefined ? data.email     : undefined,
+      email,
       role_id:   data.role_id   !== undefined ? data.role_id   : undefined,
       user_type: data.user_type !== undefined ? data.user_type : undefined,
     },

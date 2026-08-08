@@ -3,7 +3,7 @@
  *
  * Creates the fixed test identities and populates the **Acme** tenant with rich
  * demo/test data (skills, departments, roles, staff, tasks, shifts, availability,
- * leave, notifications) so the test accounts have something to work with for
+ * leave) so the test accounts have something to work with for
  * debugging. Also removes the legacy standalone demo orgs (TechCorp / BuildTech /
  * LogiCore) so the platform behaves like a normal product: a normally-registered
  * organisation starts with a clean slate — only the test accounts see seeded data.
@@ -67,7 +67,6 @@ async function deleteOrgCascade(orgId) {
   const subs = await prisma.subscription.findMany({ where: { organisation_id: orgId }, select: { subscription_id: true } });
   const del = async (fn) => { try { await fn(); } catch {} };
 
-  await del(() => prisma.notification.deleteMany({ where: { recipientId: { in: uids } } }));
   await del(() => prisma.allocationHistory.deleteMany({ where: { OR: [{ task_id: { in: tids } }, { user_id: { in: uids } }, { changed_by: { in: uids } }] } }));
   await del(() => prisma.taskUpdateRequest.deleteMany({ where: { OR: [{ task_id: { in: tids } }, { requested_by: { in: uids } }] } }));
   await del(() => prisma.taskAssignment.deleteMany({ where: { OR: [{ task_id: { in: tids } }, { assigned_to: { in: uids } }, { assigned_by: { in: uids } }] } }));
@@ -104,7 +103,6 @@ async function clearAcmeData(orgId, coreEmails) {
   const tids = tasks.map((t) => t.task_id);
   const roles = await prisma.staffRole.findMany({ where: { organisation_id: orgId }, select: { role_id: true } });
   const del = async (fn) => { try { await fn(); } catch {} };
-  await del(() => prisma.notification.deleteMany({ where: { recipientId: { in: uids } } }));
   await del(() => prisma.allocationHistory.deleteMany({ where: { OR: [{ task_id: { in: tids } }, { user_id: { in: uids } }] } }));
   await del(() => prisma.taskUpdateRequest.deleteMany({ where: { task_id: { in: tids } } }));
   await del(() => prisma.taskAssignment.deleteMany({ where: { task_id: { in: tids } } }));
@@ -199,15 +197,6 @@ async function seedAcmeData(orgId, core, password_hash) {
   // Leave requests (pending — show up on the manager dashboard for approval)
   await prisma.leaveRequest.create({ data: { user_id: core.perm.userId, leave_type: 'ANNUAL', start_date: dateOnly(10), end_date: dateOnly(12), status: 'PENDING' } });
   await prisma.leaveRequest.create({ data: { user_id: dana.userId, leave_type: 'MEDICAL', start_date: dateOnly(5), end_date: dateOnly(5), status: 'PENDING' } });
-
-  // Notifications (real unread counts for the bell; list matches)
-  const notif = (recipientId, type, message, isRead = false) => prisma.notification.create({ data: { recipientId, type, message, isRead } });
-  await notif(core.admin.userId, 'STAFF', 'Dana Lee requested a profile change.');
-  await notif(core.admin.userId, 'SYSTEM', 'Your subscription renews in 14 days.', true);
-  await notif(core.pm.userId, 'TASK_UPDATED', 'Warehouse Audit was submitted for your approval.');
-  await notif(core.pm.userId, 'STAFF', 'Perm Worker applied for annual leave.');
-  await notif(core.perm.userId, 'TASK_ASSIGNED', 'You were assigned: Build Login API.');
-  await notif(core.temp.userId, 'TASK_UPDATED', 'Your Monthly Stocktake was approved (8h logged).', true);
 }
 
 // Subscription plans + their gated features (matched to a subscription by price).

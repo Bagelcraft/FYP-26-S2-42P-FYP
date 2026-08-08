@@ -1,4 +1,5 @@
 const prisma = require('../config/prisma');
+const { sendRegistrationApprovedEmail } = require('./email.service');
 
 function makeError(message, statusCode) {
   const err = new Error(message);
@@ -22,7 +23,9 @@ async function listPendingRegistrations() {
       full_name:         true,
       email:             true,
       company_name:      true,
+      uen:               true,
       position:          true,
+      email_verified:    true,
       created_at:        true,
     },
   });
@@ -37,12 +40,26 @@ async function approveRegistration(marketingUserId) {
   });
   if (!pending) throw makeError('Registration request not found', 404);
 
+  // The applicant must have proved they own the address before we mint an account
+  // they would then be unable to sign in to (login refuses unverified emails).
+  if (!pending.email_verified) {
+    throw makeError('This applicant has not verified their email address yet', 409);
+  }
+
   const existingUser = await prisma.user.findUnique({ where: { email: pending.email } });
   if (existingUser) throw makeError('A user with this email already exists', 409);
 
+  if (pending.uen) {
+    const uenTaken = await prisma.organisation.findFirst({ where: { uen: pending.uen } });
+    if (uenTaken) throw makeError('An organisation with this UEN is already registered', 409);
+  }
+
   const user = await prisma.$transaction(async (tx) => {
     const org = await tx.organisation.create({
-      data: { name: pending.company_name || pending.full_name || pending.email },
+      data: {
+        name: pending.company_name || pending.full_name || pending.email,
+        uen:  pending.uen ?? null,
+      },
     });
 
     const created = await tx.user.create({
@@ -53,6 +70,7 @@ async function approveRegistration(marketingUserId) {
         password_hash:  pending.password,
         user_type:      'ORG_ADMIN',
         is_active:      true,
+        email_verified: true,
       },
     });
 
@@ -60,6 +78,13 @@ async function approveRegistration(marketingUserId) {
 
     return created;
   });
+
+  // Best-effort courtesy notice — a mail failure must not undo an approved account.
+  try {
+    await sendRegistrationApprovedEmail({ to: user.email, name: user.full_name });
+  } catch (err) {
+    console.error('Failed to send approval email:', err.message);
+  }
 
   return sanitizeUser(user);
 }
@@ -81,6 +106,7 @@ async function listOrganisations() {
     select: {
       organisation_id: true,
       name:            true,
+      uen:             true,
       isActive:        true,
       createdAt:       true,
       _count:          { select: { users: true } },
@@ -108,7 +134,10 @@ async function setOrganisationActive(organisationId, isActive) {
 async function getAuditLogs(filters = {}) {
   const limit = Math.min(Number(filters.limit) || 200, 500);
 
-  const [users, assignments, attendance, leave, orgs] = await Promise.all([
+  // NOTE: organisation lifecycle events are deliberately not part of the audit
+  // trail — this log covers user and activity events only. Organisation records
+  // live on the Organisations page.
+  const [users, assignments, attendance, leave] = await Promise.all([
     prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
       take: limit,
@@ -142,11 +171,6 @@ async function getAuditLogs(filters = {}) {
         leave_id: true, leave_type: true, status: true, start_date: true,
         user: { select: { full_name: true, organisation: { select: { name: true } } } },
       },
-    }),
-    prisma.organisation.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      select: { organisation_id: true, name: true, isActive: true, createdAt: true },
     }),
   ]);
 
@@ -182,14 +206,6 @@ async function getAuditLogs(filters = {}) {
       org:      l.user?.organisation?.name ?? '—',
       category: 'STAFF',
       time:     l.start_date,
-    })),
-    ...orgs.map((o) => ({
-      id:       `org-${o.organisation_id}`,
-      action:   'Organisation registered',
-      user:     'system',
-      org:      o.name,
-      category: 'SYSTEM',
-      time:     o.createdAt,
     })),
   ];
 

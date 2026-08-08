@@ -1,5 +1,6 @@
 const { body, query, validationResult } = require('express-validator');
 const svc = require('../services/org-admin.service');
+const { normaliseEmailSanitizer } = require('../utils/emailValidator');
 
 function validate(req, res, next) {
   const errors = validationResult(req);
@@ -143,7 +144,7 @@ const WORKER_TYPES = ['PERMANENT_WORKER', 'TEMPORARY_WORKER', 'PROJECT_MANAGER',
 
 const staffRules = [
   body('full_name').trim().notEmpty().withMessage('full_name is required').isLength({ max: 100 }),
-  body('email').isEmail().withMessage('Valid email required').normalizeEmail(),
+  body('email').trim().isEmail().withMessage('Valid email required').customSanitizer(normaliseEmailSanitizer),
   body('user_type').isIn(WORKER_TYPES).withMessage(`user_type must be one of: ${WORKER_TYPES.join(', ')}`),
   body('role_id').optional({ nullable: true }).isInt({ min: 1 }),
   body('password').optional().isLength({ min: 8 }).withMessage('password must be at least 8 characters'),
@@ -162,7 +163,7 @@ const staffQueryRules = [
 
 const staffUpdateRules = [
   body('full_name').optional().trim().notEmpty().isLength({ max: 100 }),
-  body('email').optional().isEmail().withMessage('Valid email required').normalizeEmail(),
+  body('email').optional().trim().isEmail().withMessage('Valid email required').customSanitizer(normaliseEmailSanitizer),
   body('user_type').optional().isIn(WORKER_TYPES).withMessage(`user_type must be one of: ${WORKER_TYPES.join(', ')}`),
   body('role_id').optional({ nullable: true }).isInt({ min: 1 }),
 ];

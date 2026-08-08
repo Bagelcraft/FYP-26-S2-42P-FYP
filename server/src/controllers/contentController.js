@@ -1,4 +1,6 @@
 const prisma = require("../config/prisma");
+const { DEFAULT_LANDING_FEATURES } = require("../utils/landingDefaults");
+const moderation = require("../services/testimonialModeration.service");
 
 const getOrCreateContent = async () => {
   let content = await prisma.landingContent.findFirst();
@@ -15,18 +17,29 @@ const getOrCreateContent = async () => {
   return content;
 };
 
+// Seed the marketing page with the product's real feature list the first time it
+// is read, so a fresh install never renders an empty Features section.
+const getOrSeedFeatures = async ({ activeOnly }) => {
+  const total = await prisma.landingFeature.count();
+  if (total === 0) {
+    await prisma.landingFeature.createMany({ data: DEFAULT_LANDING_FEATURES });
+  }
+
+  return prisma.landingFeature.findMany({
+    where: activeOnly ? { is_active: true } : undefined,
+    orderBy: { sort_order: "asc" },
+  });
+};
+
 exports.getContent = async (req, res) => {
   try {
     const content = await getOrCreateContent();
+    const features = await getOrSeedFeatures({ activeOnly: true });
 
-    const features = await prisma.landingFeature.findMany({
-      where: { is_active: true },
-      orderBy: { sort_order: "asc" },
-    });
-
+    // Only rule-approved testimonials are public; best-scoring first.
     const testimonials = await prisma.landingTestimonial.findMany({
       where: { is_active: true },
-      orderBy: { created_at: "desc" },
+      orderBy: [{ auto_score: "desc" }, { created_at: "desc" }],
     });
 
     res.json({ content, features, testimonials });
@@ -85,11 +98,7 @@ exports.updatePricing = async (req, res) => {
 
 exports.getFeatures = async (req, res) => {
   try {
-    const features = await prisma.landingFeature.findMany({
-      orderBy: { sort_order: "asc" },
-    });
-
-    res.json(features);
+    res.json(await getOrSeedFeatures({ activeOnly: false }));
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch features", error: error.message });
   }
@@ -148,15 +157,43 @@ exports.getTestimonials = async (req, res) => {
   }
 };
 
+// The publication rules the automated selector applies — surfaced so the admin UI
+// can explain the decisions instead of offering a manual override.
+exports.getTestimonialRules = async (req, res) => {
+  res.json({ rules: moderation.RULES });
+};
+
+// Every write runs the full selection so the landing page always reflects the
+// current best set — a new arrival can displace nothing, but an edit or deletion
+// can free a slot that a queued testimonial should immediately take.
+const settle = async (testimonialId) => {
+  await moderation.reevaluateAll();
+  const row = await prisma.landingTestimonial.findUnique({
+    where: { testimonial_id: testimonialId },
+  });
+  return {
+    ...row,
+    moderation: {
+      status:  row.auto_status,
+      score:   row.auto_score,
+      reasons: row.auto_reasons ? [row.auto_reasons] : [],
+    },
+  };
+};
+
 exports.createTestimonial = async (req, res) => {
   try {
     const { name, company, rating, review_text } = req.body;
+    const submitted = { name, company, rating: rating ?? 5, review_text };
 
-    const testimonial = await prisma.landingTestimonial.create({
-      data: { name, company, rating: rating ?? 5, review_text, is_active: false },
+    // Publication is decided here, by rule — never by hand afterwards.
+    const { row } = await moderation.evaluateAgainstLive(submitted);
+
+    const created = await prisma.landingTestimonial.create({
+      data: { ...submitted, ...row },
     });
 
-    res.status(201).json(testimonial);
+    res.status(201).json(await settle(created.testimonial_id));
   } catch (error) {
     res.status(500).json({ message: "Failed to create testimonial", error: error.message });
   }
@@ -164,23 +201,50 @@ exports.createTestimonial = async (req, res) => {
 
 exports.updateTestimonial = async (req, res) => {
   try {
-    const { name, company, rating, review_text, is_active } = req.body;
+    const testimonialId = parseInt(req.params.id);
+    const existing = await prisma.landingTestimonial.findUnique({
+      where: { testimonial_id: testimonialId },
+    });
+    if (!existing) return res.status(404).json({ message: "Testimonial not found" });
+
+    const { name, company, rating, review_text } = req.body;
 
     const data = {};
     if (name        !== undefined) data.name        = name;
     if (company     !== undefined) data.company     = company;
     if (rating      !== undefined) data.rating      = rating;
     if (review_text !== undefined) data.review_text = review_text;
-    if (is_active   !== undefined) data.is_active   = is_active;
+    // NOTE: is_active is intentionally not accepted from the client. Whether a
+    // testimonial appears on the landing page is decided by the rules below.
 
-    const testimonial = await prisma.landingTestimonial.update({
-      where: { testimonial_id: parseInt(req.params.id) },
-      data,
+    const { row } = await moderation.evaluateAgainstLive(
+      { ...existing, ...data },
+      testimonialId,
+    );
+
+    await prisma.landingTestimonial.update({
+      where: { testimonial_id: testimonialId },
+      data: { ...data, ...row },
     });
 
-    res.json(testimonial);
+    res.json(await settle(testimonialId));
   } catch (error) {
     res.status(500).json({ message: "Failed to update testimonial", error: error.message });
+  }
+};
+
+// Re-runs the rules over every testimonial and refills the landing-page slots by
+// score. Used after the rules change, or to fill a slot freed by a deletion.
+exports.reevaluateTestimonials = async (req, res) => {
+  try {
+    const summary = await moderation.reevaluateAll();
+    const testimonials = await prisma.landingTestimonial.findMany({
+      orderBy: { created_at: "desc" },
+    });
+
+    res.json({ ...summary, testimonials });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to re-evaluate testimonials", error: error.message });
   }
 };
 
@@ -190,7 +254,11 @@ exports.deleteTestimonial = async (req, res) => {
       where: { testimonial_id: parseInt(req.params.id) },
     });
 
-    res.json({ message: "Testimonial deleted successfully" });
+    // Deleting a published testimonial frees a landing-page slot — refill it from
+    // the queue straight away rather than leaving a gap until the next submission.
+    const summary = await moderation.reevaluateAll();
+
+    res.json({ message: "Testimonial deleted successfully", ...summary });
   } catch (error) {
     res.status(500).json({ message: "Failed to delete testimonial", error: error.message });
   }

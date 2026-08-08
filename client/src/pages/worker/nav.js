@@ -5,6 +5,5 @@ export const WORKER_NAV = [
   { path: '/worker/calendar', icon: '🗓️', label: 'Calendar' },
   { path: '/worker/attendance', icon: '🕐', label: 'Time Sheet' },
   { path: '/worker/leave', icon: '🌴', label: 'Leave' },
-  { path: '/worker/notifications', icon: '🔔', label: 'Notifications' },
   { path: '/worker/profile', icon: '👤', label: 'Profile' },
 ];

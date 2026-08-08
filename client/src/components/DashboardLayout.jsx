@@ -1,7 +1,5 @@
-import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import api from '../utils/api';
 
 // `secondaryNav` (optional) renders a subordinate "Account" group at the
 // bottom of the sidebar — used by the PM portal for Subscription / Testimonials
@@ -10,16 +8,6 @@ export default function DashboardLayout({ children, navItems, secondaryNav = [],
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [unread, setUnread] = useState(0);
-
-  // Live unread-notification count for the topbar bell; refreshes on navigation.
-  useEffect(() => {
-    let alive = true;
-    api.get('/notifications/unread-count')
-      .then((r) => { if (alive) setUnread(r.data.data?.count ?? 0); })
-      .catch(() => { if (alive) setUnread(0); });
-    return () => { alive = false; };
-  }, [location.pathname]);
 
   const handleLogout = () => {
     logout();
@@ -92,14 +80,6 @@ export default function DashboardLayout({ children, navItems, secondaryNav = [],
           <h1 className="text-gray-800 font-semibold">{currentPage?.label ?? 'Dashboard'}</h1>
           <div className="flex items-center gap-4">
             {topbarRight}
-            <Link to={`${navItems[0].path.split('/').slice(0, 2).join('/')}/notifications`} className="relative text-gray-400 hover:text-gray-600 text-lg">
-              🔔
-              {unread > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-red-500 rounded-full text-white text-[10px] font-semibold flex items-center justify-center">
-                  {unread > 9 ? '9+' : unread}
-                </span>
-              )}
-            </Link>
             <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-white text-sm font-bold">
               {user?.full_name?.[0] ?? 'U'}
             </div>

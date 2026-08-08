@@ -103,18 +103,25 @@ export default function Organisations() {
 
         {/* Pending registration requests */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-gray-800">Pending Registration Requests</h3>
-            {pending.length > 0 && (
-              <span className="text-xs font-medium text-yellow-700 bg-yellow-100 rounded-full px-2 py-0.5">
-                {pending.length}
-              </span>
-            )}
+          <div className="px-5 py-3 border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-gray-800">Pending Registration Requests</h3>
+              {pending.length > 0 && (
+                <span className="text-xs font-medium text-yellow-700 bg-yellow-100 rounded-full px-2 py-0.5">
+                  {pending.length}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Check each UEN against BizFile before approving. Requests can only be approved once the
+              applicant has verified their email address.
+            </p>
           </div>
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
                 <th className="px-5 py-3 text-left font-medium">Company</th>
+                <th className="px-5 py-3 text-left font-medium">UEN</th>
                 <th className="px-5 py-3 text-left font-medium">Applicant</th>
                 <th className="px-5 py-3 text-left font-medium">Email</th>
                 <th className="px-5 py-3 text-left font-medium">Position</th>
@@ -126,16 +133,46 @@ export default function Organisations() {
               {pending.map((r) => (
                 <tr key={r.marketing_user_id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-5 py-3 font-medium text-gray-800">{r.company_name}</td>
+                  <td className="px-5 py-3">
+                    {r.uen ? (
+                      <a
+                        href={`https://www.bizfile.gov.sg/ngbbizfileinternet/faces/oracle/webcenter/portalapp/pages/EntitySearch.jspx?searchText=${encodeURIComponent(r.uen)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        title="Look this UEN up on BizFile"
+                        className="font-mono text-xs text-primary-600 hover:underline"
+                      >
+                        {r.uen}
+                      </a>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </td>
                   <td className="px-5 py-3 text-gray-600">{r.full_name ?? '—'}</td>
-                  <td className="px-5 py-3 text-gray-600">{r.email}</td>
+                  <td className="px-5 py-3 text-gray-600">
+                    <div className="flex items-center gap-2">
+                      <span>{r.email}</span>
+                      <span
+                        title={r.email_verified
+                          ? 'Applicant confirmed this address via the emailed link'
+                          : 'Applicant has not clicked the verification link yet'}
+                        className={`text-[10px] font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${
+                          r.email_verified ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                        }`}
+                      >
+                        {r.email_verified ? 'Verified' : 'Unverified'}
+                      </span>
+                    </div>
+                  </td>
                   <td className="px-5 py-3 text-gray-500">{r.position ?? '—'}</td>
                   <td className="px-5 py-3 text-gray-500">{fmtDate(r.created_at)}</td>
                   <td className="px-5 py-3">
                     <div className="flex gap-3">
                       <button
                         onClick={() => approve(r.marketing_user_id)}
-                        disabled={actingId === r.marketing_user_id}
-                        className="text-xs font-medium text-green-600 hover:underline disabled:opacity-50"
+                        disabled={actingId === r.marketing_user_id || !r.email_verified}
+                        title={r.email_verified ? undefined : 'Cannot approve until the applicant verifies their email'}
+                        className="text-xs font-medium text-green-600 hover:underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed"
                       >
                         Approve
                       </button>
@@ -152,7 +189,7 @@ export default function Organisations() {
               ))}
               {!loading && pending.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-8 text-center text-gray-400">No pending requests.</td>
+                  <td colSpan={7} className="px-5 py-8 text-center text-gray-400">No pending requests.</td>
                 </tr>
               )}
             </tbody>
@@ -185,6 +222,7 @@ export default function Organisations() {
             <thead>
               <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
                 <th className="px-5 py-3 text-left font-medium">Organisation</th>
+                <th className="px-5 py-3 text-left font-medium">UEN</th>
                 <th className="px-5 py-3 text-left font-medium">Staff</th>
                 <th className="px-5 py-3 text-left font-medium">Registered</th>
                 <th className="px-5 py-3 text-left font-medium">Status</th>
@@ -195,6 +233,7 @@ export default function Organisations() {
               {filtered.map((org) => (
                 <tr key={org.organisation_id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-5 py-3 font-medium text-gray-800">{org.name}</td>
+                  <td className="px-5 py-3 font-mono text-xs text-gray-500">{org.uen ?? '—'}</td>
                   <td className="px-5 py-3 text-gray-600">{org._count?.users ?? 0}</td>
                   <td className="px-5 py-3 text-gray-500">{fmtDate(org.createdAt)}</td>
                   <td className="px-5 py-3"><Badge status={org.isActive ? 'ACTIVE' : 'SUSPENDED'} /></td>
@@ -211,12 +250,12 @@ export default function Organisations() {
               ))}
               {!loading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-10 text-center text-gray-400">No organisations found.</td>
+                  <td colSpan={6} className="px-5 py-10 text-center text-gray-400">No organisations found.</td>
                 </tr>
               )}
               {loading && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-10 text-center text-gray-400">Loading…</td>
+                  <td colSpan={6} className="px-5 py-10 text-center text-gray-400">Loading…</td>
                 </tr>
               )}
             </tbody>

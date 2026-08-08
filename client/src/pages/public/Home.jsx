@@ -21,9 +21,25 @@ function toEmbedUrl(url) {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
+// What the product actually ships. The server seeds the same list into
+// LandingFeature (server/src/utils/landingDefaults.js) and the admin can edit it
+// there; this is the fallback for when the API is unreachable, so the marketing
+// page never renders an empty Features section.
+const FALLBACK_FEATURES = [
+  { icon: '🤖', title: 'Automated Task Allocation', description: 'Match every task to the right person automatically, based on required skills, current availability, and workload — no more manual rostering.' },
+  { icon: '📋', title: 'Task Management',           description: 'Create tasks, set start and end times, attach required skills, and follow each one from Pending through to Completed in real time.' },
+  { icon: '🕐', title: 'Shift Scheduling',          description: 'Build reusable shift templates and roster staff onto them by date. Everyone sees their own schedule the moment it is published.' },
+  { icon: '🔄', title: 'Shift Change Requests',     description: 'Staff request a swap, managers approve or reject it in one click, and the roster updates itself — with a full record of who decided what.' },
+  { icon: '🌴', title: 'Leave Management',          description: 'Annual, medical, and unpaid leave with balances that prorate automatically for staff who join mid financial year, plus a manager approval flow.' },
+  { icon: '⏱️', title: 'Attendance & Time Sheets',  description: 'Clock in and out from any device. Working hours are totalled for you and feed straight into reporting.' },
+  { icon: '🎯', title: 'Skills & Role Management',  description: 'Maintain a skills register with certification tracking, define the skills each role requires, and have them applied to new staff on day one.' },
+  { icon: '📊', title: 'Reports & Analytics',       description: 'Track completion rates, workload distribution, and attendance across your team, and export the results when you need them.' },
+  { icon: '🔐', title: 'Role-Based Portals',        description: 'Separate, purpose-built views for organisation admins, project managers, permanent staff, and temporary staff — each seeing only what they should.' },
+];
+
 export default function Home() {
   const [content, setContent] = useState(null);
-  const [features, setFeatures] = useState([]);
+  const [features, setFeatures] = useState(FALLBACK_FEATURES);
   const [testimonials, setTestimonials] = useState([]);
 
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
@@ -170,21 +186,28 @@ export default function Home() {
       {/* Navbar */}
       <nav className="sticky top-0 z-50 border-b border-slate-800 bg-slate-950 backdrop-blur-md">
         <div className="w-full px-8 h-16 flex items-center justify-between">
-          <span className="text-blue-400 font-bold text-lg tracking-tight">SmartTask</span>
+          <a href="#top" className="text-blue-400 font-bold text-lg tracking-tight">SmartTask</a>
           <div className="hidden md:flex items-center gap-8 text-sm text-slate-300 font-medium">
+            <a href="#top" className="hover:text-white transition-colors">Home</a>
             <a href="#features" className="hover:text-white transition-colors">Features</a>
             <a href="#demo" className="hover:text-white transition-colors">About Us</a>
             <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+            <a href="#testimonials" className="hover:text-white transition-colors">Testimonials</a>
             <a href="#contact" className="hover:text-white transition-colors">Contact Us</a>
           </div>
-          <Link to="/login" className="bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors">
-            Log In
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link to="/login" className="text-slate-300 hover:text-white text-sm font-medium px-4 py-2 rounded-lg border border-slate-700 hover:border-slate-500 transition-colors">
+              Log In
+            </Link>
+            <Link to="/register" className="bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors">
+              Sign Up
+            </Link>
+          </div>
         </div>
       </nav>
 
       {/* Hero */}
-      <section className="flex min-h-[calc(100vh-64px)]">
+      <section id="top" className="flex min-h-[calc(100vh-64px)] scroll-mt-16">
         <div className="flex-1 bg-slate-950 flex items-center px-10 lg:px-20 py-14">
           <div className="max-w-lg">
             <span className="inline-block text-primary-400 text-xs font-semibold uppercase tracking-widest mb-3">
@@ -264,7 +287,7 @@ export default function Home() {
       </section>
 
       {/* Features */}
-      <section id="features" className="bg-white py-14">
+      <section id="features" className="bg-white py-14 scroll-mt-16">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-8">
             <span className="text-primary-600 text-xs font-semibold uppercase tracking-widest">Features</span>
@@ -288,7 +311,7 @@ export default function Home() {
       </section>
 
       {/* Demo / About */}
-      <section id="demo" className="bg-slate-950 py-14">
+      <section id="demo" className="bg-slate-950 py-14 scroll-mt-16">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center gap-10">
           <div className="flex-1">
             <span className="text-primary-400 text-xs font-semibold uppercase tracking-widest">See it in action</span>
@@ -315,7 +338,7 @@ export default function Home() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="bg-white py-14">
+      <section id="pricing" className="bg-white py-14 scroll-mt-16">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-8">
             <span className="text-primary-600 text-xs font-semibold uppercase tracking-widest">Pricing</span>
@@ -352,12 +375,17 @@ export default function Home() {
       </section>
 
       {/* Testimonials */}
-      <section id="testimonials" className="bg-gray-50 py-14">
+      <section id="testimonials" className="bg-gray-50 py-14 scroll-mt-16">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-8">
             <span className="text-primary-600 text-xs font-semibold uppercase tracking-widest">Testimonials</span>
             <h2 className="text-3xl font-bold text-gray-900 mt-2">What our customers say</h2>
           </div>
+          {testimonials.length === 0 && (
+            <p className="text-center text-gray-400 text-sm py-8">
+              No customer reviews have been published yet — check back soon.
+            </p>
+          )}
           <div className="grid md:grid-cols-3 gap-6">
             {testimonials.map((t) => (
               <div key={t.testimonial_id ?? t.name} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-7 flex flex-col justify-between">
@@ -385,7 +413,7 @@ export default function Home() {
       </section>
 
       {/* Contact Us */}
-      <section id="contact" className="bg-white py-14">
+      <section id="contact" className="bg-white py-14 scroll-mt-16">
         <div className="max-w-3xl mx-auto px-6">
           <div className="text-center mb-8">
             <span className="text-primary-600 text-xs font-semibold uppercase tracking-widest">Get In Touch</span>

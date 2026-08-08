@@ -16,8 +16,10 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-const TEST_ORG_NAMES     = ['Acme', 'Globex', 'TechCorp Pte Ltd', 'BuildTech Solutions', 'LogiCore Asia'];
-const TEST_EMAIL_DOMAINS = ['@acme.test', '@globex.test', '@sta.test'];
+// 'NewCo' and the *.test.local domain are created by scripts/test-cross-module.js,
+// which registers throwaway organisations on every run.
+const TEST_ORG_NAMES     = ['Acme', 'Globex', 'NewCo', 'TechCorp Pte Ltd', 'BuildTech Solutions', 'LogiCore Asia'];
+const TEST_EMAIL_DOMAINS = ['@acme.test', '@globex.test', '@sta.test', '@test.local'];
 const CONFIRM = process.argv.includes('--yes');
 
 // Delete a whole organisation and everything that references it / its users.
@@ -30,7 +32,6 @@ async function deleteOrgCascade(orgId) {
   const subs = await prisma.subscription.findMany({ where: { organisation_id: orgId }, select: { subscription_id: true } });
   const del = async (fn) => { try { await fn(); } catch {} };
 
-  await del(() => prisma.notification.deleteMany({ where: { recipientId: { in: uids } } }));
   await del(() => prisma.allocationHistory.deleteMany({ where: { OR: [{ task_id: { in: tids } }, { user_id: { in: uids } }, { changed_by: { in: uids } }] } }));
   await del(() => prisma.taskUpdateRequest.deleteMany({ where: { OR: [{ task_id: { in: tids } }, { requested_by: { in: uids } }] } }));
   await del(() => prisma.taskAssignment.deleteMany({ where: { OR: [{ task_id: { in: tids } }, { assigned_to: { in: uids } }, { assigned_by: { in: uids } }] } }));
@@ -47,6 +48,9 @@ async function deleteOrgCascade(orgId) {
   await del(() => prisma.shiftTemplate.deleteMany({ where: { organisation_id: orgId } }));
   await del(() => prisma.feedback.deleteMany({ where: { user_id: { in: uids } } }));
   await del(() => prisma.testimonial.deleteMany({ where: { user_id: { in: uids } } }));
+  // Pending registrations hold an optional FK to the org — clear them first or the
+  // organisation delete below fails (silently, since del() swallows errors).
+  await del(() => prisma.unregisteredUser.deleteMany({ where: { organisation_id: orgId } }));
   await del(() => prisma.roleSkill.deleteMany({ where: { role_id: { in: roles.map((r) => r.role_id) } } }));
   await del(() => prisma.user.updateMany({ where: { organisationId: orgId }, data: { role_id: null } }));
   await del(() => prisma.staffRole.deleteMany({ where: { organisation_id: orgId } }));
@@ -62,7 +66,6 @@ async function deleteOrgCascade(orgId) {
 // Remove an orphan test user (e.g. sysadmin@sta.test) that isn't tied to a test org.
 async function deleteOrphanUser(userId) {
   const del = async (fn) => { try { await fn(); } catch {} };
-  await del(() => prisma.notification.deleteMany({ where: { recipientId: userId } }));
   await del(() => prisma.feedback.deleteMany({ where: { user_id: userId } }));
   await del(() => prisma.testimonial.deleteMany({ where: { user_id: userId } }));
   await del(() => prisma.user.delete({ where: { userId } }));
@@ -74,11 +77,20 @@ async function main() {
   const testUsers = await prisma.user.findMany({ where: domainFilter, select: { userId: true, email: true, organisationId: true } });
   const orphanUsers = testUsers.filter((u) => !orgs.some((o) => o.organisation_id === u.organisationId));
 
+  // Registration requests that never became accounts — left behind by the
+  // cross-module test script and by any abandoned signup on a test domain.
+  const pending = await prisma.unregisteredUser.findMany({
+    where: domainFilter,
+    select: { marketing_user_id: true, email: true, company_name: true },
+  });
+
   console.log(`Target database host: ${(process.env.DATABASE_URL || '').match(/@([^:/?]+)/)?.[1] || 'unknown'}`);
   console.log(`\nTest organisations to remove (${orgs.length}):`);
   orgs.forEach((o) => console.log(`  - ${o.name} (#${o.organisation_id})`));
   console.log(`\nOrphan test accounts to remove (${orphanUsers.length}):`);
   orphanUsers.forEach((u) => console.log(`  - ${u.email}`));
+  console.log(`\nPending registration requests to remove (${pending.length}):`);
+  pending.forEach((p) => console.log(`  - ${p.email}`));
 
   if (!CONFIRM) {
     console.log('\n🔎 DRY RUN — nothing deleted. Re-run with --yes to apply.');
@@ -87,6 +99,10 @@ async function main() {
 
   for (const o of orgs) { await deleteOrgCascade(o.organisation_id); console.log(`  removed org: ${o.name}`); }
   for (const u of orphanUsers) { await deleteOrphanUser(u.userId); console.log(`  removed account: ${u.email}`); }
+  if (pending.length) {
+    await prisma.unregisteredUser.deleteMany({ where: { marketing_user_id: { in: pending.map((p) => p.marketing_user_id) } } });
+    console.log(`  removed ${pending.length} pending registration request(s)`);
+  }
   console.log('\n✅ Test/demo data purged. Real organisations and accounts were left intact.');
 }
 
