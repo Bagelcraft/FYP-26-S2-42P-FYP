@@ -8,6 +8,7 @@ import Unauthorized from './pages/Unauthorized';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import VerifyEmail from './pages/VerifyEmail';
+import NotFound from './pages/NotFound';
 
 // Admin
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -112,6 +113,9 @@ export default function App() {
           <Route path="/temp-worker/tasks" element={<TempMyTasks />} />
           <Route path="/temp-worker/schedule" element={<TempSchedule />} />
           <Route path="/temp-worker/profile" element={<TempProfile />} />
+
+          {/* Catch-all: an unmatched path must never render a blank page. */}
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
