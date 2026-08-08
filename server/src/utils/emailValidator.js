@@ -32,8 +32,22 @@ const DISPOSABLE_DOMAINS = new Set([
 // Domains that exist purely as examples/placeholders and never accept mail.
 const RESERVED_DOMAINS = new Set([
   'example.com', 'example.net', 'example.org', 'example.edu',
-  'test.com', 'invalid', 'localhost', 'local',
 ]);
+
+// RFC 2606 / RFC 6761 reserved TLDs. These are guaranteed never to resolve, so an
+// address on one can never receive mail — but they are also exactly what this
+// project's seed data and test scripts use (@acme.test, @sta.test, *.test.local).
+//
+// So: rejected in production, allowed everywhere else (and skipped by the DNS
+// check, which would always fail for them). Without this carve-out, adding staff
+// with a .test address — the documented test convention — returns a 400.
+const RESERVED_TLDS = new Set(['test', 'example', 'invalid', 'localhost', 'local']);
+
+const isProduction = () => process.env.NODE_ENV === 'production';
+
+function isReservedDomain(domain) {
+  return RESERVED_DOMAINS.has(domain) || RESERVED_TLDS.has(domain.split('.').pop());
+}
 
 // The single canonical form for every email in the system. Storage and every
 // lookup must agree, so this is the only normalisation allowed anywhere.
@@ -68,11 +82,16 @@ function checkEmailFormat(email) {
   if (!EMAIL_RE.test(value)) return { valid: false, reason: 'That is not a valid email address.' };
 
   const domain = domainOf(value);
-  if (RESERVED_DOMAINS.has(domain)) {
-    return { valid: false, reason: 'That email domain cannot receive mail. Please use a real address.' };
-  }
   if (DISPOSABLE_DOMAINS.has(domain)) {
     return { valid: false, reason: 'Disposable email addresses are not accepted. Please use your work email.' };
+  }
+  if (isReservedDomain(domain)) {
+    if (isProduction()) {
+      return { valid: false, reason: 'That email domain cannot receive mail. Please use a real address.' };
+    }
+    // Test/seed fixture outside production — allowed, but there is no point
+    // asking DNS about a domain that is defined never to resolve.
+    return { valid: true, reserved: true };
   }
 
   return { valid: true };
@@ -117,6 +136,9 @@ async function checkEmailDeliverable(email) {
   const value = normaliseEmail(email);
   const domain = domainOf(value);
 
+  // Reserved TLDs never resolve by definition — asking DNS is a guaranteed miss.
+  if (format.reserved) return { valid: true, email: value };
+
   if (!(await hasMailExchanger(domain))) {
     return {
       valid: false,
@@ -130,6 +152,8 @@ async function checkEmailDeliverable(email) {
 module.exports = {
   normaliseEmail,
   normaliseEmailSanitizer,
+  isReservedDomain,
+  domainOf,
   checkEmailFormat,
   checkEmailDeliverable,
   hasMailExchanger,

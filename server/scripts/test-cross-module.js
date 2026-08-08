@@ -27,6 +27,24 @@ const login = (email) => call('POST', '/auth/login', null, { email, password: PW
 const tok = (r) => (r.json && r.json.token) || '';
 const short = (t, n = 170) => (t.length > n ? t.slice(0, n) + '…' : t);
 const line = (s) => console.log(s);
+
+// A UEN can only ever be claimed by one organisation, so each run needs its own.
+// Format A: 8 digits + 1 check letter (see server/src/utils/uen.js).
+const mkUen = (n) => String(n).slice(-8).padStart(8, '0') + 'A';
+
+// Registration now requires the applicant to prove they own the email address
+// before a System Admin can approve them. A CLI harness has no inbox, so the
+// token is read straight from the database and posted to the real endpoint —
+// the same shortcut scripts/verification-links.js gives local dev.
+let prisma = null;
+try { prisma = new (require('@prisma/client').PrismaClient)(); } catch { /* optional */ }
+
+async function verifyPendingEmail(email) {
+  if (!prisma) return { status: 0, text: 'prisma unavailable - cannot read verification token' };
+  const row = await prisma.unregisteredUser.findFirst({ where: { email } });
+  if (!row || !row.verification_token) return { status: 0, text: 'no verification token stored' };
+  return call('POST', '/public/verify-email', null, { token: row.verification_token });
+}
 const hdr = (s) => { console.log('\n' + '='.repeat(72)); console.log(s); console.log('='.repeat(72)); };
 
 (async () => {
@@ -38,17 +56,20 @@ const hdr = (s) => { console.log('\n' + '='.repeat(72)); console.log(s); console
   hdr('TCXM001  E2E: Org registers -> SysAdmin approves -> Org Admin logs in');
   const email = `newco+${uniq}@test.local`;
   let r = await call('POST', '/public/organisations/register', null,
-    { full_name: 'New Co Admin', email, password: PW, company_name: 'NewCo' });
+    { full_name: 'New Co Admin', email, password: PW, company_name: 'NewCo', uen: mkUen(uniq) });
   line(`[1] POST /public/organisations/register        -> ${r.status}  ${short(r.text)}`);
   const sa = tok(await login('sysadmin@sta.test'));
   r = await call('GET', '/admin/registrations', sa);
   const reg = (r.json.data || []).find((x) => x.email === email);
-  line(`[2] GET  /admin/registrations (SYSTEM_ADMIN)   -> ${r.status}  found pending id=${reg && reg.marketing_user_id}, full_name="${reg && reg.full_name}"`);
+  line(`[2] GET  /admin/registrations (SYSTEM_ADMIN)   -> ${r.status}  found pending id=${reg && reg.marketing_user_id}, uen=${reg && reg.uen}, email_verified=${reg && reg.email_verified}`);
+  r = await verifyPendingEmail(email);
+  line(`[3] POST /public/verify-email (emailed link)   -> ${r.status}  ${short(r.text)}`);
   r = await call('POST', `/admin/registrations/${reg.marketing_user_id}/approve`, sa);
-  line(`[3] POST /admin/registrations/${reg.marketing_user_id}/approve       -> ${r.status}  ${short(r.text)}`);
+  line(`[4] POST /admin/registrations/${reg.marketing_user_id}/approve       -> ${r.status}  ${short(r.text)}`);
   r = await login(email);
-  line(`[4] POST /auth/login (new ORG_ADMIN)           -> ${r.status}  user_type=${r.json.user && r.json.user.user_type}, token=${tok(r) ? 'issued' : 'none'}`);
+  line(`[5] POST /auth/login (new ORG_ADMIN)           -> ${r.status}  user_type=${r.json.user && r.json.user.user_type}, token=${tok(r) ? 'issued' : 'none'}`);
   line('COMMENT: PASS if each step transitions and the new Org Admin logs in (200) after approval.');
+  line('         Approval is refused (409) until step [3] verifies the email - that gate is the point.');
 
   // ---------------------------------------------------------------- TCXM002
   hdr('TCXM002  E2E: PM creates task -> auto-allocate -> worker acknowledges');
@@ -111,7 +132,7 @@ const hdr = (s) => { console.log('\n' + '='.repeat(72)); console.log(s); console
   r = await call('POST', '/auth/login', null, { email: "' OR '1'='1", password: 'x' });
   line(`[1] POST /auth/login  email="' OR '1'='1"       -> ${r.status}  ${short(r.text)}`);
   const xssEmail = `xss+${uniq}@test.local`;
-  r = await call('POST', '/public/organisations/register', null, { full_name: 'XSS', email: xssEmail, password: PW, company_name: '<script>alert(1)</script>' });
+  r = await call('POST', '/public/organisations/register', null, { full_name: 'XSS', email: xssEmail, password: PW, company_name: '<script>alert(1)</script>', uen: mkUen(uniq + 1) });
   line(`[2] POST /public/organisations/register company_name="<script>alert(1)</script>" -> ${r.status}`);
   r = await call('GET', '/admin/registrations', sa);
   const xrec = (r.json.data || []).find((x) => x.email === xssEmail);
@@ -131,5 +152,6 @@ const hdr = (s) => { console.log('\n' + '='.repeat(72)); console.log(s); console
   line('MANUAL / not automatable from CLI — run login + one core flow by hand in Chrome, Edge, Firefox on staging.');
 
   console.log('\n[done]');
+  if (prisma) await prisma.$disconnect();
   process.exit(0);
 })().catch((e) => { console.error('ERROR', e.message); process.exit(1); });

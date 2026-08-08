@@ -1,11 +1,24 @@
 const sgMail = require('@sendgrid/mail');
+const { isReservedDomain, domainOf } = require('../utils/emailValidator');
+
+function logInstead(to, subject, html, reason) {
+  console.log(`[DEV] Email to ${to} — ${subject}\n${html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()}`);
+  return { sent: false, reason };
+}
 
 // Single place that talks to SendGrid. When no API key is configured (local dev,
 // CI) the message is logged instead of sent so flows stay testable end-to-end.
 async function sendMail({ to, subject, html }) {
   if (!process.env.SENDGRID_API_KEY) {
-    console.log(`[DEV] Email to ${to} — ${subject}\n${html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()}`);
-    return { sent: false, reason: 'SENDGRID_API_KEY not configured' };
+    return logInstead(to, subject, html, 'SENDGRID_API_KEY not configured');
+  }
+
+  // Never attempt delivery to an RFC 2606 reserved TLD (.test/.local/.example).
+  // Those addresses cannot exist, so SendGrid hard-bounces them — and the test
+  // scripts and seed data are full of them. Left unchecked, a few runs of
+  // `npm run test:xm` would tank the account's bounce rate and risk suspension.
+  if (isReservedDomain(domainOf(to))) {
+    return logInstead(to, subject, html, `reserved test domain (${domainOf(to)}) — not delivered`);
   }
 
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
