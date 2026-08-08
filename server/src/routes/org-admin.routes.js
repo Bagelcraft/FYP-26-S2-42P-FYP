@@ -58,6 +58,10 @@ router.post('/shift-assignments/bulk',  c.shiftBulkAssignRules, c.validate, c.bu
 router.delete('/shift-assignments/:id', c.deleteShiftAssignment);
 
 // ─── Shift-change requests (review) ───────────────────────────
+// ─── Audit logs (this organisation only) ──────────────────────
+
+router.get('/audit-logs', c.getAuditLogs);
+
 router.get('/shift-change-requests',       scr.listForOrg);
 router.patch('/shift-change-requests/:id', scr.reviewRules, scr.reviewRequest);
 

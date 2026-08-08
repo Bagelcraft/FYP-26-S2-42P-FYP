@@ -3,7 +3,7 @@ import DashboardLayout from '../../components/DashboardLayout';
 import { ADMIN_NAV } from './nav';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
-const TABS = ['Headline', 'About / Video', 'Pricing', 'Testimonials'];
+const TABS = ['Headline', 'About / Video', 'Pricing', 'Features', 'Testimonials'];
 
 function toEmbedUrl(url) {
   if (!url) return url;
@@ -26,6 +26,9 @@ export default function AdminLandingContent() {
   const [testimonials, setTestimonials] = useState([]);
   const [rules, setRules] = useState(null);
   const [rerunning, setRerunning] = useState(false);
+  const [features, setFeatures] = useState([]);
+  const [editing, setEditing] = useState(null);   // feature being edited, or 'new'
+  const [savingFeature, setSavingFeature] = useState(false);
 
   const token   = localStorage.getItem('token');
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
@@ -35,10 +38,11 @@ export default function AdminLandingContent() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [contentRes, testimRes, rulesRes] = await Promise.all([
+      const [contentRes, testimRes, rulesRes, featRes] = await Promise.all([
         fetch(`${API_BASE}/admin/content`, { headers }),
         fetch(`${API_BASE}/admin/content/testimonials`, { headers }),
         fetch(`${API_BASE}/admin/content/testimonials/rules`, { headers }),
+        fetch(`${API_BASE}/admin/content/features`, { headers }),
       ]);
       const { content } = await contentRes.json();
       if (content) {
@@ -48,6 +52,7 @@ export default function AdminLandingContent() {
       }
       setTestimonials(await testimRes.json());
       setRules((await rulesRes.json()).rules ?? null);
+      setFeatures(await featRes.json());
     } catch {
       showToast('Failed to load content.', true);
     } finally {
@@ -96,6 +101,60 @@ export default function AdminLandingContent() {
     } finally {
       setRerunning(false);
     }
+  };
+
+  // ── Feature CRUD (backend: POST/PUT/DELETE /admin/content/features) ──
+  const saveFeature = async (e) => {
+    e.preventDefault();
+    setSavingFeature(true);
+    const isNew = editing.feature_id === undefined;
+    const body = {
+      title:       editing.title,
+      description: editing.description,
+      icon:        editing.icon || null,
+      sort_order:  Number(editing.sort_order) || 0,
+      ...(isNew ? {} : { is_active: editing.is_active }),
+    };
+    try {
+      const res = await fetch(
+        `${API_BASE}/admin/content/features${isNew ? '' : `/${editing.feature_id}`}`,
+        { method: isNew ? 'POST' : 'PUT', headers, body: JSON.stringify(body) },
+      );
+      if (!res.ok) throw new Error();
+      const saved = await res.json();
+      setFeatures((prev) => (isNew
+        ? [...prev, saved]
+        : prev.map((f) => (f.feature_id === saved.feature_id ? saved : f))
+      ).sort((a, b) => a.sort_order - b.sort_order));
+      setEditing(null);
+      showToast(isNew ? 'Feature added.' : 'Feature saved.');
+    } catch {
+      showToast('Failed to save feature.', true);
+    } finally {
+      setSavingFeature(false);
+    }
+  };
+
+  const toggleFeature = async (f) => {
+    try {
+      const res = await fetch(`${API_BASE}/admin/content/features/${f.feature_id}`, {
+        method: 'PUT', headers, body: JSON.stringify({ ...f, is_active: !f.is_active }),
+      });
+      if (!res.ok) throw new Error();
+      const saved = await res.json();
+      setFeatures((prev) => prev.map((x) => (x.feature_id === saved.feature_id ? saved : x)));
+      showToast(saved.is_active ? 'Feature shown on the landing page.' : 'Feature hidden.');
+    } catch { showToast('Failed to update feature.', true); }
+  };
+
+  const deleteFeature = async (f) => {
+    if (!window.confirm(`Delete "${f.title}"? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/admin/content/features/${f.feature_id}`, { method: 'DELETE', headers });
+      if (!res.ok) throw new Error();
+      setFeatures((prev) => prev.filter((x) => x.feature_id !== f.feature_id));
+      showToast('Feature deleted.');
+    } catch { showToast('Failed to delete feature.', true); }
   };
 
   const inputCls = 'w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent';
@@ -186,6 +245,97 @@ export default function AdminLandingContent() {
                 </div>
                 <button type="submit" className={saveBtnCls}>Save Pricing</button>
               </form>
+            )}
+
+            {/* ── Features ── */}
+            {tab === 'Features' && (
+              <div className="space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="font-semibold text-gray-800">Landing Page Features</h3>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      The feature cards shown on the public site. Lower sort order appears first;
+                      hidden features stay saved but are not published.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setEditing({ title: '', description: '', icon: '', sort_order: (features.length + 1) })}
+                    className="flex-shrink-0 bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                  >
+                    + Add Feature
+                  </button>
+                </div>
+
+                {editing && (
+                  <form onSubmit={saveFeature} className="bg-gray-50 border border-gray-200 rounded-xl p-5 space-y-4">
+                    <h4 className="font-medium text-gray-800 text-sm">
+                      {editing.feature_id === undefined ? 'New feature' : `Editing "${editing.title}"`}
+                    </h4>
+                    <div className="grid sm:grid-cols-[80px_1fr_110px] gap-3">
+                      <div>
+                        <label className={labelCls}>Icon</label>
+                        <input className={inputCls} value={editing.icon ?? ''} maxLength={10} placeholder="🤖"
+                          onChange={(e) => setEditing((p) => ({ ...p, icon: e.target.value }))} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Title</label>
+                        <input className={inputCls} value={editing.title} required maxLength={200} placeholder="Automated Task Allocation"
+                          onChange={(e) => setEditing((p) => ({ ...p, title: e.target.value }))} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Sort order</label>
+                        <input className={inputCls} type="number" min={0} value={editing.sort_order ?? 0}
+                          onChange={(e) => setEditing((p) => ({ ...p, sort_order: e.target.value }))} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Description</label>
+                      <textarea className={inputCls} rows={3} value={editing.description ?? ''}
+                        placeholder="What this feature does, in one or two sentences."
+                        onChange={(e) => setEditing((p) => ({ ...p, description: e.target.value }))} />
+                    </div>
+                    <div className="flex justify-end gap-3">
+                      <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">
+                        Cancel
+                      </button>
+                      <button type="submit" disabled={savingFeature || !editing.title.trim()} className={saveBtnCls}>
+                        {savingFeature ? 'Saving…' : 'Save Feature'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {features.length === 0 ? (
+                  <p className="text-gray-400 text-sm">No features yet. Add one to populate the landing page.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {features.map((f) => (
+                      <div key={f.feature_id} className={`flex items-start justify-between rounded-xl px-4 py-3 border ${f.is_active ? 'bg-gray-50 border-gray-100' : 'bg-white border-dashed border-gray-200 opacity-70'}`}>
+                        <div className="flex gap-3 flex-1 min-w-0">
+                          <span className="text-xl leading-none mt-0.5">{f.icon || '•'}</span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-medium text-gray-800">{f.title}</p>
+                              <span className="text-xs text-gray-400">#{f.sort_order}</span>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">{f.description}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 ml-4 flex-shrink-0">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${f.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                            {f.is_active ? 'Shown' : 'Hidden'}
+                          </span>
+                          <button onClick={() => setEditing(f)} className="text-xs font-medium text-primary-600 hover:underline">Edit</button>
+                          <button onClick={() => toggleFeature(f)} className={`text-xs font-medium hover:underline ${f.is_active ? 'text-gray-500' : 'text-green-600'}`}>
+                            {f.is_active ? 'Hide' : 'Show'}
+                          </button>
+                          <button onClick={() => deleteFeature(f)} className="text-xs font-medium text-red-500 hover:underline">Delete</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
 
             {/* ── Testimonials ── */}

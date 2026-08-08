@@ -28,10 +28,6 @@ router.post('/organisations',                adminController.createOrganisation)
 router.put('/organisations/:id/suspend',     adminController.suspendOrganisation);
 router.put('/organisations/:id/reactivate',  adminController.reactivateOrganisation);
 
-// ─── Audit logs ───────────────────────────────────────────────
-
-router.get('/logs', adminController.getAuditLogs);
-
 // ─── Enquiries ────────────────────────────────────────────────
 
 router.get('/enquiries', enquiryController.getAllEnquiries);

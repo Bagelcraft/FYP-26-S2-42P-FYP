@@ -1,5 +1,11 @@
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import api from '../utils/api';
+import { markSeen, reconcile, unseenCount } from '../utils/navBadges';
+
+// How often to re-check for new activity while the user sits on a page.
+const POLL_MS = 60000;
 
 // `secondaryNav` (optional) renders a subordinate "Account" group at the
 // bottom of the sidebar — used by the PM portal for Subscription / Testimonials
@@ -8,6 +14,11 @@ export default function DashboardLayout({ children, navItems, secondaryNav = [],
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+
+  // counts = live per-tab totals from the server; seen = what this user has
+  // already looked at. A dot appears only where counts has grown past seen.
+  const [counts, setCounts] = useState({});
+  const [seen, setSeen] = useState({});
 
   const handleLogout = () => {
     logout();
@@ -21,16 +32,60 @@ export default function DashboardLayout({ children, navItems, secondaryNav = [],
     return !best || item.path.length > best.path.length ? item : best;
   }, null);
 
+  const currentPath = currentPage?.path;
+
+  const refresh = useCallback(async () => {
+    try {
+      const r = await api.get('/activity/badges');
+      const next = r.data.data ?? {};
+      setCounts(next);
+      // Viewing a tab counts as reading it, so the dot never lingers on the page
+      // the user is already looking at.
+      const base = reconcile(user?.userId, next);
+      setSeen(currentPath !== undefined && next[currentPath] !== undefined
+        ? markSeen(user?.userId, currentPath, next[currentPath])
+        : base);
+    } catch {
+      setCounts({}); // badges are decoration — never surface an error for them
+    }
+  }, [user?.userId, currentPath]);
+
+  useEffect(() => {
+    refresh();
+    const id = setInterval(refresh, POLL_MS);
+    return () => clearInterval(id);
+  }, [refresh]);
+
   const renderLink = (item, { secondary } = {}) => {
     const isActive = item === currentPage;
+    const unread = unseenCount(counts, seen, item.path);
     const base = 'flex items-center gap-3 rounded-lg font-medium transition-colors';
     const cls = secondary
       ? `${base} px-3 py-2 text-[13px] ${isActive ? 'bg-gray-800 text-white' : 'text-gray-500 hover:bg-gray-800/60 hover:text-gray-300'}`
       : `${base} px-3 py-2.5 text-sm ${isActive ? 'bg-primary-600 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`;
     return (
-      <Link key={item.path} to={item.path} className={cls}>
-        <span className={`w-5 text-center ${secondary ? 'text-sm opacity-80' : ''}`}>{item.icon}</span>
-        {item.label}
+      <Link
+        key={item.path}
+        to={item.path}
+        className={cls}
+        // Clear immediately on click rather than waiting for the next poll.
+        onClick={() => setSeen(markSeen(user?.userId, item.path, counts[item.path] ?? 0))}
+      >
+        <span className={`relative w-5 text-center ${secondary ? 'text-sm opacity-80' : ''}`}>
+          {item.icon}
+          {unread > 0 && (
+            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-gray-900" />
+          )}
+        </span>
+        <span className="flex-1">{item.label}</span>
+        {unread > 0 && (
+          <span
+            title={`${unread} new`}
+            className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center"
+          >
+            {unread > 99 ? '99+' : unread}
+          </span>
+        )}
       </Link>
     );
   };

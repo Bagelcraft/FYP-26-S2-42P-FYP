@@ -250,8 +250,19 @@ async function changePlan(req, res, next) {
   try { ok(res, await svc.changePlan(orgId(req), req.body.plan_id)); } catch (e) { next(e); }
 }
 
+async function getAuditLogs(req, res, next) {
+  try {
+    ok(res, await svc.getAuditLogs(orgId(req), {
+      category: req.query.category,
+      search:   req.query.search,
+      limit:    req.query.limit,
+    }));
+  } catch (e) { next(e); }
+}
+
 module.exports = {
   validate,
+  getAuditLogs,
   getProfile, profileUpdateRules, updateProfile,
   getSubscription, listBilling, renewSubscription, cancelSubscription, listPlans, changePlan,
   deptRules, deptUpdateRules, listDepts, createDept, updateDept, deleteDept,

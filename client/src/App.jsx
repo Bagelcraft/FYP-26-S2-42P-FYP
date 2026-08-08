@@ -13,7 +13,6 @@ import NotFound from './pages/NotFound';
 // Admin
 import AdminDashboard from './pages/admin/AdminDashboard';
 import Organisations from './pages/admin/Organisations';
-import AuditLogs from './pages/admin/AuditLogs';
 import AdminEnquiries from './pages/admin/AdminEnquiries';
 import AdminLandingContent from './pages/admin/AdminLandingContent';
 
@@ -28,6 +27,7 @@ import OrgSubscription from './pages/org-admin/Subscription';
 import OrgProfile from './pages/org-admin/OrgProfile';
 import ProfileChangeRequests from './pages/org-admin/ProfileChangeRequests';
 import ShiftChangeRequests from './pages/org-admin/ShiftChangeRequests';
+import AuditLogs from './pages/org-admin/AuditLogs';
 
 // Manager
 import PMDashboard from './pages/pm/PMDashboard';
@@ -74,7 +74,6 @@ export default function App() {
           <Route path="/admin/organisations" element={<Organisations />} />
           <Route path="/admin/enquiries" element={<AdminEnquiries />} />
           <Route path="/admin/landing-content" element={<AdminLandingContent />} />
-          <Route path="/admin/logs" element={<AuditLogs />} />
 
           {/* Organisation Admin */}
           <Route path="/org-admin" element={<OrgAdminDashboard />} />
@@ -87,6 +86,7 @@ export default function App() {
           <Route path="/org-admin/profile" element={<OrgProfile />} />
           <Route path="/org-admin/profile-change-requests" element={<ProfileChangeRequests />} />
           <Route path="/org-admin/shift-change-requests" element={<ShiftChangeRequests />} />
+          <Route path="/org-admin/audit-logs" element={<AuditLogs />} />
 
           {/* Manager */}
           <Route path="/pm" element={<PMDashboard />} />

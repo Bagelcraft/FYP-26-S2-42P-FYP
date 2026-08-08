@@ -9,4 +9,5 @@ export const ORG_ADMIN_NAV = [
   { path: '/org-admin/subscription', icon: '💳', label: 'Subscription' },
   { path: '/org-admin/profile-change-requests', icon: '📝', label: 'Profile Requests' },
   { path: '/org-admin/shift-change-requests', icon: '🔄', label: 'Shift Requests' },
+  { path: '/org-admin/audit-logs', icon: '📋', label: 'Audit Logs' },
 ];

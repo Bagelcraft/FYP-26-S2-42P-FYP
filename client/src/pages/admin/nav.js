@@ -3,5 +3,4 @@ export const ADMIN_NAV = [
   { path: '/admin/organisations', icon: '🏢', label: 'Organisations' },
   { path: '/admin/enquiries', icon: '✉️', label: 'Enquiries' },
   { path: '/admin/landing-content', icon: '🖊️', label: 'Landing Content' },
-  { path: '/admin/logs', icon: '📋', label: 'Audit Logs' },
 ];

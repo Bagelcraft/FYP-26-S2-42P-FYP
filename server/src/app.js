@@ -9,6 +9,7 @@ const pmRoutes = require('./routes/pm.routes');
 const permanentWorkerRoutes = require('./routes/permanent-worker.routes');
 const temporaryWorkerRoutes = require('./routes/temporary-worker.routes');
 const publicRoutes = require('./routes/public.routes');
+const activityRoutes = require('./routes/activity.routes');
 const errorMiddleware = require('./middleware/error.middleware');
 const contentRoutes = require("./routes/content.routes");
 
@@ -47,6 +48,7 @@ app.use('/api/v1/org-admin', orgAdminRoutes);
 app.use('/api/v1/pm', pmRoutes);
 app.use('/api/v1/worker', permanentWorkerRoutes);
 app.use('/api/v1/temp-worker', temporaryWorkerRoutes);
+app.use('/api/v1/activity', activityRoutes);
 app.use('/api/v1/public', publicRoutes);
 
 app.use(errorMiddleware);

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
-import { ADMIN_NAV } from './nav';
+import { ORG_ADMIN_NAV } from './nav';
 import api from '../../utils/api';
 
 const CATEGORY_COLORS = {
@@ -40,7 +40,6 @@ function exportPDF(logs, { category, search, dateFrom, dateTo }) {
     <tr>
       <td>${l.action}</td>
       <td>${l.user}</td>
-      <td>${l.org}</td>
       <td><span class="badge ${l.category}">${l.category}</span></td>
       <td>${fmtTime(l.time)}</td>
     </tr>`).join('');
@@ -72,9 +71,9 @@ function exportPDF(logs, { category, search, dateFrom, dateTo }) {
 <p class="meta">Generated: ${now} &nbsp;|&nbsp; Filter: ${filterStr} &nbsp;|&nbsp; Total: ${logs.length} entries</p>
 <table>
   <thead>
-    <tr><th>Action</th><th>User</th><th>Organisation</th><th>Category</th><th>Timestamp</th></tr>
+    <tr><th>Action</th><th>User</th><th>Category</th><th>Timestamp</th></tr>
   </thead>
-  <tbody>${rows || '<tr><td colspan="5" style="text-align:center;color:#9ca3af;padding:20px">No entries in selected range.</td></tr>'}</tbody>
+  <tbody>${rows || '<tr><td colspan="4" style="text-align:center;color:#9ca3af;padding:20px">No entries in selected range.</td></tr>'}</tbody>
 </table>
 </body>
 </html>`;
@@ -97,7 +96,7 @@ export default function AuditLogs() {
 
   useEffect(() => {
     setLoading(true);
-    api.get('/admin/logs')
+    api.get('/org-admin/audit-logs')
       .then((r) => setLogs(r.data.data ?? []))
       .catch((e) => setError(e.response?.data?.message || e.message))
       .finally(() => setLoading(false));
@@ -106,8 +105,7 @@ export default function AuditLogs() {
   const filtered = logs.filter((l) => {
     const matchSearch =
       l.action.toLowerCase().includes(search.toLowerCase()) ||
-      l.user.toLowerCase().includes(search.toLowerCase()) ||
-      l.org.toLowerCase().includes(search.toLowerCase());
+      l.user.toLowerCase().includes(search.toLowerCase());
     const matchCat  = category === 'ALL' || l.category === category;
     const logDate   = toDateStr(l.time);
     const matchFrom = !dateFrom || logDate >= dateFrom;
@@ -116,13 +114,13 @@ export default function AuditLogs() {
   });
 
   return (
-    <DashboardLayout navItems={ADMIN_NAV} roleLabel="System Admin">
+    <DashboardLayout navItems={ORG_ADMIN_NAV} roleLabel="Organisation Admin">
       <div className="space-y-6">
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-xl font-bold text-gray-800">Audit Logs</h2>
             <p className="text-gray-500 text-sm mt-0.5">
-              User and activity trail across the platform. Organisation records live on the Organisations page.
+              Activity trail for your organisation — staff, tasks, attendance and leave.
             </p>
           </div>
           <button
@@ -140,7 +138,7 @@ export default function AuditLogs() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <input
             type="text"
-            placeholder="Search action, user or organisation…"
+            placeholder="Search action or user…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -202,7 +200,6 @@ export default function AuditLogs() {
                 <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
                   <th className="px-5 py-3 text-left font-medium">Action</th>
                   <th className="px-5 py-3 text-left font-medium">User</th>
-                  <th className="px-5 py-3 text-left font-medium">Organisation</th>
                   <th className="px-5 py-3 text-left font-medium">Category</th>
                   <th className="px-5 py-3 text-left font-medium">Timestamp</th>
                 </tr>
@@ -212,7 +209,6 @@ export default function AuditLogs() {
                   <tr key={log.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-5 py-3 font-medium text-gray-800">{log.action}</td>
                     <td className="px-5 py-3 text-gray-600">{log.user}</td>
-                    <td className="px-5 py-3 text-gray-500">{log.org}</td>
                     <td className="px-5 py-3">
                       <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${CATEGORY_COLORS[log.category] ?? 'bg-gray-100 text-gray-600'}`}>
                         {log.category}
@@ -223,7 +219,7 @@ export default function AuditLogs() {
                 ))}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-5 py-10 text-center text-gray-400">
+                    <td colSpan={4} className="px-5 py-10 text-center text-gray-400">
                       {dateFrom || dateTo ? 'No logs found in the selected date range.' : 'No logs found.'}
                     </td>
                   </tr>

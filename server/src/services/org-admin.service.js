@@ -609,7 +609,99 @@ async function bulkCreateShiftAssignments(organisationId, data) {
   return { created, skipped: requested - created, employees: userIds.length, days: dates.length };
 }
 
+
+// ─── Audit Logs ───────────────────────────────────────────────
+
+// Activity trail for ONE organisation. Every query below is constrained to the
+// caller's organisationId, so an org admin can never see another tenant's
+// activity — the scoping is in the query, not applied afterwards in JS.
+//
+// Organisation lifecycle events are deliberately excluded: this log covers user
+// and activity events only.
+async function getAuditLogs(organisationId, filters = {}) {
+  const limit = Math.min(Number(filters.limit) || 200, 500);
+
+  const [users, assignments, attendance, leave] = await Promise.all([
+    prisma.user.findMany({
+      where:   { organisationId },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: { userId: true, full_name: true, user_type: true, createdAt: true },
+    }),
+    prisma.taskAssignment.findMany({
+      where:   { task: { organisation_id: organisationId } },
+      orderBy: { assigned_at: 'desc' },
+      take: limit,
+      select: {
+        assignment_id: true, assignment_type: true, assigned_at: true,
+        assignedTo: { select: { full_name: true } },
+        assignedBy: { select: { full_name: true } },
+        task:       { select: { title: true } },
+      },
+    }),
+    prisma.attendance.findMany({
+      where:   { user: { organisationId } },
+      orderBy: { clock_in: 'desc' },
+      take: limit,
+      select: { attendance_id: true, clock_in: true, user: { select: { full_name: true } } },
+    }),
+    prisma.leaveRequest.findMany({
+      where:   { user: { organisationId } },
+      orderBy: { start_date: 'desc' },
+      take: limit,
+      select: {
+        leave_id: true, leave_type: true, status: true, start_date: true,
+        user: { select: { full_name: true } },
+      },
+    }),
+  ]);
+
+  const entries = [
+    ...users.map((u) => ({
+      id:       `user-${u.userId}`,
+      action:   u.user_type === 'ORG_ADMIN' ? 'Organisation admin account created' : 'Staff account created',
+      user:     u.full_name,
+      category: 'STAFF',
+      time:     u.createdAt,
+    })),
+    ...assignments.map((a) => ({
+      id:       `assign-${a.assignment_id}`,
+      action:   `Task ${a.assignment_type === 'AUTO' ? 'auto-' : ''}assigned: ${a.task?.title ?? ''}`,
+      user:     a.assignedBy?.full_name ?? 'system',
+      category: 'TASK',
+      time:     a.assigned_at,
+    })),
+    ...attendance.map((a) => ({
+      id:       `att-${a.attendance_id}`,
+      action:   'Employee clocked in',
+      user:     a.user?.full_name ?? '—',
+      category: 'AUTH',
+      time:     a.clock_in,
+    })),
+    ...leave.map((l) => ({
+      id:       `leave-${l.leave_id}`,
+      action:   `${l.leave_type} leave request — ${l.status}`,
+      user:     l.user?.full_name ?? '—',
+      category: 'STAFF',
+      time:     l.start_date,
+    })),
+  ];
+
+  entries.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+  const { category, search } = filters;
+  return entries
+    .filter((e) => !category || category === 'ALL' || e.category === category)
+    .filter((e) => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return e.action.toLowerCase().includes(q) || e.user.toLowerCase().includes(q);
+    })
+    .slice(0, limit);
+}
+
 module.exports = {
+  getAuditLogs,
   getOrgProfile, updateOrgProfile,
   listDepartments, createDepartment, updateDepartment, deleteDepartment,
   listRoles, createRole, updateRole, deleteRole,
