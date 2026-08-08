@@ -482,6 +482,30 @@ async function cancelSubscription(organisationId) {
   });
 }
 
+// Available plans (with their features) so an OA can compare / upgrade.
+async function listPlans() {
+  return prisma.subscriptionPlan.findMany({
+    where:   { is_active: true },
+    include: { features: { select: { feature_name: true } } },
+    orderBy: { price_monthly: 'asc' },
+  });
+}
+
+// Upgrade / downgrade: point the active subscription at the chosen plan's price.
+// (Payment is external — this only records the plan change.)
+async function changePlan(organisationId, planId) {
+  const plan = await prisma.subscriptionPlan.findUnique({ where: { plan_id: Number(planId) } });
+  if (!plan) throw makeError('Plan not found', 404);
+  const org = await prisma.organisation.findUnique({
+    where: { organisation_id: organisationId }, include: { activeSubscription: true },
+  });
+  if (!org?.activeSubscription) throw makeError('No active subscription to change', 404);
+  return prisma.subscription.update({
+    where: { subscription_id: org.activeSubscription.subscription_id },
+    data:  { amount: plan.price_monthly, status: 'ACTIVE' },
+  });
+}
+
 // ─── Shift Assignments (roster) ───────────────────────────────
 const SHIFT_ASSIGN_INCLUDE = {
   user:  { select: { userId: true, full_name: true, user_type: true } },
@@ -583,4 +607,5 @@ module.exports = {
   listStaff, registerStaff, updateStaff, deactivateStaff, reactivateStaff,
   assignSkillToStaff, removeSkillFromStaff,
   getSubscription, listBilling, renewSubscription, cancelSubscription,
+  listPlans, changePlan,
 };

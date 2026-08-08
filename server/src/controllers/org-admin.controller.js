@@ -242,11 +242,17 @@ async function renewSubscription(req, res, next) {
 async function cancelSubscription(req, res, next) {
   try { ok(res, await svc.cancelSubscription(orgId(req))); } catch (e) { next(e); }
 }
+async function listPlans(req, res, next) {
+  try { ok(res, await svc.listPlans()); } catch (e) { next(e); }
+}
+async function changePlan(req, res, next) {
+  try { ok(res, await svc.changePlan(orgId(req), req.body.plan_id)); } catch (e) { next(e); }
+}
 
 module.exports = {
   validate,
   getProfile, profileUpdateRules, updateProfile,
-  getSubscription, listBilling, renewSubscription, cancelSubscription,
+  getSubscription, listBilling, renewSubscription, cancelSubscription, listPlans, changePlan,
   deptRules, deptUpdateRules, listDepts, createDept, updateDept, deleteDept,
   roleRules, roleUpdateRules, listRoles, createRole, updateRole, deleteRole,
   skillRules, skillUpdateRules, listSkills, createSkill, updateSkill, deleteSkill,

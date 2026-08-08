@@ -210,11 +210,32 @@ async function seedAcmeData(orgId, core, password_hash) {
   await notif(core.temp.userId, 'TASK_UPDATED', 'Your Monthly Stocktake was approved (8h logged).', true);
 }
 
+// Subscription plans + their gated features (matched to a subscription by price).
+async function seedPlans() {
+  await prisma.planFeature.deleteMany({});
+  await prisma.subscriptionPlan.deleteMany({});
+  const mk = async (name, price_monthly, price_annual, max_users, features) => {
+    const plan = await prisma.subscriptionPlan.create({
+      data: { name, description: `${name} plan`, price_monthly, price_annual, max_users, is_active: true },
+    });
+    await prisma.planFeature.createMany({ data: features.map((f) => ({ plan_id: plan.plan_id, feature_name: f })) });
+  };
+  // Basic ($9) lacks "Advanced Reports"; Pro ($29) includes it — this is what feature gating checks.
+  await mk('Basic', 9, 90, 25, ['Task Management', 'Workforce Scheduling', 'Auto Allocation', 'Basic Reports']);
+  await mk('Pro', 29, 290, 100, ['Task Management', 'Workforce Scheduling', 'Auto Allocation', 'Basic Reports', 'Advanced Reports', 'Priority Support']);
+}
+
 async function main() {
   assertLocalDatabase();
   const password_hash = await bcrypt.hash(PASSWORD, 10);
   const acme = await getOrCreateOrg('Acme');
   const globex = await getOrCreateOrg('Globex');
+
+  // Plan catalogue; put Acme on Pro (Advanced Reports enabled), leave Globex on Basic.
+  await seedPlans();
+  if (acme.active_subscription_id) {
+    await prisma.subscription.update({ where: { subscription_id: acme.active_subscription_id }, data: { amount: 29 } });
+  }
 
   const core = {
     admin: await upsertUser({ email: 'admin@acme.test', full_name: 'Acme Org Admin', user_type: 'ORG_ADMIN', password_hash, organisationId: acme.organisation_id }),
