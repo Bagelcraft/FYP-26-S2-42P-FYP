@@ -11,6 +11,8 @@ const { sendVerificationEmail } = require('../services/email.service');
 
 const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+const ORG_TYPES = ['PROJECT', 'NON_PROJECT'];
+
 function newVerificationToken() {
   return {
     token:   crypto.randomBytes(32).toString('hex'),
@@ -42,12 +44,18 @@ router.post('/enquiry', enquiryController.createEnquiry);
 
 // POST /api/v1/public/organisations/register
 router.post('/organisations/register', async (req, res) => {
-  const { full_name, email, password, company_name, uen, position } = req.body;
+  const { full_name, email, password, company_name, uen, position, org_type } = req.body;
 
   if (!full_name || !email || !password || !company_name || !uen) {
     return res.status(400).json({
       message: 'Full name, email, password, company name, and UEN are required.',
     });
+  }
+
+  // How the company schedules work. Older clients that omit it keep the
+  // shift-based default, which is what every existing organisation uses.
+  if (org_type !== undefined && !ORG_TYPES.includes(org_type)) {
+    return res.status(400).json({ message: `company type must be one of: ${ORG_TYPES.join(', ')}` });
   }
 
   // The applicant's UEN is what the system admin verifies the organisation against,
@@ -87,6 +95,7 @@ router.post('/organisations/register', async (req, res) => {
         password: password_hash,
         company_name,
         uen: uenCheck.uen,
+        org_type: org_type ?? 'NON_PROJECT',
         position: position || null,
         role: 'ORG_ADMIN',
         email_verified: false,

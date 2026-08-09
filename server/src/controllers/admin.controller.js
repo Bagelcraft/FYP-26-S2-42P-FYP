@@ -34,6 +34,11 @@ async function reactivateOrganisation(req, res, next) {
   try { ok(res, await svc.setOrganisationActive(id(req), true)); } catch (e) { next(e); }
 }
 
+// PATCH /admin/organisations/:id/type — fix a wrong choice made at registration.
+async function setOrganisationType(req, res, next) {
+  try { ok(res, await svc.setOrganisationType(id(req), req.body.org_type)); } catch (e) { next(e); }
+}
+
 module.exports = {
   listRegistrations,
   approveRegistration,
@@ -42,4 +47,5 @@ module.exports = {
   createOrganisation,
   suspendOrganisation,
   reactivateOrganisation,
+  setOrganisationType,
 };

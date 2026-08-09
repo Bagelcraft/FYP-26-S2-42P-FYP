@@ -3,18 +3,20 @@ const { body, query } = require('express-validator');
 const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
 const { requireFeature } = require('../middleware/feature.middleware');
+const { requireOrgType, attachOrgType } = require('../middleware/orgType.middleware');
 const taskController = require('../controllers/task.controller');
 const allocationController = require('../controllers/allocation.controller');
 const managerController = require('../controllers/manager.controller');
+const projectController = require('../controllers/project.controller');
 const updateRequestController = require('../controllers/task-update-request.controller');
 
 const router = express.Router();
 
-router.use(verifyToken, requireRole(['PROJECT_MANAGER']));
+router.use(verifyToken, requireRole(['PROJECT_MANAGER']), attachOrgType);
 
 // ─── Validation rules ─────────────────────────────────────────────────────
 
-const TASK_STATUSES = ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+const TASK_STATUSES = ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'SUBMITTED', 'COMPLETED', 'CANCELLED'];
 
 const createRules = [
   body('title')
@@ -34,6 +36,9 @@ const createRules = [
   body('department_id')
     .optional({ nullable: true })
     .isInt({ min: 1 }).withMessage('department_id must be a positive integer'),
+  body('project_id')
+    .optional({ nullable: true })
+    .isInt({ min: 1 }).withMessage('project_id must be a positive integer'),
   // NEW — multi-skill. Accept an array of skill ids.
   body('required_skill_ids')
     .optional({ nullable: true })
@@ -57,6 +62,9 @@ const updateRules = [
   body('department_id')
     .optional({ nullable: true })
     .isInt({ min: 1 }).withMessage('department_id must be a positive integer'),
+  body('project_id')
+    .optional({ nullable: true })
+    .isInt({ min: 1 }).withMessage('project_id must be a positive integer'),
   body('required_skill_ids')
     .optional({ nullable: true })
     .isArray().withMessage('required_skill_ids must be an array'),
@@ -70,12 +78,33 @@ const updateRules = [
 const listQueryRules = [
   query('status').optional().isIn(TASK_STATUSES).withMessage(`status must be one of: ${TASK_STATUSES.join(', ')}`),
   query('department_id').optional().isInt({ min: 1 }).withMessage('department_id must be a positive integer'),
+  query('project_id').optional().custom((v) => v === 'unassigned' || /^[1-9]\d*$/.test(v))
+    .withMessage('project_id must be a positive integer or "unassigned"'),
   query('date').optional().isISO8601().withMessage('date must be a valid ISO 8601 date'),
 ];
 
 const leaveDecisionRules = [
   body('status').isIn(['APPROVED', 'REJECTED']).withMessage('status must be APPROVED or REJECTED'),
 ];
+
+// ─── Projects (PROJECT organisations only) ────────────────────────────────
+//
+// Task → Resource → Duration. A project owns its tasks, names the pool of
+// workers who may take them, and bounds when the work can be scheduled.
+
+const projectsOnly = requireOrgType('PROJECT');
+
+router.get('/projects',       projectsOnly, projectController.listQueryRules, projectController.list);
+router.get('/projects/:id',   projectsOnly, projectController.getOne);
+router.post('/projects',      projectsOnly, projectController.createRules,    projectController.create);
+router.patch('/projects/:id', projectsOnly, projectController.updateRules,    projectController.update);
+router.delete('/projects/:id', projectsOnly, projectController.remove);
+
+// Resources — who is able to work on this project
+router.get('/projects/:id/resources',            projectsOnly, projectController.listResources);
+router.get('/projects/:id/available-resources',  projectsOnly, projectController.listAvailableResources);
+router.post('/projects/:id/resources',           projectsOnly, projectController.resourceRules, projectController.addResources);
+router.delete('/projects/:id/resources/:userId', projectsOnly, projectController.removeResource);
 
 // ─── Task CRUD (manager view with filters) ────────────────────────────────
 

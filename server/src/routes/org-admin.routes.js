@@ -1,13 +1,19 @@
 const express = require('express');
 const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
+const { requireOrgType, attachOrgType } = require('../middleware/orgType.middleware');
 const c = require('../controllers/org-admin.controller');
 const pcr = require('../controllers/profileChangeRequest.controller');
 const scr = require('../controllers/shiftChangeRequest.controller');
 
 const router = express.Router();
 
-router.use(verifyToken, requireRole(['ORG_ADMIN']));
+router.use(verifyToken, requireRole(['ORG_ADMIN']), attachOrgType);
+
+// Shift work belongs to shift-based organisations. A project-based organisation
+// has no roster at all — its temporary workers stay free of shifts until a task
+// activates them, and its permanent staff are scheduled by task, not by shift.
+const shiftOrgOnly = requireOrgType('NON_PROJECT');
 
 // ─── Organisation Profile ─────────────────────────────────────
 
@@ -46,24 +52,24 @@ router.post('/subscription/change-plan', c.changePlan);
 
 // ─── Shift Templates ──────────────────────────────────────────
 
-router.get('/shifts',        c.listShifts);
-router.post('/shifts',       c.shiftRules,       c.validate, c.createShift);
-router.patch('/shifts/:id',  c.shiftUpdateRules, c.validate, c.updateShift);
-router.delete('/shifts/:id', c.deleteShift);
+router.get('/shifts',        shiftOrgOnly, c.listShifts);
+router.post('/shifts',       shiftOrgOnly, c.shiftRules,       c.validate, c.createShift);
+router.patch('/shifts/:id',  shiftOrgOnly, c.shiftUpdateRules, c.validate, c.updateShift);
+router.delete('/shifts/:id', shiftOrgOnly, c.deleteShift);
 
 // ─── Shift Assignments (roster) ───────────────────────────────
-router.get('/shift-assignments',        c.listShiftAssignments);
-router.post('/shift-assignments',       c.shiftAssignRules, c.validate, c.createShiftAssignment);
-router.post('/shift-assignments/bulk',  c.shiftBulkAssignRules, c.validate, c.bulkCreateShiftAssignments);
-router.delete('/shift-assignments/:id', c.deleteShiftAssignment);
+router.get('/shift-assignments',        shiftOrgOnly, c.listShiftAssignments);
+router.post('/shift-assignments',       shiftOrgOnly, c.shiftAssignRules, c.validate, c.createShiftAssignment);
+router.post('/shift-assignments/bulk',  shiftOrgOnly, c.shiftBulkAssignRules, c.validate, c.bulkCreateShiftAssignments);
+router.delete('/shift-assignments/:id', shiftOrgOnly, c.deleteShiftAssignment);
 
 // ─── Shift-change requests (review) ───────────────────────────
 // ─── Audit logs (this organisation only) ──────────────────────
 
 router.get('/audit-logs', c.getAuditLogs);
 
-router.get('/shift-change-requests',       scr.listForOrg);
-router.patch('/shift-change-requests/:id', scr.reviewRules, scr.reviewRequest);
+router.get('/shift-change-requests',       shiftOrgOnly, scr.listForOrg);
+router.patch('/shift-change-requests/:id', shiftOrgOnly, scr.reviewRules, scr.reviewRequest);
 
 // ─── Staff ────────────────────────────────────────────────────
 

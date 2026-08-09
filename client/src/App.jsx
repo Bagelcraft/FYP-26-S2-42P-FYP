@@ -31,6 +31,7 @@ import AuditLogs from './pages/org-admin/AuditLogs';
 
 // Manager
 import PMDashboard from './pages/pm/PMDashboard';
+import Projects from './pages/pm/Projects';
 import Tasks from './pages/pm/Tasks';
 import Team from './pages/pm/Team';
 import Allocate from './pages/pm/Allocate';
@@ -90,6 +91,7 @@ export default function App() {
 
           {/* Manager */}
           <Route path="/pm" element={<PMDashboard />} />
+          <Route path="/pm/projects" element={<Projects />} />
           <Route path="/pm/tasks" element={<Tasks />} />
           <Route path="/pm/team" element={<Team />} />
           <Route path="/pm/allocate" element={<Allocate />} />

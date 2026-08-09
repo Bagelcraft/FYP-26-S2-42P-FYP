@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import Badge from '../../components/Badge';
 import api from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
 import { PM_NAV, PM_SECONDARY } from './nav';
 
 const fmtTs = (iso) => {
@@ -23,6 +24,8 @@ function AllocationHistoryModal({ task, onClose }) {
 
   const actionColor = (action) => {
     if (action === 'ALLOCATED') return 'bg-green-50 text-green-700';
+    // ACTIVATED marks a temporary worker being brought onto their first task.
+    if (action === 'ACTIVATED') return 'bg-amber-50 text-amber-700';
     if (action === 'REALLOCATED') return 'bg-blue-50 text-blue-700';
     if (action === 'UNASSIGNED') return 'bg-red-50 text-red-600';
     return 'bg-gray-100 text-gray-600';
@@ -237,7 +240,7 @@ function fmtShiftTime(t) {
   return `${h12}:${String(m).padStart(2, '0')} ${suffix}`;
 }
 
-function TaskModal({ task, depts, skills, shifts, onClose, onSaved }) {
+function TaskModal({ task, depts, skills, shifts, projects = [], isProjectOrg, onClose, onSaved }) {
   const editing = !!task;
   const initialSkillIds = editing
     ? skillsOf(task).map((s) => String(s.skill_id))
@@ -246,6 +249,7 @@ function TaskModal({ task, depts, skills, shifts, onClose, onSaved }) {
     ? {
         title: task.title,
         department_id: task.department_id ? String(task.department_id) : '',
+        project_id: task.project_id ? String(task.project_id) : '',
         required_skill_ids: initialSkillIds,
         status: task.status,
         due: toDateInput(task.start_datetime),
@@ -253,7 +257,7 @@ function TaskModal({ task, depts, skills, shifts, onClose, onSaved }) {
         shift_id: '',
         description: task.description ?? '',
       }
-    : { title: '', department_id: '', required_skill_ids: [], status: 'PENDING', due: '', end: '', shift_id: '', description: '' });
+    : { title: '', department_id: '', project_id: '', required_skill_ids: [], status: 'PENDING', due: '', end: '', shift_id: '', description: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [avail, setAvail] = useState({ days: [], total: 0 });
@@ -277,6 +281,12 @@ function TaskModal({ task, depts, skills, shifts, onClose, onSaved }) {
 
   const selectedShift = shifts.find((s) => String(s.shift_id) === form.shift_id);
 
+  // A project's duration bounds its tasks, so the date pickers clamp to it and
+  // the server rejects anything that slips through anyway.
+  const selectedProject = projects.find((p) => String(p.project_id) === form.project_id);
+  const projMin = selectedProject ? toDateInput(selectedProject.start_date) : undefined;
+  const projMax = selectedProject ? toDateInput(selectedProject.end_date) : undefined;
+
   async function submit(e) {
     e.preventDefault();
     setSaving(true); setError('');
@@ -293,6 +303,7 @@ function TaskModal({ task, depts, skills, shifts, onClose, onSaved }) {
         department_id: form.department_id ? Number(form.department_id) : null,
         required_skill_ids: form.required_skill_ids.map(Number),
       };
+      if (isProjectOrg) body.project_id = form.project_id ? Number(form.project_id) : null;
       let res;
       if (editing) {
         body.status = form.status;
@@ -323,6 +334,25 @@ function TaskModal({ task, depts, skills, shifts, onClose, onSaved }) {
             <input required value={form.title} onChange={set('title')} placeholder="e.g. Build Reports Export"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
+          {isProjectOrg && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Project</label>
+              <select value={form.project_id} onChange={set('project_id')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                <option value="">— Standalone task —</option>
+                {projects.map((p) => <option key={p.project_id} value={p.project_id}>{p.name}</option>)}
+              </select>
+              {selectedProject ? (
+                <p className="text-xs text-gray-400 mt-1">
+                  Runs {toDateInput(selectedProject.start_date)} → {toDateInput(selectedProject.end_date)}
+                  {selectedProject.resourceCount > 0
+                    ? ` · only the ${selectedProject.resourceCount} worker(s) in its resource pool can be allocated`
+                    : ' · no resource pool set, so anyone qualified can be allocated'}
+                </p>
+              ) : (
+                <p className="text-xs text-gray-400 mt-1">Leave blank for ad-hoc work that belongs to no project.</p>
+              )}
+            </div>
+          )}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Department</label>
             <select value={form.department_id} onChange={set('department_id')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
@@ -338,11 +368,11 @@ function TaskModal({ task, depts, skills, shifts, onClose, onSaved }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Start Date *</label>
-              <input type="date" required value={form.due} onChange={set('due')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              <input type="date" required min={projMin} max={projMax} value={form.due} onChange={set('due')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Deadline</label>
-              <input type="date" min={form.due || undefined} value={form.end} onChange={set('end')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              <input type="date" min={form.due || projMin} max={projMax} value={form.end} onChange={set('end')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
               <p className="text-xs text-gray-400 mt-1">Defaults to the start date.</p>
             </div>
           </div>
@@ -370,17 +400,20 @@ function TaskModal({ task, depts, skills, shifts, onClose, onSaved }) {
               <p className="text-xs text-gray-400 mt-1">Qualified workers available each day — click a day to set the start date.</p>
             </div>
           )}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Shift Template</label>
-            <select value={form.shift_id} onChange={set('shift_id')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-              <option value="">— Custom (9 AM–6 PM) —</option>
-              {shifts.map((s) => (
-                <option key={s.shift_id} value={s.shift_id}>
-                  {s.name} ({fmtShiftTime(s.start_time)} – {fmtShiftTime(s.end_time)})
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Project-based companies run no roster, so there are no shift templates to pick. */}
+          {!isProjectOrg && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Shift Template</label>
+              <select value={form.shift_id} onChange={set('shift_id')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                <option value="">— Custom (9 AM–6 PM) —</option>
+                {shifts.map((s) => (
+                  <option key={s.shift_id} value={s.shift_id}>
+                    {s.name} ({fmtShiftTime(s.start_time)} – {fmtShiftTime(s.end_time)})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           {selectedShift && (
             <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-xs text-blue-700">
               Task hours: <span className="font-medium">{fmtShiftTime(selectedShift.start_time)} – {fmtShiftTime(selectedShift.end_time)}</span>
@@ -410,13 +443,18 @@ function TaskModal({ task, depts, skills, shifts, onClose, onSaved }) {
 }
 
 export default function Tasks() {
+  const { user } = useAuth();
+  const isProjectOrg = user?.org_type === 'PROJECT';
+
   const [tasks, setTasks] = useState([]);
   const [depts, setDepts] = useState([]);
   const [skills, setSkills] = useState([]);
   const [shifts, setShifts] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [projectFilter, setProjectFilter] = useState('ALL');
   const [search, setSearch] = useState('');
   const [creating, setCreating] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
@@ -445,15 +483,25 @@ export default function Tasks() {
     api.get('/pm/skills')
       .then((r) => setSkills(r.data.data))
       .catch(() => api.get('/org-admin/skills').then((r) => setSkills(r.data.data)).catch(() => setSkills([])));
-    api.get('/pm/shift-templates')
-      .then((r) => setShifts(r.data.data ?? []))
-      .catch(() => setShifts([]));
-  }, []);
+    // Shift templates only exist in shift-based organisations; projects only in
+    // project-based ones. Each request is skipped where it would 403.
+    if (isProjectOrg) {
+      api.get('/pm/projects')
+        .then((r) => setProjects(r.data.data ?? []))
+        .catch(() => setProjects([]));
+    } else {
+      api.get('/pm/shift-templates')
+        .then((r) => setShifts(r.data.data ?? []))
+        .catch(() => setShifts([]));
+    }
+  }, [isProjectOrg]);
 
   const filtered = tasks.filter((t) => {
     const matchSearch = t.title.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'ALL' || t.status === statusFilter;
-    return matchSearch && matchStatus;
+    const matchProject = projectFilter === 'ALL'
+      || (projectFilter === 'NONE' ? t.project_id == null : String(t.project_id) === projectFilter);
+    return matchSearch && matchStatus && matchProject;
   });
 
   async function delTask(t) {
@@ -503,6 +551,14 @@ export default function Tasks() {
             <option value="SUBMITTED">Submitted</option>
             <option value="COMPLETED">Completed</option>
           </select>
+          {isProjectOrg && (
+            <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <option value="ALL">All Projects</option>
+              <option value="NONE">Standalone</option>
+              {projects.map((p) => <option key={p.project_id} value={p.project_id}>{p.name}</option>)}
+            </select>
+          )}
         </div>
 
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -513,6 +569,7 @@ export default function Tasks() {
               <thead>
                 <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
                   <th className="px-5 py-3 text-left font-medium">Task</th>
+                  {isProjectOrg && <th className="px-5 py-3 text-left font-medium">Project</th>}
                   <th className="px-5 py-3 text-left font-medium">Department</th>
                   <th className="px-5 py-3 text-left font-medium">Assigned To</th>
                   <th className="px-5 py-3 text-left font-medium">Skills</th>
@@ -527,6 +584,11 @@ export default function Tasks() {
                   return (
                     <tr key={t.task_id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-5 py-3 font-medium text-gray-800">{t.title}</td>
+                      {isProjectOrg && (
+                        <td className="px-5 py-3 text-gray-600">
+                          {t.project?.name ?? <span className="text-gray-300">Standalone</span>}
+                        </td>
+                      )}
                       <td className="px-5 py-3 text-gray-500">{t.department?.name ?? '—'}</td>
                       <td className="px-5 py-3 text-gray-600">{assigneeOf(t) ?? <span className="text-gray-400">Unassigned</span>}</td>
                       <td className="px-5 py-3">
@@ -560,7 +622,7 @@ export default function Tasks() {
                     </tr>
                   );
                 })}
-                {filtered.length === 0 && <tr><td colSpan={7} className="px-5 py-10 text-center text-gray-400">No tasks found.</td></tr>}
+                {filtered.length === 0 && <tr><td colSpan={isProjectOrg ? 8 : 7} className="px-5 py-10 text-center text-gray-400">No tasks found.</td></tr>}
               </tbody>
             </table>
           )}
@@ -569,14 +631,14 @@ export default function Tasks() {
 
       {creating && (
         <TaskModal
-          depts={depts} skills={skills} shifts={shifts}
+          depts={depts} skills={skills} shifts={shifts} projects={projects} isProjectOrg={isProjectOrg}
           onClose={() => setCreating(false)}
           onSaved={(t) => { load(); showToast(`Task “${t.title}” created`); }}
         />
       )}
       {editingTask && (
         <TaskModal
-          task={editingTask} depts={depts} skills={skills} shifts={shifts}
+          task={editingTask} depts={depts} skills={skills} shifts={shifts} projects={projects} isProjectOrg={isProjectOrg}
           onClose={() => setEditingTask(null)}
           onSaved={(t) => { load(); showToast(`Task “${t.title}” updated`); }}
         />

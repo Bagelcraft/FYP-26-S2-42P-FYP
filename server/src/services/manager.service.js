@@ -175,7 +175,7 @@ async function listBilling(organisationId) {
 async function getOrgInfo(organisationId) {
   return prisma.organisation.findUnique({
     where: { organisation_id: organisationId },
-    select: { name: true },
+    select: { name: true, org_type: true },
   });
 }
 

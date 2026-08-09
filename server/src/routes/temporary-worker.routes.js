@@ -1,6 +1,7 @@
 const express = require('express');
 const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
+const { requireOrgType, attachOrgType } = require('../middleware/orgType.middleware');
 const workerController = require('../controllers/worker.controller');
 const updateRequestController = require('../controllers/task-update-request.controller');
 const profileChangeController = require('../controllers/profileChangeRequest.controller');
@@ -8,7 +9,11 @@ const shiftChangeController = require('../controllers/shiftChangeRequest.control
 
 const router = express.Router();
 
-router.use(verifyToken, requireRole(['TEMPORARY_WORKER']));
+router.use(verifyToken, requireRole(['TEMPORARY_WORKER']), attachOrgType);
+
+// In a project-based organisation a temporary worker carries no shifts at all —
+// they stay dormant until a task is assigned, so there is nothing to swap.
+const shiftOrgOnly = requireOrgType('NON_PROJECT');
 
 // ─── Task views (5 — worker read-only) ───────────────────────────────────
 
@@ -58,8 +63,8 @@ router.get('/hours', workerController.getMyHours);
 router.get('/schedule', workerController.getMySchedule);
 
 // ─── Shift-change requests ────────────────────────────────────
-router.get('/shift-change-requests', shiftChangeController.listMine);
-router.post('/shift-change-request', shiftChangeController.submitRules, shiftChangeController.submitRequest);
+router.get('/shift-change-requests', shiftOrgOnly, shiftChangeController.listMine);
+router.post('/shift-change-request', shiftOrgOnly, shiftChangeController.submitRules, shiftChangeController.submitRequest);
 
 // Note: temporary workers (freelancers) have no leave entitlement — no leave routes.
 

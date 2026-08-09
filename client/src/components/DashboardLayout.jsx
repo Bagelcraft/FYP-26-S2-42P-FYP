@@ -7,6 +7,14 @@ import { markSeen, reconcile, unseenCount } from '../utils/navBadges';
 // How often to re-check for new activity while the user sits on a page.
 const POLL_MS = 60000;
 
+// A nav item may carry `orgTypes: ['PROJECT']` (or ['NON_PROJECT']) to restrict
+// it to one kind of organisation — Projects only exist for project-based
+// companies, shift rostering only for shift-based ones. Items without the field
+// are shown to everyone. An unknown org type (a session predating the field)
+// falls back to showing everything; the API still enforces the real boundary.
+const visibleFor = (items, orgType) =>
+  items.filter((i) => !i.orgTypes || !orgType || i.orgTypes.includes(orgType));
+
 // `secondaryNav` (optional) renders a subordinate "Account" group at the
 // bottom of the sidebar — used by the PM portal for Subscription / Testimonials
 // so they sit below the core operational features.
@@ -14,6 +22,10 @@ export default function DashboardLayout({ children, navItems, secondaryNav = [],
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+
+  const orgType = user?.org_type ?? null;
+  const primaryItems = visibleFor(navItems, orgType);
+  const secondaryItems = visibleFor(secondaryNav, orgType);
 
   // counts = live per-tab totals from the server; seen = what this user has
   // already looked at. A dot appears only where counts has grown past seen.
@@ -25,7 +37,7 @@ export default function DashboardLayout({ children, navItems, secondaryNav = [],
     navigate('/login');
   };
 
-  const allItems = [...navItems, ...secondaryNav];
+  const allItems = [...primaryItems, ...secondaryItems];
   const currentPage = allItems.reduce((best, item) => {
     const matches = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
     if (!matches) return best;
@@ -100,12 +112,12 @@ export default function DashboardLayout({ children, navItems, secondaryNav = [],
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          {navItems.map((item) => renderLink(item))}
+          {primaryItems.map((item) => renderLink(item))}
 
-          {secondaryNav.length > 0 && (
+          {secondaryItems.length > 0 && (
             <div className="pt-4 mt-3 border-t border-gray-700/60">
               <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-600">Account</p>
-              {secondaryNav.map((item) => renderLink(item, { secondary: true }))}
+              {secondaryItems.map((item) => renderLink(item, { secondary: true }))}
             </div>
           )}
         </nav>

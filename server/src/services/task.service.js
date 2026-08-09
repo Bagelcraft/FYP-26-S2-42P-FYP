@@ -1,4 +1,5 @@
 const prisma = require('../config/prisma');
+const projectService = require('./project.service');
 
 function makeError(message, statusCode) {
   const err = new Error(message);
@@ -10,16 +11,18 @@ function makeError(message, statusCode) {
 // legacy single requiredSkill for backward-compat.
 const TASK_INCLUDE = {
   department:    { select: { name: true } },
+  project:       { select: { project_id: true, name: true, status: true, start_date: true, end_date: true } },
   requiredSkill: { select: { skill_id: true, skill_name: true } },
   requiredSkills: { include: { skill: { select: { skill_id: true, skill_name: true } } } },
   createdBy:     { select: { full_name: true } },
   assignments: {
-    include: { assignedTo: { select: { full_name: true, email: true } } },
+    include: { assignedTo: { select: { full_name: true, email: true, user_type: true } } },
   },
 };
 
 const WORKER_TASK_INCLUDE = {
   department:    { select: { name: true } },
+  project:       { select: { project_id: true, name: true, start_date: true, end_date: true } },
   requiredSkill: { select: { skill_id: true, skill_name: true } },
   requiredSkills: { include: { skill: { select: { skill_id: true, skill_name: true } } } },
 };
@@ -56,6 +59,9 @@ async function listTasks(organisationId, filters = {}) {
 
   if (filters.status)        where.status        = filters.status;
   if (filters.department_id) where.department_id = parseInt(filters.department_id, 10);
+  // `unassigned` selects the ad-hoc tasks that belong to no project.
+  if (filters.project_id === 'unassigned') where.project_id = null;
+  else if (filters.project_id)             where.project_id = parseInt(filters.project_id, 10);
   if (filters.date) {
     const d = new Date(filters.date);
     where.start_datetime = { lte: d };
@@ -102,11 +108,19 @@ async function createTask({
   start_datetime,
   end_datetime,
   department_id = null,
+  project_id = null,
   required_skill_id = null,   // legacy single (still accepted)
   required_skill_ids,         // NEW — array
 }) {
   const skillIds = normaliseSkillIds(required_skill_ids, required_skill_id);
   await validateFKs({ department_id, skillIds, organisationId });
+
+  // The project's duration bounds its tasks — reject anything scheduled outside it.
+  if (project_id != null) {
+    await projectService.assertTaskWindowInProject(
+      Number(project_id), organisationId, start_datetime, end_datetime,
+    );
+  }
 
   const created = await prisma.task.create({
     data: {
@@ -118,6 +132,7 @@ async function createTask({
       start_datetime:    new Date(start_datetime),
       end_datetime:      new Date(end_datetime),
       department_id:     department_id ?? null,
+      project_id:        project_id != null ? Number(project_id) : null,
       required_skill_id: skillIds[0] ?? null,                  // keep first for compat
       requiredSkills:    { create: skillIds.map((id) => ({ skill_id: id })) },
     },
@@ -127,7 +142,7 @@ async function createTask({
 }
 
 async function updateTask(taskId, organisationId, updates) {
-  await getTask(taskId, organisationId);
+  const current = await getTask(taskId, organisationId);
 
   // Did the caller send any skill update?
   const hasSkillUpdate = updates.required_skill_ids !== undefined || updates.required_skill_id !== undefined;
@@ -148,7 +163,19 @@ async function updateTask(taskId, organisationId, updates) {
   if (updates.start_datetime !== undefined) data.start_datetime = new Date(updates.start_datetime);
   if (updates.end_datetime !== undefined)   data.end_datetime   = new Date(updates.end_datetime);
   if (updates.department_id !== undefined)  data.department_id  = updates.department_id;
+  if (updates.project_id !== undefined)     data.project_id     = updates.project_id != null ? Number(updates.project_id) : null;
   if (skillIds !== null)                    data.required_skill_id = skillIds[0] ?? null;
+
+  // Re-check the project window whenever either the project or the schedule moves.
+  const effectiveProjectId = data.project_id !== undefined ? data.project_id : current.project_id;
+  if (effectiveProjectId != null && (data.project_id !== undefined || data.start_datetime || data.end_datetime)) {
+    await projectService.assertTaskWindowInProject(
+      effectiveProjectId,
+      organisationId,
+      data.start_datetime ?? current.start_datetime,
+      data.end_datetime ?? current.end_datetime,
+    );
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
     if (skillIds !== null) {
@@ -297,6 +324,9 @@ async function getWorkerHours(userId, organisationId) {
 // Tasks that are PENDING and whose required skills the worker FULLY satisfies.
 // (`every` over the TaskSkill relation: a task with no required skills matches
 //  everyone; a task with required skills matches only workers who hold them all.)
+//
+// Project tasks are additionally hidden unless the worker is in that project's
+// resource pool — a named pool is the list of who may work on it.
 async function listAvailableTasks(userId, organisationId) {
   const userSkills = await prisma.userSkill.findMany({
     where:  { user_id: userId },
@@ -309,6 +339,11 @@ async function listAvailableTasks(userId, organisationId) {
       organisation_id: organisationId,
       status:          'PENDING',
       requiredSkills:  { every: { skill_id: { in: skillIds } } },
+      OR: [
+        { project_id: null },
+        { project: { resources: { none: {} } } },              // pool not yet defined — open to all
+        { project: { resources: { some: { user_id: userId } } } },
+      ],
     },
     include: WORKER_TASK_INCLUDE,
     orderBy: { start_datetime: 'asc' },

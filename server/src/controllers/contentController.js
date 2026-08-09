@@ -9,7 +9,8 @@ const getOrCreateContent = async () => {
     content = await prisma.landingContent.create({
       data: {
         hero_title: "Smart Workforce & Task Allocation",
-        hero_subtitle: "Manage your workforce. Assign tasks. Track progress in real time.",
+        hero_subtitle:
+          "Run your work by project or by shift — whichever fits your company.\nAssign tasks to the right people automatically and track progress in real time.",
       },
     });
   }

@@ -1,5 +1,8 @@
 const prisma = require('../config/prisma');
 const { sendRegistrationApprovedEmail } = require('./email.service');
+const { clearOrgTypeCache } = require('../middleware/orgType.middleware');
+
+const ORG_TYPES = ['PROJECT', 'NON_PROJECT'];
 
 function makeError(message, statusCode) {
   const err = new Error(message);
@@ -24,6 +27,7 @@ async function listPendingRegistrations() {
       email:             true,
       company_name:      true,
       uen:               true,
+      org_type:          true,
       position:          true,
       email_verified:    true,
       created_at:        true,
@@ -57,8 +61,10 @@ async function approveRegistration(marketingUserId) {
   const user = await prisma.$transaction(async (tx) => {
     const org = await tx.organisation.create({
       data: {
-        name: pending.company_name || pending.full_name || pending.email,
-        uen:  pending.uen ?? null,
+        name:     pending.company_name || pending.full_name || pending.email,
+        uen:      pending.uen ?? null,
+        // The applicant's scheduling model, chosen at registration.
+        org_type: pending.org_type,
       },
     });
 
@@ -107,9 +113,10 @@ async function listOrganisations() {
       organisation_id: true,
       name:            true,
       uen:             true,
+      org_type:        true,
       isActive:        true,
       createdAt:       true,
-      _count:          { select: { users: true } },
+      _count:          { select: { users: true, projects: true } },
       activeSubscription: { select: { status: true, amount: true } },
     },
   });
@@ -129,6 +136,43 @@ async function setOrganisationActive(organisationId, isActive) {
   });
 }
 
+// Correct an organisation's scheduling model — the escape hatch for a wrong
+// choice at registration. Switching away from PROJECT is refused while projects
+// exist, since those become unreachable under shift-based rules.
+async function setOrganisationType(organisationId, orgType) {
+  if (!ORG_TYPES.includes(orgType)) {
+    throw makeError(`org_type must be one of: ${ORG_TYPES.join(', ')}`, 422);
+  }
+  const org = await prisma.organisation.findUnique({ where: { organisation_id: organisationId } });
+  if (!org) throw makeError('Organisation not found', 404);
+  if (org.org_type === orgType) return org;
+
+  if (org.org_type === 'PROJECT') {
+    const projectCount = await prisma.project.count({ where: { organisation_id: organisationId } });
+    if (projectCount > 0) {
+      throw makeError(
+        `This organisation has ${projectCount} project(s). Delete them before switching to shift-based scheduling.`,
+        409,
+      );
+    }
+  } else {
+    const rosterCount = await prisma.shiftAssignment.count({ where: { organisation_id: organisationId } });
+    if (rosterCount > 0) {
+      throw makeError(
+        `This organisation has ${rosterCount} rostered shift(s). Clear the roster before switching to project-based scheduling.`,
+        409,
+      );
+    }
+  }
+
+  const updated = await prisma.organisation.update({
+    where: { organisation_id: organisationId },
+    data:  { org_type: orgType },
+  });
+  clearOrgTypeCache(organisationId);
+  return updated;
+}
+
 module.exports = {
   listPendingRegistrations,
   approveRegistration,
@@ -136,4 +180,5 @@ module.exports = {
   listOrganisations,
   createOrganisation,
   setOrganisationActive,
+  setOrganisationType,
 };

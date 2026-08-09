@@ -16,6 +16,7 @@ async function getOrgProfile(organisationId) {
     select: {
       organisation_id:  true,
       name:             true,
+      org_type:         true,
       isActive:         true,
       fiscal_year_start_month: true,
       createdAt:        true,
@@ -37,7 +38,7 @@ async function updateOrgProfile(organisationId, data) {
   return prisma.organisation.update({
     where: { organisation_id: organisationId },
     data:  update,
-    select: { organisation_id: true, name: true, isActive: true, fiscal_year_start_month: true, createdAt: true },
+    select: { organisation_id: true, name: true, org_type: true, isActive: true, fiscal_year_start_month: true, createdAt: true },
   });
 }
 

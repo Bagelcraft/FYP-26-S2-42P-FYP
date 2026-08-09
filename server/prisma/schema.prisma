@@ -17,6 +17,26 @@ enum UserType {
   TEMPORARY_WORKER
 }
 
+// How an organisation schedules its people. Chosen at registration and drives
+// which half of the system it uses:
+//   PROJECT     — work is organised as projects (task → resource → duration).
+//                 No shift roster; temporary workers sit dormant until a task
+//                 activates them, permanent workers are the first choice.
+//   NON_PROJECT — conventional shift work. The roster is the primary flow and
+//                 ad-hoc tasks are assigned within a worker's rostered shift.
+enum OrgType {
+  PROJECT
+  NON_PROJECT
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
 enum TaskStatus {
   PENDING
   ASSIGNED
@@ -88,6 +108,9 @@ model Organisation {
   // Singapore Unique Entity Number, captured at registration and verified by the
   // system admin before the organisation is approved.
   uen                     String?  @unique @db.VarChar(20)
+  // Project-based vs shift-based scheduling. Carried over from the applicant's
+  // choice at registration; the system admin can correct it afterwards.
+  org_type                OrgType  @default(NON_PROJECT)
   isActive                Boolean  @default(true)
   // Month the leave / financial year starts in (1 = Jan … 12 = Dec). Drives leave proration.
   fiscal_year_start_month Int      @default(1)
@@ -99,6 +122,7 @@ model Organisation {
   departments        Department[]
   skills             Skill[]
   tasks              Task[]
+  projects           Project[]
   staffRoles         StaffRole[]
   unregisteredUsers  UnregisteredUser[]
   shiftTemplates     ShiftTemplate[]
@@ -180,6 +204,8 @@ model User {
   attendance            Attendance[]
   availability          Availability[]
   createdTasks          Task[]                 @relation("CreatedTasks")
+  managedProjects       Project[]              @relation("ManagedProjects")
+  projectResources      ProjectResource[]      @relation("ProjectResources")
   assignedTasks         TaskAssignment[]       @relation("AssignedTo")
   taskAssignedBy        TaskAssignment[]       @relation("AssignedBy")
   leaveRequests         LeaveRequest[]         @relation("UserLeave")
@@ -282,11 +308,53 @@ model LeaveBalance {
   user User @relation(fields: [user_id], references: [userId])
 }
 
+// ─── Projects (PROJECT organisations only) ────────────────────
+
+// A body of work with a fixed duration, a set of tasks, and a resource pool.
+// The three things a project manager cares about map onto this model directly:
+//   Task     → project.tasks
+//   Resource → project.resources (who may be allocated to those tasks)
+//   Duration → start_date / end_date (tasks must fall inside this window)
+model Project {
+  project_id      Int           @id @default(autoincrement())
+  organisation_id Int
+  manager_id      Int?
+  name            String        @db.VarChar(150)
+  description     String?       @db.Text
+  status          ProjectStatus @default(PLANNING)
+  start_date      DateTime      @db.Date
+  end_date        DateTime      @db.Date
+  created_at      DateTime      @default(now())
+
+  organisation Organisation      @relation(fields: [organisation_id], references: [organisation_id])
+  manager      User?             @relation("ManagedProjects", fields: [manager_id], references: [userId])
+  tasks        Task[]
+  resources    ProjectResource[]
+
+  @@index([organisation_id])
+}
+
+// The pool of workers who may be allocated to a project's tasks. An empty pool
+// means "anyone in the organisation" — the allocation engine only narrows the
+// candidate list once at least one resource has been named.
+model ProjectResource {
+  resource_id Int      @id @default(autoincrement())
+  project_id  Int
+  user_id     Int
+  added_at    DateTime @default(now())
+
+  project Project @relation(fields: [project_id], references: [project_id], onDelete: Cascade)
+  user    User    @relation("ProjectResources", fields: [user_id], references: [userId])
+
+  @@unique([project_id, user_id])
+}
+
 // ─── Tasks & Allocation ───────────────────────────────────────
 
 model Task {
   task_id           Int        @id @default(autoincrement())
   organisation_id   Int
+  project_id        Int?
   department_id     Int?
   created_by        Int
   required_skill_id Int?
@@ -298,6 +366,7 @@ model Task {
   createdAt         DateTime   @default(now())
 
   organisation      Organisation        @relation(fields: [organisation_id], references: [organisation_id])
+  project           Project?            @relation(fields: [project_id], references: [project_id])
   department        Department?         @relation(fields: [department_id], references: [department_id])
   createdBy         User                @relation("CreatedTasks", fields: [created_by], references: [userId])
   requiredSkill     Skill?              @relation(fields: [required_skill_id], references: [skill_id])
@@ -305,6 +374,8 @@ model Task {
   assignments       TaskAssignment[]
   allocationHistory AllocationHistory[]
   updateRequests    TaskUpdateRequest[]
+
+  @@index([project_id])
 }
 
 model TaskSkill {
@@ -413,6 +484,9 @@ model UnregisteredUser {
   company_name         String?   @db.VarChar(150)
   // Singapore UEN supplied by the applicant for the admin to verify.
   uen                  String?   @db.VarChar(20)
+  // How the applicant says they schedule work. Copied onto the Organisation
+  // when the registration is approved.
+  org_type             OrgType   @default(NON_PROJECT)
   position             String?   @db.VarChar(100)
   // Email ownership proof. The admin cannot approve a request until the applicant
   // has clicked the emailed link and email_verified flips to true.

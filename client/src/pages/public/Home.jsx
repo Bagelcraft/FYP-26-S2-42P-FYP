@@ -26,12 +26,15 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api
 // there; this is the fallback for when the API is unreachable, so the marketing
 // page never renders an empty Features section.
 const FALLBACK_FEATURES = [
-  { icon: '🤖', title: 'Automated Task Allocation', description: 'Match every task to the right person automatically, based on required skills, current availability, and workload — no more manual rostering.' },
-  { icon: '📋', title: 'Task Management',           description: 'Create tasks, set start and end times, attach required skills, and follow each one from Pending through to Completed in real time.' },
-  { icon: '🕐', title: 'Shift Scheduling',          description: 'Build reusable shift templates and roster staff onto them by date. Everyone sees their own schedule the moment it is published.' },
+  { icon: '🔀', title: 'Two Ways to Schedule',      description: 'Tell us how you work when you sign up. Project-based companies get projects, resource pools and task-driven allocation; shift-based companies get shift templates and a roster. Every portal adapts to the model you chose.' },
+  { icon: '🗂️', title: 'Projects, Resources & Duration', description: 'Group work into projects with a fixed start and end date, then name the pool of people allowed to work on them. Every task is checked against both before it can be scheduled or allocated.' },
+  { icon: '⚡', title: 'On-Demand Temporary Staff', description: 'Temporary workers carry no roster at all. They stay dormant until a task activates them — so you only draw on freelance cover for the days you actually need it.' },
+  { icon: '🤖', title: 'Automated Task Allocation', description: 'Match every task to the right person by required skills, availability and current workload. Permanent staff are always offered the work first, and the engine falls through to temporary cover only on the days nobody permanent is free.' },
+  { icon: '📋', title: 'Task Management',           description: 'Create tasks, set start and end times, attach the skills they require, and follow each one from Pending through to Completed — including a submit-and-approve step for freelance work.' },
+  { icon: '🕐', title: 'Shift Scheduling',          description: 'For shift-based teams: build reusable shift templates and roster staff onto them in bulk across any date range. Everyone sees their own schedule the moment it is published.' },
   { icon: '🔄', title: 'Shift Change Requests',     description: 'Staff request a swap, managers approve or reject it in one click, and the roster updates itself — with a full record of who decided what.' },
-  { icon: '🌴', title: 'Leave Management',          description: 'Annual, medical, and unpaid leave with balances that prorate automatically for staff who join mid financial year, plus a manager approval flow.' },
-  { icon: '⏱️', title: 'Attendance & Time Sheets',  description: 'Clock in and out from any device. Working hours are totalled for you and feed straight into reporting.' },
+  { icon: '🌴', title: 'Leave Management',          description: 'Annual, medical, and unpaid leave with balances that prorate automatically for staff who join mid financial year. Approved leave takes someone out of the allocation pool for those days without anyone having to remember.' },
+  { icon: '⏱️', title: 'Attendance & Time Sheets',  description: 'Clock in and out from any device. Working hours are totalled for you and feed straight into reporting and workload limits.' },
   { icon: '🎯', title: 'Skills & Role Management',  description: 'Maintain a skills register with certification tracking, define the skills each role requires, and have them applied to new staff on day one.' },
   { icon: '📊', title: 'Reports & Analytics',       description: 'Track completion rates, workload distribution, and attendance across your team, and export the results when you need them.' },
   { icon: '🔐', title: 'Role-Based Portals',        description: 'Separate, purpose-built views for organisation admins, project managers, permanent staff, and temporary staff — each seeing only what they should.' },
@@ -295,6 +298,43 @@ export default function Home() {
             <p className="text-gray-500 mt-2 max-w-xl mx-auto text-sm">
               One platform built for every role — admins, project managers, and workers alike.
             </p>
+          </div>
+
+          {/* The scheduling model is the first choice a new customer makes, so the
+              two options are spelled out before the feature grid. */}
+          <div className="grid sm:grid-cols-2 gap-5 mb-10 max-w-4xl mx-auto">
+            <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-6">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl" aria-hidden="true">🗂️</span>
+                <h3 className="font-semibold text-gray-900">Project-based companies</h3>
+              </div>
+              <p className="text-gray-600 text-sm mt-2 leading-relaxed">
+                Work is organised as projects. Define the tasks a project needs, the resources able to
+                work on it, and how long it runs — then let the engine allocate within those bounds.
+              </p>
+              <ul className="mt-3 space-y-1.5 text-sm text-gray-600">
+                <li className="flex gap-2"><span className="text-indigo-500">✓</span>Tasks bounded by the project duration</li>
+                <li className="flex gap-2"><span className="text-indigo-500">✓</span>A named resource pool per project</li>
+                <li className="flex gap-2"><span className="text-indigo-500">✓</span>Permanent staff first, temporary cover as fallback</li>
+                <li className="flex gap-2"><span className="text-indigo-500">✓</span>No rosters — temporary staff activate on assignment</li>
+              </ul>
+            </div>
+            <div className="rounded-2xl border border-sky-100 bg-sky-50/60 p-6">
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl" aria-hidden="true">🕐</span>
+                <h3 className="font-semibold text-gray-900">Shift-based companies</h3>
+              </div>
+              <p className="text-gray-600 text-sm mt-2 leading-relaxed">
+                Work is organised as shifts. Build templates, roster your team across any date range,
+                and assign ad-hoc tasks to whoever is actually on shift at the time.
+              </p>
+              <ul className="mt-3 space-y-1.5 text-sm text-gray-600">
+                <li className="flex gap-2"><span className="text-sky-500">✓</span>Reusable shift templates, including overnight</li>
+                <li className="flex gap-2"><span className="text-sky-500">✓</span>Bulk rostering by weekday and date range</li>
+                <li className="flex gap-2"><span className="text-sky-500">✓</span>Tasks matched against real shift coverage</li>
+                <li className="flex gap-2"><span className="text-sky-500">✓</span>Swap requests with manager approval</li>
+              </ul>
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {features.map((f) => (

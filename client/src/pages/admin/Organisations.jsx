@@ -6,6 +6,20 @@ import api from '../../utils/api';
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : '—');
 
+// Scheduling model. Shown on both tables so the admin can see what the applicant
+// asked for and correct it after approval if it was the wrong choice.
+const ORG_TYPE_LABEL = { PROJECT: 'Project-based', NON_PROJECT: 'Shift-based' };
+
+function OrgTypeChip({ type }) {
+  const project = type === 'PROJECT';
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${project ? 'bg-indigo-100 text-indigo-700' : 'bg-sky-100 text-sky-700'}`}>
+      <span aria-hidden="true">{project ? '🗂️' : '🕐'}</span>
+      {ORG_TYPE_LABEL[type] ?? type ?? '—'}
+    </span>
+  );
+}
+
 export default function Organisations() {
   const [pending, setPending] = useState([]);
   const [orgs, setOrgs] = useState([]);
@@ -78,6 +92,25 @@ export default function Organisations() {
     }
   };
 
+  // Switching is refused (409) while the organisation holds projects or a roster
+  // that the other model cannot represent — the message says which.
+  const switchType = async (org) => {
+    const next = org.org_type === 'PROJECT' ? 'NON_PROJECT' : 'PROJECT';
+    if (!window.confirm(`Change "${org.name}" to ${ORG_TYPE_LABEL[next]} scheduling?`)) return;
+    setActingId(org.organisation_id);
+    setError('');
+    try {
+      await api.patch(`/admin/organisations/${org.organisation_id}/type`, { org_type: next });
+      setOrgs((prev) =>
+        prev.map((o) => (o.organisation_id === org.organisation_id ? { ...o, org_type: next } : o))
+      );
+    } catch (err) {
+      setError(err.response?.data?.message ?? 'Failed to change the organisation type.');
+    } finally {
+      setActingId(null);
+    }
+  };
+
   const filtered = orgs.filter((o) => {
     const status = o.isActive ? 'ACTIVE' : 'SUSPENDED';
     const matchSearch = o.name.toLowerCase().includes(search.toLowerCase());
@@ -121,6 +154,7 @@ export default function Organisations() {
             <thead>
               <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
                 <th className="px-5 py-3 text-left font-medium">Company</th>
+                <th className="px-5 py-3 text-left font-medium">Type</th>
                 <th className="px-5 py-3 text-left font-medium">UEN</th>
                 <th className="px-5 py-3 text-left font-medium">Applicant</th>
                 <th className="px-5 py-3 text-left font-medium">Email</th>
@@ -133,6 +167,7 @@ export default function Organisations() {
               {pending.map((r) => (
                 <tr key={r.marketing_user_id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-5 py-3 font-medium text-gray-800">{r.company_name}</td>
+                  <td className="px-5 py-3"><OrgTypeChip type={r.org_type} /></td>
                   <td className="px-5 py-3">
                     {r.uen ? (
                       <a
@@ -189,7 +224,7 @@ export default function Organisations() {
               ))}
               {!loading && pending.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-8 text-center text-gray-400">No pending requests.</td>
+                  <td colSpan={8} className="px-5 py-8 text-center text-gray-400">No pending requests.</td>
                 </tr>
               )}
             </tbody>
@@ -222,6 +257,7 @@ export default function Organisations() {
             <thead>
               <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
                 <th className="px-5 py-3 text-left font-medium">Organisation</th>
+                <th className="px-5 py-3 text-left font-medium">Type</th>
                 <th className="px-5 py-3 text-left font-medium">UEN</th>
                 <th className="px-5 py-3 text-left font-medium">Staff</th>
                 <th className="px-5 py-3 text-left font-medium">Registered</th>
@@ -233,29 +269,45 @@ export default function Organisations() {
               {filtered.map((org) => (
                 <tr key={org.organisation_id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-5 py-3 font-medium text-gray-800">{org.name}</td>
+                  <td className="px-5 py-3">
+                    <OrgTypeChip type={org.org_type} />
+                    {org.org_type === 'PROJECT' && org._count?.projects > 0 && (
+                      <span className="block text-[10px] text-gray-400 mt-0.5">{org._count.projects} project(s)</span>
+                    )}
+                  </td>
                   <td className="px-5 py-3 font-mono text-xs text-gray-500">{org.uen ?? '—'}</td>
                   <td className="px-5 py-3 text-gray-600">{org._count?.users ?? 0}</td>
                   <td className="px-5 py-3 text-gray-500">{fmtDate(org.createdAt)}</td>
                   <td className="px-5 py-3"><Badge status={org.isActive ? 'ACTIVE' : 'SUSPENDED'} /></td>
                   <td className="px-5 py-3">
-                    <button
-                      onClick={() => toggleStatus(org)}
-                      disabled={actingId === org.organisation_id}
-                      className={`text-xs font-medium hover:underline disabled:opacity-50 ${org.isActive ? 'text-red-500' : 'text-green-600'}`}
-                    >
-                      {actingId === org.organisation_id ? '…' : org.isActive ? 'Suspend' : 'Reactivate'}
-                    </button>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => toggleStatus(org)}
+                        disabled={actingId === org.organisation_id}
+                        className={`text-xs font-medium hover:underline disabled:opacity-50 ${org.isActive ? 'text-red-500' : 'text-green-600'}`}
+                      >
+                        {actingId === org.organisation_id ? '…' : org.isActive ? 'Suspend' : 'Reactivate'}
+                      </button>
+                      <button
+                        onClick={() => switchType(org)}
+                        disabled={actingId === org.organisation_id}
+                        title={`Switch to ${ORG_TYPE_LABEL[org.org_type === 'PROJECT' ? 'NON_PROJECT' : 'PROJECT']} scheduling`}
+                        className="text-xs font-medium text-gray-500 hover:underline disabled:opacity-50"
+                      >
+                        Change type
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
               {!loading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center text-gray-400">No organisations found.</td>
+                  <td colSpan={7} className="px-5 py-10 text-center text-gray-400">No organisations found.</td>
                 </tr>
               )}
               {loading && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center text-gray-400">Loading…</td>
+                  <td colSpan={7} className="px-5 py-10 text-center text-gray-400">Loading…</td>
                 </tr>
               )}
             </tbody>

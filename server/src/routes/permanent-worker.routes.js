@@ -1,6 +1,7 @@
 const express = require('express');
 const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
+const { requireOrgType, attachOrgType } = require('../middleware/orgType.middleware');
 const workerController = require('../controllers/worker.controller');
 const updateRequestController = require('../controllers/task-update-request.controller');
 const attendanceController = require('../controllers/attendance.controller');
@@ -9,7 +10,11 @@ const shiftChangeController = require('../controllers/shiftChangeRequest.control
 
 const router = express.Router();
 
-router.use(verifyToken, requireRole(['PERMANENT_WORKER']));
+router.use(verifyToken, requireRole(['PERMANENT_WORKER']), attachOrgType);
+
+// A project-based organisation runs no roster, so there is no shift to view or
+// swap — work reaches these staff as tasks instead.
+const shiftOrgOnly = requireOrgType('NON_PROJECT');
 
 // ─── Task views (5 — worker read-only) ───────────────────────────────────
 
@@ -49,8 +54,8 @@ router.get('/shift-templates', workerController.listOrgShifts);
 router.get('/schedule', workerController.getMySchedule);
 
 // ─── Shift-change requests ────────────────────────────────────
-router.get('/shift-change-requests', shiftChangeController.listMine);
-router.post('/shift-change-request', shiftChangeController.submitRules, shiftChangeController.submitRequest);
+router.get('/shift-change-requests', shiftOrgOnly, shiftChangeController.listMine);
+router.post('/shift-change-request', shiftOrgOnly, shiftChangeController.submitRules, shiftChangeController.submitRequest);
 
 // ─── Leave (worker self-service) ──────────────────────────────
 router.get('/calendar', workerController.getMyCalendar);

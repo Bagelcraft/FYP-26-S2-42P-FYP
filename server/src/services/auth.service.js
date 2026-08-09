@@ -23,7 +23,12 @@ function sanitizeUser(user) {
 }
 
 async function login(email, password) {
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({
+    where: { email },
+    // org_type travels with the session so the client knows, before its first
+    // data fetch, whether to render the project portal or the shift portal.
+    include: { organisation: { select: { name: true, org_type: true } } },
+  });
   if (!user || !user.is_active) {
     throw makeError('Invalid email or password', 401);
   }
@@ -42,7 +47,10 @@ async function login(email, password) {
     data: { lastLogin: new Date() },
   });
 
-  return { user: sanitizeUser(user), token: signToken(user) };
+  return {
+    user: { ...sanitizeUser(user), org_type: user.organisation?.org_type ?? null },
+    token: signToken(user),
+  };
 }
 
 async function changePassword(userId, currentPassword, newPassword) {

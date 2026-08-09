@@ -10,6 +10,24 @@ const UEN_PATTERNS = [
   /^[TSR]\d{2}[A-Z]{2}\d{4}[A-Z]$/, // T09LL0001B — other entities
 ];
 
+// How the company schedules its people. The choice decides which half of the
+// system the organisation gets — a project portal or a shift roster — so it is
+// asked up front rather than inferred later. A system admin can correct it.
+const ORG_TYPES = [
+  {
+    value: 'NON_PROJECT',
+    icon: '🕐',
+    title: 'Shift-based',
+    blurb: 'Staff work rostered shifts. You build a roster from shift templates and assign work within it.',
+  },
+  {
+    value: 'PROJECT',
+    icon: '🗂️',
+    title: 'Project-based',
+    blurb: 'Work is organised as projects with tasks, a resource pool and a fixed duration. No shifts — temporary staff are activated when given a task.',
+  },
+];
+
 export default function Register() {
   const navigate = useNavigate();
   const [form, setForm] = useState({
@@ -19,6 +37,7 @@ export default function Register() {
     confirm_password: '',
     company_name: '',
     uen: '',
+    org_type: 'NON_PROJECT',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -54,6 +73,7 @@ export default function Register() {
         password: form.password,
         company_name: form.company_name,
         uen,
+        org_type: form.org_type,
       });
       setSuccess(true);
     } catch (err) {
@@ -180,6 +200,35 @@ export default function Register() {
                 placeholder="Acme Corp"
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">How do you schedule work?</label>
+              <div className="space-y-2">
+                {ORG_TYPES.map((t) => {
+                  const selected = form.org_type === t.value;
+                  return (
+                    <button
+                      type="button"
+                      key={t.value}
+                      onClick={() => setForm({ ...form, org_type: t.value })}
+                      aria-pressed={selected}
+                      className={`w-full flex items-start gap-3 text-left px-4 py-3 rounded-lg border transition-colors ${
+                        selected ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <span className="text-lg leading-none mt-0.5" aria-hidden="true">{t.icon}</span>
+                      <span className="min-w-0">
+                        <span className={`block text-sm font-medium ${selected ? 'text-primary-700' : 'text-gray-800'}`}>{t.title}</span>
+                        <span className="block text-xs text-gray-500 mt-0.5">{t.blurb}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5">
+                This sets up your portal. If you pick wrong, our team can change it before you add staff.
+              </p>
             </div>
 
             <div>

@@ -5,9 +5,11 @@ import api from '../../utils/api';
 import { PM_NAV, PM_SECONDARY } from './nav';
 
 // Eligibility data comes straight from the allocation engine
-// (GET /pm/tasks/:id/eligible-staff → { task, candidates }). Each candidate:
-//   { userId, full_name, user_type, staffRole, skills[], weeklyHours,
-//     maxHours, remainingHours, isAvailable, withinHours, eligible, ineligibleReason }
+// (GET /pm/tasks/:id/eligible-staff → { task, orgType, project, candidates, summary }).
+// Each candidate:
+//   { userId, full_name, user_type, staffRole, skills[], weeklyHours, maxHours,
+//     remainingHours, isAvailable, withinHours, isDormant, inResourcePool,
+//     blockers[], blockedDays[], rosteredDays, eligible, ineligibleReason }
 const typeLabel = (t) => (t === 'PERMANENT_WORKER' ? 'Permanent Employee' : t === 'TEMPORARY_WORKER' ? 'Temporary Employee' : t);
 const fmtDue = (iso) => (iso ? new Date(iso).toLocaleDateString('en-SG', { day: '2-digit', month: 'short' }) : '—');
 
@@ -77,6 +79,9 @@ export default function Allocate() {
   const taskSkills = skillsOf(task);
   const candidates = evalData?.candidates ?? [];
   const suggestion = candidates.find((c) => c.eligible);
+  const summary = evalData?.summary;
+  const project = evalData?.project;
+  const isProjectOrg = evalData?.orgType === 'PROJECT';
 
   async function assign(userId, auto) {
     if (!sel) return;
@@ -145,10 +150,28 @@ export default function Allocate() {
                   <div className="flex items-start justify-between">
                     <div>
                       <h3 className="font-semibold text-gray-800">{task.title}</h3>
-                      <p className="text-xs text-gray-400 mt-0.5">{task.department?.name ?? 'No dept'} · Requires <span className="font-medium text-gray-600">{taskSkills.length ? taskSkills.map((s) => s.skill_name).join(' + ') : 'any skill'}</span> · Due {fmtDue(task.end_datetime)}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {project ? <span className="text-primary-600 font-medium">{project.name}</span> : (task.department?.name ?? 'No dept')}
+                        {' · '}Requires <span className="font-medium text-gray-600">{taskSkills.length ? taskSkills.map((s) => s.skill_name).join(' + ') : 'any skill'}</span> · Due {fmtDue(task.end_datetime)}
+                      </p>
+                      {project && (
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {project.resourceCount > 0
+                            ? `Candidates limited to the project's ${project.resourceCount}-worker resource pool.`
+                            : 'No resource pool set — anyone qualified in the organisation can take this.'}
+                        </p>
+                      )}
                     </div>
                     <Badge status="PENDING" />
                   </div>
+
+                  {/* Permanent staff come first; a temp is only reached when none is free. */}
+                  {summary?.fallbackToTemporary && (
+                    <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-xs text-amber-800">
+                      No permanent employee is free for this window — the work falls to a temporary worker,
+                      who is activated by the assignment.
+                    </div>
+                  )}
                   {suggestion && (
                     <div className="mt-4 flex items-center justify-between bg-gradient-to-r from-primary-50 to-blue-50 border border-primary-100 rounded-lg px-4 py-3">
                       <div className="flex items-center gap-3">
@@ -166,7 +189,9 @@ export default function Allocate() {
                 <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
                   <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
                     <h4 className="font-semibold text-gray-800 text-sm">Ranked Candidates</h4>
-                    <span className="text-xs text-gray-400">{candidates.filter((c) => c.eligible).length} of {candidates.length} eligible</span>
+                    <span className="text-xs text-gray-400">
+                      {summary ? `${summary.eligible} of ${summary.total} eligible · ${summary.eligiblePermanent} permanent, ${summary.eligibleTemporary} temporary` : `${candidates.filter((c) => c.eligible).length} of ${candidates.length} eligible`}
+                    </span>
                   </div>
                   <div className="divide-y divide-gray-50">
                     {evalLoading ? <div className="px-5 py-10 text-center text-gray-400 text-sm">Evaluating eligibility…</div> : candidates.map((c, i) => (
@@ -176,7 +201,16 @@ export default function Allocate() {
                             <span className="text-xs text-gray-300 font-mono w-4">{i + 1}</span>
                             <Avatar name={c.full_name} ring={c === suggestion} />
                             <div>
-                              <p className="text-sm font-medium text-gray-800">{c.full_name}</p>
+                              <p className="text-sm font-medium text-gray-800 flex items-center gap-1.5">
+                                {c.full_name}
+                                {/* A temp carrying no live work — assigning this task is what activates them. */}
+                                {c.isDormant && (
+                                  <span title="Free of shifts and carrying no active work — this assignment activates them"
+                                    className="bg-amber-50 text-amber-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
+                                    DORMANT
+                                  </span>
+                                )}
+                              </p>
                               <p className="text-xs text-gray-400">{typeLabel(c.user_type)}{c.staffRole ? ` · ${c.staffRole}` : ''}</p>
                             </div>
                           </div>
@@ -188,14 +222,32 @@ export default function Allocate() {
                         <div className="flex flex-wrap items-center gap-2 mt-2 pl-11">
                           {/* One chip per required skill — green if the candidate has it, red if missing. */}
                           {taskSkills.map((s) => <CheckChip key={s.skill_id} ok={(c.skills ?? []).includes(s.skill_name)}>{s.skill_name}</CheckChip>)}
-                          <CheckChip ok={c.isAvailable}>{c.isAvailable ? 'Available' : 'No availability'}</CheckChip>
+                          <CheckChip ok={c.isAvailable}>
+                            {c.isAvailable
+                              ? (isProjectOrg ? 'Free' : 'On shift')
+                              : isProjectOrg
+                                ? 'Blocked'
+                                : c.rosterCoverage > 0 ? `Rostered ${c.rosterCoverage}%` : 'Not rostered'}
+                          </CheckChip>
                           <CheckChip ok={c.withinHours}>{c.withinHours ? `${c.remainingHours}h spare` : 'Hours maxed'}</CheckChip>
                           <HoursBar c={c} />
                         </div>
                         {!c.eligible && c.ineligibleReason && <p className="text-xs text-red-500 mt-1 pl-11">{c.ineligibleReason}</p>}
+                        {/* Exactly which days are lost, so a partial clash is obvious. */}
+                        {c.blockedDays?.length > 0 && (
+                          <p className="text-xs text-gray-400 mt-0.5 pl-11">
+                            Unavailable on {c.blockedDays.map((d) => new Date(d + 'T00:00:00').toLocaleDateString('en-SG', { day: '2-digit', month: 'short' })).join(', ')}
+                          </p>
+                        )}
                       </div>
                     ))}
-                    {!evalLoading && candidates.length === 0 && <div className="px-5 py-10 text-center text-gray-400 text-sm">No staff with the required skills.</div>}
+                    {!evalLoading && candidates.length === 0 && (
+                      <div className="px-5 py-10 text-center text-gray-400 text-sm">
+                        {project?.resourceCount > 0
+                          ? 'No one in this project\'s resource pool has the required skills. Add resources on the Projects page.'
+                          : 'No staff with the required skills.'}
+                      </div>
+                    )}
                   </div>
                 </div>
               </>

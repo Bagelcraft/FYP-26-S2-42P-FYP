@@ -15,6 +15,7 @@ const list = async (req, res, next) => {
     const tasks = await taskService.listTasks(req.user.organisationId, {
       status:        req.query.status,
       department_id: req.query.department_id,
+      project_id:    req.query.project_id,
       date:          req.query.date,
     });
     res.json({ success: true, data: tasks });
