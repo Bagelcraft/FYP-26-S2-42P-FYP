@@ -6,6 +6,7 @@ import api from '../../utils/api';
 const CATEGORY_COLORS = {
   AUTH:    'bg-blue-100 text-blue-700',
   TASK:    'bg-purple-100 text-purple-700',
+  PROJECT: 'bg-indigo-100 text-indigo-700',
   BILLING: 'bg-green-100 text-green-700',
   SYSTEM:  'bg-gray-100 text-gray-600',
   STAFF:   'bg-orange-100 text-orange-700',
@@ -60,6 +61,7 @@ function exportPDF(logs, { category, search, dateFrom, dateTo }) {
   .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 600; }
   .AUTH    { background: #dbeafe; color: #1d4ed8; }
   .TASK    { background: #ede9fe; color: #6d28d9; }
+  .PROJECT { background: #e0e7ff; color: #4338ca; }
   .BILLING { background: #d1fae5; color: #065f46; }
   .SYSTEM  { background: #f3f4f6; color: #374151; }
   .STAFF   { background: #ffedd5; color: #9a3412; }
@@ -151,6 +153,7 @@ export default function AuditLogs() {
             <option value="ALL">All Categories</option>
             <option value="AUTH">Auth</option>
             <option value="TASK">Task</option>
+            <option value="PROJECT">Project</option>
             <option value="BILLING">Billing</option>
             <option value="STAFF">Staff</option>
           </select>

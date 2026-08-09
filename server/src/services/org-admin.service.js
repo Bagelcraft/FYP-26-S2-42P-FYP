@@ -622,7 +622,7 @@ async function bulkCreateShiftAssignments(organisationId, data) {
 async function getAuditLogs(organisationId, filters = {}) {
   const limit = Math.min(Number(filters.limit) || 200, 500);
 
-  const [users, assignments, attendance, leave] = await Promise.all([
+  const [users, assignments, attendance, leave, projects, projectResources] = await Promise.all([
     prisma.user.findMany({
       where:   { organisationId },
       orderBy: { createdAt: 'desc' },
@@ -655,6 +655,27 @@ async function getAuditLogs(organisationId, filters = {}) {
         user: { select: { full_name: true } },
       },
     }),
+    // Project lifecycle. Only project-based organisations have these, so the
+    // queries simply return nothing for a shift-based tenant.
+    prisma.project.findMany({
+      where:   { organisation_id: organisationId },
+      orderBy: { created_at: 'desc' },
+      take: limit,
+      select: {
+        project_id: true, name: true, status: true, created_at: true,
+        manager: { select: { full_name: true } },
+      },
+    }),
+    prisma.projectResource.findMany({
+      where:   { project: { organisation_id: organisationId } },
+      orderBy: { added_at: 'desc' },
+      take: limit,
+      select: {
+        resource_id: true, added_at: true,
+        user:    { select: { full_name: true } },
+        project: { select: { name: true } },
+      },
+    }),
   ]);
 
   const entries = [
@@ -671,6 +692,20 @@ async function getAuditLogs(organisationId, filters = {}) {
       user:     a.assignedBy?.full_name ?? 'system',
       category: 'TASK',
       time:     a.assigned_at,
+    })),
+    ...projects.map((p) => ({
+      id:       `project-${p.project_id}`,
+      action:   `Project created: ${p.name} (${p.status.replace('_', ' ').toLowerCase()})`,
+      user:     p.manager?.full_name ?? 'system',
+      category: 'PROJECT',
+      time:     p.created_at,
+    })),
+    ...projectResources.map((r) => ({
+      id:       `pres-${r.resource_id}`,
+      action:   `Resource added to ${r.project?.name ?? 'project'}: ${r.user?.full_name ?? '—'}`,
+      user:     r.user?.full_name ?? '—',
+      category: 'PROJECT',
+      time:     r.added_at,
     })),
     ...attendance.map((a) => ({
       id:       `att-${a.attendance_id}`,
