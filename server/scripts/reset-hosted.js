@@ -120,21 +120,43 @@ async function wipe() {
   if (wipeMarketing) await prisma.landingTestimonial.deleteMany({});
 }
 
+// SmartTask sells one tier, so the seed creates exactly one — matching
+// scripts/normalise-subscriptions.js and the "One plan. Full access." copy on the
+// landing page. Seeding Basic/Pro side by side is what left organisations sitting
+// on different prices with nothing to reconcile them.
+//
+// Every feature name used by requireFeature() must appear here, or that route
+// 403s for everyone.
+const PLAN_NAME = process.env.PLAN_NAME || 'Standard';
+const PLAN_PRICE = Number(process.env.PLAN_PRICE || 9);
+const PLAN_PRICE_ANNUAL = Number(process.env.PLAN_PRICE_ANNUAL || PLAN_PRICE * 10);
+const PLAN_FEATURES = [
+  'Task Management',
+  'Workforce Scheduling',
+  'Auto Allocation',
+  'Basic Reports',
+  'Advanced Reports',
+  'Priority Support',
+];
+
 async function createPlans() {
-  const mk = async (name, price_monthly, price_annual, max_users, features) => {
-    const plan = await prisma.subscriptionPlan.create({
-      data: { name, description: `${name} plan`, price_monthly, price_annual, max_users, is_active: true },
-    });
-    await prisma.planFeature.createMany({ data: features.map((f) => ({ plan_id: plan.plan_id, feature_name: f })) });
-    return plan;
-  };
-  // Basic lacks "Advanced Reports"; Pro includes it — that difference is what the
-  // feature gate on /pm/reports checks.
-  await mk('Basic', 9, 90, 25, ['Task Management', 'Workforce Scheduling', 'Auto Allocation', 'Basic Reports']);
-  await mk('Pro', 29, 290, 100, ['Task Management', 'Workforce Scheduling', 'Auto Allocation', 'Basic Reports', 'Advanced Reports', 'Priority Support']);
+  const plan = await prisma.subscriptionPlan.create({
+    data: {
+      name:          PLAN_NAME,
+      description:   `${PLAN_NAME} plan`,
+      price_monthly: PLAN_PRICE,
+      price_annual:  PLAN_PRICE_ANNUAL,
+      max_users:     null,
+      is_active:     true,
+    },
+  });
+  await prisma.planFeature.createMany({
+    data: PLAN_FEATURES.map((f) => ({ plan_id: plan.plan_id, feature_name: f })),
+  });
+  return plan;
 }
 
-async function createOrg({ name, uen, org_type, amount }) {
+async function createOrg({ name, uen, org_type, amount = PLAN_PRICE }) {
   const org = await prisma.organisation.create({ data: { name, uen, org_type, isActive: true } });
   const sub = await prisma.subscription.create({
     data: {
@@ -152,11 +174,16 @@ async function createOrg({ name, uen, org_type, amount }) {
 }
 
 // A tenant exactly as admin.service.approveRegistration leaves it: an
-// organisation, one ORG_ADMIN, and nothing else — no subscription, departments,
-// skills, roles, staff, tasks or shifts. Use these to exercise empty states and
-// first-run onboarding.
+// organisation, one ORG_ADMIN, an active subscription on the single tier, and
+// nothing else — no departments, skills, roles, staff, tasks or shifts. Use these
+// to exercise empty states and first-run onboarding.
+//
+// The subscription matters: approval provisions one, so a seeded tenant without
+// it is not a fresh tenant but a broken one — its Subscription page reads "No
+// active subscription" and every requireFeature() route 403s, because gating
+// resolves a plan by matching the subscription amount.
 async function createFreshOrg({ name, uen, org_type, adminEmail, adminName }, password_hash) {
-  const org = await prisma.organisation.create({ data: { name, uen, org_type, isActive: true } });
+  const org = await createOrg({ name, uen, org_type });
   const admin = await prisma.user.create({
     data: {
       organisationId: org.organisation_id,
@@ -184,7 +211,7 @@ const mkUser = (organisationId, email, full_name, user_type, password_hash, role
 // a second project with no pool, a dormant temp, and a day where every
 // permanent worker is on leave so the work must fall to a temporary worker.
 async function buildProjectOrg(hash) {
-  const org = await createOrg({ name: 'Meridian Projects', uen: '201811223M', org_type: 'PROJECT', amount: 29 });
+  const org = await createOrg({ name: 'Meridian Projects', uen: '201811223M', org_type: 'PROJECT' });
   const oid = org.organisation_id;
   const year = new Date().getFullYear();
 
@@ -279,7 +306,7 @@ async function buildProjectOrg(hash) {
 // The roster is the source of truth here, so the tasks below cover full,
 // partial and absent shift coverage, including one crossing midnight.
 async function buildShiftOrg(hash) {
-  const org = await createOrg({ name: 'Northgate Retail', uen: '201944556N', org_type: 'NON_PROJECT', amount: 9 });
+  const org = await createOrg({ name: 'Northgate Retail', uen: '201944556N', org_type: 'NON_PROJECT' });
   const oid = org.organisation_id;
   const year = new Date().getFullYear();
 
