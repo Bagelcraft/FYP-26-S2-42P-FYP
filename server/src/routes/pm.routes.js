@@ -2,7 +2,6 @@ const express = require('express');
 const { body, query } = require('express-validator');
 const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
-const { requireFeature } = require('../middleware/feature.middleware');
 const { requireOrgType, attachOrgType } = require('../middleware/orgType.middleware');
 const { requireActiveOrganisation } = require('../middleware/orgActive.middleware');
 const taskController = require('../controllers/task.controller');
@@ -143,7 +142,10 @@ router.get('/leave-balance',                 managerController.listLeaveBalances
 router.patch('/leave-balance/:userId',       managerController.updateLeaveBalance);
 
 // Reports — working hours + task completion (gated: plan must include "Advanced Reports")
-router.get('/reports', requireFeature('Advanced Reports'), managerController.getReports);
+// SmartTask sells a single tier, so there is no "upgrade" for a manager to buy —
+// gating reports behind a plan feature could only ever produce a dead end. The
+// requireFeature middleware is kept for if tiers ever return.
+router.get('/reports', managerController.getReports);
 
 // Calendar — shifts, unavailability and task start/deadline across a date range
 router.get('/calendar', managerController.getCalendar);

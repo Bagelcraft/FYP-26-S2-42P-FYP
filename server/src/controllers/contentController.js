@@ -146,9 +146,16 @@ exports.deleteFeature = async (req, res) => {
   }
 };
 
+// A testimonial belongs to whoever submitted it. Managers see and manage only
+// their own; the system admin curates the whole set. Without this scoping any
+// manager could list, edit and delete every other organisation's review.
+const isAdmin = (req) => req.user?.role === "SYSTEM_ADMIN";
+const ownerFilter = (req) => (isAdmin(req) ? {} : { submitted_by: req.user?.userId ?? -1 });
+
 exports.getTestimonials = async (req, res) => {
   try {
     const testimonials = await prisma.landingTestimonial.findMany({
+      where: ownerFilter(req),
       orderBy: { created_at: "desc" },
     });
 
@@ -185,7 +192,7 @@ const settle = async (testimonialId) => {
 exports.createTestimonial = async (req, res) => {
   try {
     const { name, company, rating, review_text } = req.body;
-    const submitted = { name, company, rating: rating ?? 5, review_text };
+    const submitted = { name, company, rating: rating ?? 5, review_text, submitted_by: req.user?.userId ?? null };
 
     // Publication is decided here, by rule — never by hand afterwards.
     const { row } = await moderation.evaluateAgainstLive(submitted);
@@ -207,6 +214,11 @@ exports.updateTestimonial = async (req, res) => {
       where: { testimonial_id: testimonialId },
     });
     if (!existing) return res.status(404).json({ message: "Testimonial not found" });
+    // 404 rather than 403: a manager has no business learning that someone
+    // else's testimonial exists at this id.
+    if (!isAdmin(req) && existing.submitted_by !== req.user?.userId) {
+      return res.status(404).json({ message: "Testimonial not found" });
+    }
 
     const { name, company, rating, review_text } = req.body;
 
@@ -251,8 +263,15 @@ exports.reevaluateTestimonials = async (req, res) => {
 
 exports.deleteTestimonial = async (req, res) => {
   try {
+    const testimonialId = parseInt(req.params.id);
+    const existing = await prisma.landingTestimonial.findUnique({ where: { testimonial_id: testimonialId } });
+    if (!existing) return res.status(404).json({ message: "Testimonial not found" });
+    if (!isAdmin(req) && existing.submitted_by !== req.user?.userId) {
+      return res.status(404).json({ message: "Testimonial not found" });
+    }
+
     await prisma.landingTestimonial.delete({
-      where: { testimonial_id: parseInt(req.params.id) },
+      where: { testimonial_id: testimonialId },
     });
 
     // Deleting a published testimonial frees a landing-page slot — refill it from

@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
+import SkillRequestModal from '../../components/SkillRequestModal';
 import DashboardLayout from '../../components/DashboardLayout';
 import api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 import { WORKER_NAV } from './nav';
 
-const FIELDS = ['Full Name', 'Email', 'Phone', 'Department', 'Job Title', 'Skills'];
+// 'Skills' is deliberately absent — it has its own popup (SkillRequestModal),
+// because a skill change is a set of skills, not a single text value.
+const FIELDS = ['Full Name', 'Email', 'Phone', 'Department', 'Job Title'];
 
 export default function Profile() {
   const { user } = useAuth();
@@ -17,8 +20,17 @@ export default function Profile() {
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
   const [skills, setSkills] = useState([]);
+  const [skillModalOpen, setSkillModalOpen] = useState(false);
+  const [profile, setProfile] = useState(null);
 
-  useEffect(() => { api.get('/worker/skills').then((r) => setSkills(r.data.data ?? [])).catch(() => {}); }, []);
+  const loadProfile = () => api.get('/worker/profile')
+    .then((r) => setProfile(r.data.data ?? null))
+    .catch(() => {});
+
+  useEffect(() => {
+    api.get('/worker/skills').then((r) => setSkills(r.data.data ?? [])).catch(() => {});
+    loadProfile();
+  }, []);
 
   const showToast = (m) => { setToast(m); setTimeout(() => setToast(''), 3000); };
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
@@ -98,11 +110,32 @@ export default function Profile() {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-gray-800">My Skills</h3>
-            <button onClick={openModal} className="text-xs text-primary-600 hover:underline">Request skill change</button>
+            <button onClick={() => setSkillModalOpen(true)} className="text-xs text-primary-600 hover:underline">Request skill change</button>
           </div>
-          <p className="text-sm text-gray-400">Your skills are managed by your organisation admin. Use <span className="font-medium">Request skill change</span> to propose an update.</p>
+          {profile?.skills?.length ? (
+            <div className="flex flex-wrap gap-2">
+              {profile.skills.map((s) => (
+                <span key={s.skill_id} className="inline-flex items-center gap-1.5 text-xs bg-gray-100 text-gray-700 rounded-full px-3 py-1">
+                  {s.skill_name}
+                  {s.cert_required && <span className="text-[10px] text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">cert</span>}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400">No skills registered yet.</p>
+          )}
+          <p className="text-xs text-gray-400 mt-3">Your skills are managed by your organisation admin. Use <span className="font-medium">Request skill change</span> to propose an update.</p>
         </div>
       </div>
+
+      {skillModalOpen && (
+        <SkillRequestModal
+          endpoint="/worker/profile/change-request"
+          currentSkills={profile?.skills ?? []}
+          onClose={() => setSkillModalOpen(false)}
+          onSubmitted={() => showToast('Skill change request sent to your organisation admin.')}
+        />
+      )}
 
       {/* Request Changes modal */}
       {modalOpen && (

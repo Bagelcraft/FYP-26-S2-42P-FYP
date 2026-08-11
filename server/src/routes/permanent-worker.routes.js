@@ -41,9 +41,7 @@ router.patch('/tasks/:id/update-requests/:requestId/respond', updateRequestContr
 
 // ─── Stubs (to be implemented) ────────────────────────────────────────────
 
-router.get('/profile', (req, res) => {
-  res.json({ message: 'Get profile — to be implemented' });
-});
+router.get('/profile', workerController.getMyProfile);
 
 // POST /worker/profile/change-request
 router.post('/profile/change-request', profileChangeController.submitRules, profileChangeController.submitRequest);

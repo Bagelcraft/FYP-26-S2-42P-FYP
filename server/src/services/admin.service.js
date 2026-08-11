@@ -78,6 +78,34 @@ async function approveRegistration(marketingUserId) {
       },
     });
 
+    // Every organisation is provisioned onto the single subscription tier at
+    // approval. Without this the org lands with no subscription at all: the
+    // Subscription page reads "No active subscription", and every feature behind
+    // requireFeature() returns 403 because there is no plan to match against.
+    const plan = await tx.subscriptionPlan.findFirst({
+      where:   { is_active: true },
+      orderBy: { price_monthly: 'asc' },
+    });
+    if (plan) {
+      const start = new Date();
+      const end = new Date(start);
+      end.setFullYear(end.getFullYear() + 1);
+
+      const subscription = await tx.subscription.create({
+        data: {
+          organisation_id: org.organisation_id,
+          amount:          plan.price_monthly,
+          start_date:      start,
+          end_date:        end,
+          status:          'ACTIVE',
+        },
+      });
+      await tx.organisation.update({
+        where: { organisation_id: org.organisation_id },
+        data:  { active_subscription_id: subscription.subscription_id },
+      });
+    }
+
     await tx.unregisteredUser.delete({ where: { marketing_user_id: marketingUserId } });
 
     return created;

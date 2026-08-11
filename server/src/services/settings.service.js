@@ -6,7 +6,12 @@ const prisma = require('../config/prisma');
 // process, because they are read on every registration and every staff creation.
 // updateSettings() drops the cache so a change takes effect immediately.
 
-const FIELDS = ['require_registration_verification', 'require_staff_verification'];
+const FIELDS = [
+  'require_registration_verification',
+  'require_staff_verification',
+  'require_registration_domain_check',
+  'require_staff_domain_check',
+];
 
 let cached = null;
 

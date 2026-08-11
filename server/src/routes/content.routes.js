@@ -27,7 +27,7 @@ const testimonialWriters = [verifyToken, requireRole(["SYSTEM_ADMIN", "PROJECT_M
 // Public reads (used by the landing page)
 router.get("/", getContent);
 router.get("/features", getFeatures);
-router.get("/testimonials", getTestimonials);
+router.get("/testimonials", ...testimonialWriters, getTestimonials);
 router.get("/testimonials/rules", getTestimonialRules);
 
 // Admin-only writes

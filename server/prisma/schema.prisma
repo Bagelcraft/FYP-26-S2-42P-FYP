@@ -223,6 +223,7 @@ model User {
   sentUpdateRequests    TaskUpdateRequest[]    @relation("UpdateRequestedBy")
   feedback              Feedback[]
   testimonials          Testimonial[]
+  landingTestimonials   LandingTestimonial[]   @relation("SubmittedTestimonials")
   profileChangeRequests ProfileChangeRequest[] @relation("ProfileChangeRequests")
   profileChangeReviews  ProfileChangeRequest[] @relation("ProfileChangeReviews")
 }
@@ -566,6 +567,10 @@ model LandingFeature {
 
 model LandingTestimonial {
   testimonial_id Int       @id @default(autoincrement())
+  // Author. Managers may only read and edit their own submissions; the system
+  // admin sees every one. Nullable for rows created before ownership existed —
+  // those stay admin-managed.
+  submitted_by   Int?
   name           String    @db.VarChar(100)
   company        String?   @db.VarChar(150)
   rating         Int       @default(5)
@@ -578,6 +583,8 @@ model LandingTestimonial {
   auto_reasons   String?   @db.Text
   moderated_at   DateTime?
   created_at     DateTime  @default(now())
+
+  submitter User? @relation("SubmittedTestimonials", fields: [submitted_by], references: [userId])
 }
 
 // ─── Profile Change Requests ─────────────────────────────────
@@ -635,6 +642,13 @@ model SystemSettings {
   // Staff created by an org admin: employee must verify before they can sign in.
   // Off by default — the org admin vouches for addresses they enter themselves.
   require_staff_verification Boolean @default(false)
+
+  // Live DNS check that the email's domain actually publishes a mail server.
+  // Genuine internal or not-yet-configured domains (test.corp, a new company
+  // domain mid-setup) have no MX record and are rejected, so these exist to
+  // switch that check off per flow. Address syntax is always still validated.
+  require_registration_domain_check Boolean @default(true)
+  require_staff_domain_check        Boolean @default(true)
 
   updated_at DateTime @default(now()) @updatedAt
 }

@@ -6,7 +6,11 @@ import api from '../../utils/api';
 // Two independent switches. Each controls email verification for one flow, so a
 // system admin can relax one without touching the other — e.g. drop the step for
 // staff onboarding during a demo while keeping public signups verified.
-const TOGGLES = [
+const SECTIONS = [
+  {
+    title: 'Email Verification',
+    blurb: 'Verification proves someone can actually receive mail at the address they gave — which is what password reset depends on later.',
+    toggles: [
   {
     key: 'require_registration_verification',
     title: 'Verify email on organisation registration',
@@ -20,6 +24,28 @@ const TOGGLES = [
     on:  'New employees receive a link and cannot sign in until they use it.',
     off: 'New employees can sign in as soon as their account is created.',
     caution: 'Turning this on will block new staff from signing in until they act on the email — make sure sending is configured.',
+  },
+    ],
+  },
+  {
+    title: 'Email Domain Check',
+    blurb: 'Before accepting an address, SmartTask asks DNS whether its domain publishes a mail server. Internal domains (test.corp) and company domains still being set up have none, so switch the check off for that flow. Address spelling is always still validated.',
+    toggles: [
+      {
+        key: 'require_registration_domain_check',
+        title: 'Check the domain when an organisation registers',
+        on:  'Registration is refused if the domain has no mail server.',
+        off: 'Any correctly-formed address is accepted, even on a domain that cannot receive mail.',
+        caution: 'With this off, an applicant can register on a domain that will never receive your verification email.',
+      },
+      {
+        key: 'require_staff_domain_check',
+        title: 'Check the domain when an org admin adds an employee',
+        on:  'Adding an employee is refused if the domain has no mail server.',
+        off: 'Any correctly-formed address is accepted — use this for internal domains like company.corp.',
+        caution: 'With this off, staff may be created on addresses that cannot receive password-reset emails.',
+      },
+    ],
   },
 ];
 
@@ -78,18 +104,15 @@ export default function Settings() {
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-8 text-center text-gray-400 text-sm">
             Loading settings…
           </div>
-        ) : (
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
+        ) : SECTIONS.map((section) => (
+          <div key={section.title} className="bg-white rounded-xl border border-gray-100 shadow-sm">
             <div className="px-6 py-4 border-b border-gray-100">
-              <h3 className="font-semibold text-gray-800 text-sm">Email Verification</h3>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Verification proves someone can actually receive mail at the address they gave —
-                which is what password reset depends on later.
-              </p>
+              <h3 className="font-semibold text-gray-800 text-sm">{section.title}</h3>
+              <p className="text-xs text-gray-500 mt-0.5">{section.blurb}</p>
             </div>
 
             <div className="divide-y divide-gray-50">
-              {TOGGLES.map(({ key, title, on, off, caution }) => {
+              {section.toggles.map(({ key, title, on, off, caution }) => {
                 const enabled = Boolean(settings?.[key]);
                 return (
                   <div key={key} className="px-6 py-5 flex items-start justify-between gap-6">
@@ -121,11 +144,11 @@ export default function Settings() {
             <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 rounded-b-xl">
               <p className="text-xs text-gray-500">
                 Changes take effect immediately. Accounts created earlier keep whatever
-                verification state they already had.
+                state they already had.
               </p>
             </div>
           </div>
-        )}
+        ))}
       </div>
     </DashboardLayout>
   );

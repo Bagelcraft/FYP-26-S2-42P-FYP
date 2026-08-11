@@ -66,7 +66,12 @@ router.post('/organisations/register', async (req, res) => {
 
   // Reject addresses that cannot possibly receive mail (bad syntax, disposable
   // provider, or a domain with no mail server) before we try to send anything.
-  const emailCheck = await checkEmailDeliverable(email);
+  // The domain half is switchable by the system admin for companies on internal
+  // or not-yet-configured domains.
+  const settings = await getSettings();
+  const emailCheck = await checkEmailDeliverable(email, {
+    checkDomain: settings.require_registration_domain_check,
+  });
   if (!emailCheck.valid) return res.status(400).json({ message: emailCheck.reason });
 
   // Already canonicalised by checkEmailDeliverable via normaliseEmail() — the same

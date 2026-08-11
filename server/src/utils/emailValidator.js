@@ -127,9 +127,15 @@ async function hasMailExchanger(domain) {
 
 /**
  * Full deliverability gate: format + disposable + live DNS MX lookup.
+ *
+ * `checkDomain: false` keeps the syntax and disposable-provider checks but skips
+ * the DNS lookup. That is what the system admin's per-flow switches turn off:
+ * a company using an internal domain, or one whose DNS is still being set up,
+ * has no MX record and would otherwise be unable to register or hire anyone.
+ *
  * @returns {Promise<{ valid: boolean, reason?: string, email?: string }>}
  */
-async function checkEmailDeliverable(email) {
+async function checkEmailDeliverable(email, { checkDomain = true } = {}) {
   const format = checkEmailFormat(email);
   if (!format.valid) return format;
 
@@ -138,6 +144,7 @@ async function checkEmailDeliverable(email) {
 
   // Reserved TLDs never resolve by definition — asking DNS is a guaranteed miss.
   if (format.reserved) return { valid: true, email: value };
+  if (!checkDomain) return { valid: true, email: value };
 
   if (!(await hasMailExchanger(domain))) {
     return {

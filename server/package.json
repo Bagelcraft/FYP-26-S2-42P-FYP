@@ -12,7 +12,8 @@
     "verify:links": "node scripts/verification-links.js",
     "test:email": "node scripts/test-email.js",
     "purge:test": "node prisma/purge-test-data.js",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "subs:normalise": "node scripts/normalise-subscriptions.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

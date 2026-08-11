@@ -1,4 +1,5 @@
 const { body, validationResult } = require('express-validator');
+const prisma = require('../config/prisma');
 const taskService = require('../services/task.service');
 const workerService = require('../services/worker.service');
 
@@ -251,7 +252,36 @@ const getMyCalendar = async (req, res, next) => {
 };
 
 
+// GET /worker/profile — the employee's own record, including the skills the org
+// admin has assigned them. The page needs these to show "My Skills" and to
+// pre-tick the skill-change request.
+const getMyProfile = async (req, res, next) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { userId: req.user.userId },
+      select: {
+        userId: true, full_name: true, email: true, user_type: true,
+        join_date: true, email_verified: true,
+        staffRole:  { select: { role_id: true, role_name: true, department: { select: { name: true } } } },
+        skills:     { select: { skill: { select: { skill_id: true, skill_name: true, cert_required: true } } } },
+      },
+    });
+    if (!user) return res.status(404).json({ success: false, message: 'Profile not found' });
+
+    res.json({
+      success: true,
+      data: {
+        ...user,
+        role: user.staffRole?.role_name ?? null,
+        department: user.staffRole?.department?.name ?? null,
+        skills: user.skills.map((s) => s.skill),
+      },
+    });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
+  getMyProfile,
   listMyTasks,
   getMyTask,
   acknowledge,

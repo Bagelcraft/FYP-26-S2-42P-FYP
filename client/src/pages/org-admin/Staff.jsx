@@ -30,6 +30,7 @@ export default function Staff() {
   const [modalMode, setModalMode]   = useState(null); // null | 'add' | 'edit'
   const [form, setForm]         = useState(getEmptyForm);
   const [saving, setSaving]     = useState(false);
+  const [justCreated, setJustCreated] = useState(null);
   const [formError, setFormError]   = useState('');
   const [showPass, setShowPass] = useState(false);
   const [skillsForId, setSkillsForId] = useState(null); // userId whose skills modal is open
@@ -128,7 +129,12 @@ export default function Staff() {
           body.prorate_leave = form.prorate_leave;
         }
         const r = await api.post('/org-admin/staff', body);
-        setStaff((prev) => [...prev, r.data.data].sort((a, b) => a.full_name.localeCompare(b.full_name)));
+        const created = r.data.data;
+        setStaff((prev) => [...prev, created].sort((a, b) => a.full_name.localeCompare(b.full_name)));
+        // When verification is required the account exists but cannot sign in yet.
+        // Say so explicitly — otherwise the new hire waits on an email nobody
+        // told them to expect.
+        setJustCreated({ name: created.full_name, email: created.email, needsVerification: created.email_verified === false });
       } else {
         const body = { full_name: form.full_name.trim(), email: form.email.trim(), user_type: form.user_type, role_id };
         const r = await api.patch(`/org-admin/staff/${form.userId}`, body);
@@ -197,6 +203,38 @@ export default function Staff() {
         </div>
 
         {error && <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-600">{error}</div>}
+
+        {justCreated && (
+          <div className={`rounded-xl border px-5 py-4 flex items-start gap-3 ${justCreated.needsVerification ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'}`}>
+            <span className="text-lg leading-none mt-0.5" aria-hidden="true">
+              {justCreated.needsVerification ? '✉️' : '✅'}
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm font-medium ${justCreated.needsVerification ? 'text-blue-900' : 'text-green-900'}`}>
+                {justCreated.name} has been registered.
+              </p>
+              {justCreated.needsVerification ? (
+                <p className="text-sm text-blue-800/80 mt-1 leading-relaxed">
+                  A verification link has been sent to <span className="font-medium">{justCreated.email}</span>.
+                  They need to open it before they can sign in — ask them to check their inbox,
+                  including the spam folder.
+                </p>
+              ) : (
+                <p className="text-sm text-green-800/80 mt-1 leading-relaxed">
+                  They can sign in straight away at <span className="font-medium">{justCreated.email}</span>{' '}
+                  with the password you set.
+                </p>
+              )}
+            </div>
+            <button
+              onClick={() => setJustCreated(null)}
+              aria-label="Dismiss"
+              className={`text-lg leading-none flex-shrink-0 ${justCreated.needsVerification ? 'text-blue-400 hover:text-blue-600' : 'text-green-400 hover:text-green-600'}`}
+            >
+              &times;
+            </button>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="flex gap-3">

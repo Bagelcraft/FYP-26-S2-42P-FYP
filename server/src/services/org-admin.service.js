@@ -286,7 +286,11 @@ async function listStaff(organisationId, filters = {}) {
 async function registerStaff(organisationId, data) {
   // Staff can only sign in with an address that can actually receive mail (password
   // resets go there), so the same deliverability gate as public registration applies.
-  const emailCheck = await checkEmailDeliverable(data.email);
+  // The system admin can switch off the DNS half for internal company domains.
+  const settings = await getSettings();
+  const emailCheck = await checkEmailDeliverable(data.email, {
+    checkDomain: settings.require_staff_domain_check,
+  });
   if (!emailCheck.valid) throw makeError(emailCheck.reason, 400);
   const email = emailCheck.email;
 
@@ -395,7 +399,8 @@ async function updateStaff(organisationId, userId, data) {
 
   let email;
   if (data.email && data.email !== user.email) {
-    const emailCheck = await checkEmailDeliverable(data.email);
+    const { require_staff_domain_check: checkDomain } = await getSettings();
+    const emailCheck = await checkEmailDeliverable(data.email, { checkDomain });
     if (!emailCheck.valid) throw makeError(emailCheck.reason, 400);
     email = emailCheck.email;
 
