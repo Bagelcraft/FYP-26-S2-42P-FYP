@@ -29,6 +29,17 @@ const createRules = [
     }),
   body('description').optional({ nullable: true }).isString(),
   body('status').optional().isIn(PROJECT_STATUSES).withMessage(`status must be one of: ${PROJECT_STATUSES.join(', ')}`),
+
+  // Optional onboarding payload — who works on this project, and its first tasks.
+  // Shapes are checked here; the business rules (workers belong to the org, tasks
+  // sit inside the project window) are enforced in the service.
+  body('resource_ids').optional().isArray().withMessage('resource_ids must be an array'),
+  body('resource_ids.*').isInt({ min: 1 }).withMessage('each resource id must be a positive integer'),
+  body('tasks').optional().isArray().withMessage('tasks must be an array'),
+  body('tasks.*.title').trim().notEmpty().withMessage('every task needs a name')
+    .isLength({ max: 200 }).withMessage('task name must be 200 characters or fewer'),
+  body('tasks.*.start_date').optional({ nullable: true, checkFalsy: true }).isISO8601().withMessage('task start date must be a valid date'),
+  body('tasks.*.end_date').optional({ nullable: true, checkFalsy: true }).isISO8601().withMessage('task deadline must be a valid date'),
   body('manager_id').optional({ nullable: true }).isInt({ min: 1 }).withMessage('manager_id must be a positive integer'),
 ];
 

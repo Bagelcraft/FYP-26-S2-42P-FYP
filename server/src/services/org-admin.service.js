@@ -1,6 +1,12 @@
 const bcrypt = require('bcrypt');
 const prisma = require('../config/prisma');
 const { checkEmailDeliverable } = require('../utils/emailValidator');
+const { clearOrgTypeCache } = require('../middleware/orgType.middleware');
+const { getSettings } = require('./settings.service');
+const { sendVerificationEmail } = require('./email.service');
+const crypto = require('crypto');
+
+const ORG_TYPES = ['PROJECT', 'NON_PROJECT'];
 
 function makeError(message, statusCode) {
   const err = new Error(message);
@@ -305,6 +311,17 @@ async function registerStaff(organisationId, data) {
   // Union of chosen skills + the role's required skills (auto-add rule).
   const skillIds = [...new Set([...selectedSkillIds, ...roleSkillIds])];
 
+  // When the system admin requires it, a new employee must confirm their address
+  // before they can sign in. Off by default: the org admin typed the address and
+  // vouches for it, so forcing a round-trip just delays onboarding.
+  const { require_staff_verification: requireVerification } = await getSettings();
+  const verification = requireVerification
+    ? {
+        token:   crypto.randomBytes(32).toString('hex'),
+        expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      }
+    : null;
+
   const password_hash = await bcrypt.hash(data.password || 'Password123!', 10);
   const now = new Date();
   const year = now.getFullYear();
@@ -330,7 +347,7 @@ async function registerStaff(organisationId, data) {
   const annualEntitled  = prorate ? proratedDays(data.annual_entitled)  : (Number(data.annual_entitled)  || 0);
   const medicalEntitled = prorate ? proratedDays(data.medical_entitled) : (Number(data.medical_entitled) || 0);
 
-  return prisma.user.create({
+  const created = await prisma.user.create({
     data: {
       organisationId,
       role_id:       data.role_id ?? null,
@@ -339,6 +356,9 @@ async function registerStaff(organisationId, data) {
       password_hash,
       user_type:     data.user_type,
       is_active:     true,
+      email_verified:       !requireVerification,
+      verification_token:   verification?.token ?? null,
+      verification_expires: verification?.expires ?? null,
       join_date:     joinDate,
       skills: skillIds.length ? { create: skillIds.map((id) => ({ skill_id: id })) } : undefined,
       // Permanent workers get a leave balance set by the org admin at registration.
@@ -350,11 +370,23 @@ async function registerStaff(organisationId, data) {
       } : undefined,
     },
     select: {
-      userId: true, full_name: true, email: true, user_type: true, is_active: true, createdAt: true,
+      userId: true, full_name: true, email: true, user_type: true, is_active: true,
+      email_verified: true, createdAt: true,
       staffRole: { select: { role_id: true, role_name: true } },
       skills: { include: { skill: { select: { skill_id: true, skill_name: true } } } },
     },
   });
+
+  if (verification) {
+    // Best-effort: the account exists either way, and the org admin can resend.
+    try {
+      await sendVerificationEmail({ to: email, name: data.full_name, token: verification.token });
+    } catch (err) {
+      console.error('Failed to send staff verification email:', err.message);
+    }
+  }
+
+  return created;
 }
 
 async function updateStaff(organisationId, userId, data) {
@@ -736,7 +768,53 @@ async function getAuditLogs(organisationId, filters = {}) {
     .slice(0, limit);
 }
 
+// ─── Scheduling model ─────────────────────────────────────────
+
+// An organisation admin sets their own scheduling model — they are the ones who
+// know how the business actually runs, and a wrong choice at registration should
+// not need a support request to fix.
+//
+// The organisation id comes from the session, never the request body, so this
+// can only ever change the caller's own organisation.
+//
+// Switching away from PROJECT is refused while projects exist, since those become
+// unreachable under shift-based rules; the reverse is refused while a roster exists.
+async function setOrgType(organisationId, orgType) {
+  if (!ORG_TYPES.includes(orgType)) {
+    throw makeError(`org_type must be one of: ${ORG_TYPES.join(', ')}`, 422);
+  }
+  const org = await prisma.organisation.findUnique({ where: { organisation_id: organisationId } });
+  if (!org) throw makeError('Organisation not found', 404);
+  if (org.org_type === orgType) return org;
+
+  if (org.org_type === 'PROJECT') {
+    const projectCount = await prisma.project.count({ where: { organisation_id: organisationId } });
+    if (projectCount > 0) {
+      throw makeError(
+        `Your organisation has ${projectCount} project(s). Delete them before switching to shift-based scheduling.`,
+        409,
+      );
+    }
+  } else {
+    const rosterCount = await prisma.shiftAssignment.count({ where: { organisation_id: organisationId } });
+    if (rosterCount > 0) {
+      throw makeError(
+        `Your organisation has ${rosterCount} rostered shift(s). Clear the roster before switching to project-based scheduling.`,
+        409,
+      );
+    }
+  }
+
+  const updated = await prisma.organisation.update({
+    where: { organisation_id: organisationId },
+    data:  { org_type: orgType },
+  });
+  clearOrgTypeCache(organisationId);
+  return updated;
+}
+
 module.exports = {
+  setOrgType,
   getAuditLogs,
   getOrgProfile, updateOrgProfile,
   listDepartments, createDepartment, updateDepartment, deleteDepartment,

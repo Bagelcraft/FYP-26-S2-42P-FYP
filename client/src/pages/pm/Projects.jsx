@@ -66,6 +66,29 @@ function ProjectModal({ project, onClose, onSaved }) {
   const [error, setError] = useState('');
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
+  // A new project is set up in one pass: who works on it, and the work itself.
+  // When editing, both are managed from the project detail tabs instead, so these
+  // sections only appear on create.
+  const [team, setTeam] = useState([]);
+  const [picked, setPicked] = useState([]);
+  const [tasks, setTasks] = useState([]);
+
+  useEffect(() => {
+    if (editing) return;
+    api.get('/pm/team')
+      .then((r) => setTeam(r.data.data ?? []))
+      .catch(() => setTeam([]));
+  }, [editing]);
+
+  const togglePerson = (userId) =>
+    setPicked((prev) => (prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]));
+
+  const addTaskRow = () =>
+    setTasks((prev) => [...prev, { title: '', start_date: form.start_date, end_date: '' }]);
+  const setTaskField = (i, k) => (e) =>
+    setTasks((prev) => prev.map((t, idx) => (idx === i ? { ...t, [k]: e.target.value } : t)));
+  const removeTaskRow = (i) => setTasks((prev) => prev.filter((_, idx) => idx !== i));
+
   async function submit(e) {
     e.preventDefault();
     setSaving(true); setError('');
@@ -77,6 +100,19 @@ function ProjectModal({ project, onClose, onSaved }) {
         start_date: form.start_date,
         end_date: form.end_date,
       };
+      if (!editing) {
+        if (picked.length) body.resource_ids = picked;
+        // Blank rows are dropped rather than rejected — an empty extra row is a
+        // mis-click, not a reason to fail the whole submission.
+        const filled = tasks.filter((t) => t.title.trim());
+        if (filled.length) {
+          body.tasks = filled.map((t) => ({
+            title: t.title.trim(),
+            start_date: t.start_date || form.start_date,
+            end_date: t.end_date || t.start_date || form.start_date,
+          }));
+        }
+      }
       const res = editing
         ? await api.patch(`/pm/projects/${project.project_id}`, body)
         : await api.post('/pm/projects', body);
@@ -89,30 +125,30 @@ function ProjectModal({ project, onClose, onSaved }) {
     }
   }
 
+  const inputCls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
-      <form onSubmit={submit} className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <form onSubmit={submit} className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
           <h2 className="font-semibold text-gray-800">{editing ? 'Edit Project' : 'New Project'}</h2>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
         </div>
-        <div className="px-6 py-5 space-y-4">
+
+        <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
           {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-600">{error}</div>}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Project Name *</label>
-            <input required value={form.name} onChange={set('name')} placeholder="e.g. Marina Bay Fit-Out"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            <input required value={form.name} onChange={set('name')} placeholder="e.g. Marina Bay Fit-Out" className={inputCls} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Start Date *</label>
-              <input type="date" required value={form.start_date} onChange={set('start_date')}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              <input type="date" required value={form.start_date} onChange={set('start_date')} className={inputCls} />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">End Date *</label>
-              <input type="date" required min={form.start_date || undefined} value={form.end_date} onChange={set('end_date')}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              <input type="date" required min={form.start_date || undefined} value={form.end_date} onChange={set('end_date')} className={inputCls} />
             </div>
           </div>
           <p className="text-xs text-gray-400">
@@ -120,21 +156,119 @@ function ProjectModal({ project, onClose, onSaved }) {
           </p>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
-            <select value={form.status} onChange={set('status')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+            <select value={form.status} onChange={set('status')} className={inputCls}>
               {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Description (optional)</label>
-            <textarea rows={2} value={form.description} onChange={set('description')}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
+            <textarea rows={2} value={form.description} onChange={set('description')} className={`${inputCls} resize-none`} />
           </div>
-          <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
-            <button type="submit" disabled={saving} className="px-5 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
-              {saving ? 'Saving…' : editing ? 'Save Changes' : 'Create Project'}
-            </button>
-          </div>
+
+          {!editing && (
+            <>
+              {/* Who is onboarded */}
+              <div className="pt-2 border-t border-gray-100">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-gray-600">Who is on this project?</label>
+                  {picked.length > 0 && <span className="text-xs text-primary-600 font-medium">{picked.length} selected</span>}
+                </div>
+                <p className="text-xs text-gray-400 mb-2">
+                  Only these people can be allocated to its tasks. You can change this later.
+                </p>
+                {team.length === 0 ? (
+                  <p className="text-xs text-gray-400 py-2">No workers available yet.</p>
+                ) : (
+                  <div className="border border-gray-200 rounded-lg max-h-40 overflow-y-auto divide-y divide-gray-50">
+                    {team.map((m) => (
+                      <label key={m.id} className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={picked.includes(m.id)}
+                          onChange={() => togglePerson(m.id)}
+                          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span className="text-sm text-gray-700 flex-1 min-w-0 truncate">{m.name}</span>
+                        {m.type === 'TEMPORARY_WORKER' && (
+                          <span className="text-[10px] font-medium text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">Temp</span>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* First tasks */}
+              <div className="pt-2 border-t border-gray-100">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-gray-600">What needs to be done?</label>
+                  <button type="button" onClick={addTaskRow} className="text-xs font-medium text-primary-600 hover:underline">
+                    + Add task
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mb-2">
+                  Optional — these are created as Pending and land in the Allocate queue.
+                </p>
+                {tasks.length === 0 ? (
+                  <button
+                    type="button"
+                    onClick={addTaskRow}
+                    className="w-full border border-dashed border-gray-300 rounded-lg py-3 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
+                  >
+                    + Add the first task
+                  </button>
+                ) : (
+                  <div className="space-y-2">
+                    {tasks.map((t, i) => (
+                      <div key={i} className="border border-gray-200 rounded-lg p-3 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            value={t.title}
+                            onChange={setTaskField(i, 'title')}
+                            placeholder={`Task ${i + 1} name`}
+                            className={`${inputCls} flex-1`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeTaskRow(i)}
+                            title="Remove this task"
+                            className="text-gray-400 hover:text-red-500 text-lg leading-none px-1"
+                          >
+                            &times;
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Start</label>
+                            <input
+                              type="date" value={t.start_date} onChange={setTaskField(i, 'start_date')}
+                              min={form.start_date || undefined} max={form.end_date || undefined}
+                              className={inputCls}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Deadline</label>
+                            <input
+                              type="date" value={t.end_date} onChange={setTaskField(i, 'end_date')}
+                              min={t.start_date || form.start_date || undefined} max={form.end_date || undefined}
+                              className={inputCls}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="px-6 py-4 flex justify-end gap-3 border-t border-gray-100 flex-shrink-0">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
+          <button type="submit" disabled={saving} className="px-5 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
+            {saving ? 'Saving…' : editing ? 'Save Changes' : 'Create Project'}
+          </button>
         </div>
       </form>
     </div>
@@ -216,10 +350,103 @@ function AddResourceModal({ projectId, onClose, onAdded }) {
   );
 }
 
+// ── Add a task straight onto this project ──────────────────────────────────
+function AddTaskModal({ project, onClose, onAdded }) {
+  const [form, setForm] = useState({
+    title: '',
+    start_date: toDateInput(project.start_date),
+    end_date: '',
+    description: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+
+  const projStart = toDateInput(project.start_date);
+  const projEnd = toDateInput(project.end_date);
+  const inputCls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500';
+
+  async function submit(e) {
+    e.preventDefault();
+    setSaving(true); setError('');
+    try {
+      // Same working-day window the Tasks page uses. A bare date on both ends
+      // would make start === end, which the API rejects (end must be after start).
+      const startDay = form.start_date;
+      const endDay = form.end_date || startDay;
+      await api.post('/pm/tasks', {
+        title: form.title.trim(),
+        project_id: project.project_id,
+        description: form.description.trim() || null,
+        start_datetime: `${startDay}T09:00:00`,
+        end_datetime: `${endDay}T18:00:00`,
+      });
+      onAdded();
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.message || err.response?.data?.errors?.[0]?.msg || err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
+      <form onSubmit={submit} className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+          <div>
+            <h2 className="font-semibold text-gray-800">Add Task</h2>
+            <p className="text-xs text-gray-400 mt-0.5 truncate">on {project.name}</p>
+          </div>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+        </div>
+        <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
+          {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-600">{error}</div>}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Task Name *</label>
+            <input required value={form.title} onChange={set('title')} placeholder="e.g. Site survey" className={inputCls} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Start Date *</label>
+              <input type="date" required value={form.start_date} onChange={set('start_date')}
+                min={projStart} max={projEnd} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Deadline</label>
+              <input type="date" value={form.end_date} onChange={set('end_date')}
+                min={form.start_date || projStart} max={projEnd} className={inputCls} />
+            </div>
+          </div>
+          <p className="text-xs text-gray-400">
+            Must fall between {fmtShort(project.start_date)} and {fmtShort(project.end_date)} — the project duration.
+          </p>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Description (optional)</label>
+            <textarea rows={2} value={form.description} onChange={set('description')} className={`${inputCls} resize-none`} />
+          </div>
+          <p className="text-xs text-gray-400">
+            Starts as <span className="font-medium text-gray-600">Pending</span>. Add skills and a department
+            from the Tasks page if the allocation engine needs them.
+          </p>
+        </div>
+        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 flex-shrink-0">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
+          <button type="submit" disabled={saving || !form.title.trim()}
+            className="px-5 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
+            {saving ? 'Adding…' : 'Add Task'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 // ── Detail panel ───────────────────────────────────────────────────────────
 function ProjectDetail({ project, onEdit, onDelete, onChanged, showToast }) {
   const [tab, setTab] = useState('tasks');
   const [adding, setAdding] = useState(false);
+  const [addingTask, setAddingTask] = useState(false);
 
   const remaining = daysRemaining(project.end_date);
   const tasks = project.tasks ?? [];
@@ -287,6 +514,11 @@ function ProjectDetail({ project, onEdit, onDelete, onChanged, showToast }) {
               </button>
             ))}
           </div>
+          {tab === 'tasks' && (
+            <button onClick={() => setAddingTask(true)} className="text-xs font-medium bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-lg transition-colors">
+              + Add Task
+            </button>
+          )}
           {tab === 'resources' && (
             <button onClick={() => setAdding(true)} className="text-xs font-medium bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-lg transition-colors">
               + Add Resource
@@ -310,9 +542,12 @@ function ProjectDetail({ project, onEdit, onDelete, onChanged, showToast }) {
               </div>
             ))}
             {tasks.length === 0 && (
-              <p className="px-5 py-10 text-center text-gray-400 text-sm">
-                No tasks yet. Create them on the Tasks page and pick this project.
-              </p>
+              <div className="px-5 py-10 text-center">
+                <p className="text-gray-400 text-sm">No tasks on this project yet.</p>
+                <button onClick={() => setAddingTask(true)} className="mt-3 text-sm font-medium text-primary-600 hover:underline">
+                  + Add the first task
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -350,6 +585,13 @@ function ProjectDetail({ project, onEdit, onDelete, onChanged, showToast }) {
         )}
       </div>
 
+      {addingTask && (
+        <AddTaskModal
+          project={project}
+          onClose={() => setAddingTask(false)}
+          onAdded={() => { showToast('Task added'); onChanged(); }}
+        />
+      )}
       {adding && (
         <AddResourceModal
           projectId={project.project_id}

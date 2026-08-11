@@ -4,6 +4,21 @@ import { ORG_ADMIN_NAV } from './nav';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
+const ORG_TYPES = [
+  {
+    value: 'PROJECT',
+    icon: '🗂️',
+    label: 'Project-based',
+    blurb: 'Work is grouped into projects with a start and end date, and allocated to a named pool of resources.',
+  },
+  {
+    value: 'NON_PROJECT',
+    icon: '🕐',
+    label: 'Shift-based',
+    blurb: 'Work is scheduled against recurring shift templates and staff are rostered onto them by date.',
+  },
+];
+
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 export default function OrgProfile() {
@@ -13,6 +28,7 @@ export default function OrgProfile() {
   const [fiscalMonth, setFiscalMonth] = useState(1);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
+  const [switchingType, setSwitchingType] = useState(false);
 
   const token = localStorage.getItem('token');
 
@@ -52,6 +68,36 @@ export default function OrgProfile() {
       showToast('Failed to save changes.', true);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Changing the scheduling model reshapes every portal, so it is deliberately a
+  // separate, confirmed action rather than part of the general "save details" form.
+  // The server refuses (409) if existing projects or a roster would be orphaned.
+  const changeOrgType = async (next) => {
+    const target = ORG_TYPES.find((t) => t.value === next);
+    if (!window.confirm(
+      `Switch your organisation to ${target.label} scheduling?
+
+`
+      + 'This changes which features every member of your organisation sees.',
+    )) return;
+
+    setSwitchingType(true);
+    try {
+      const res = await fetch(`${API_BASE}/org-admin/org-type`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ org_type: next }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.message || 'Failed to change the scheduling model.');
+      setProfile((prev) => ({ ...prev, org_type: next }));
+      showToast(`Now using ${target.label} scheduling. Sign out and back in to refresh your menu.`);
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      setSwitchingType(false);
     }
   };
 
@@ -108,6 +154,51 @@ export default function OrgProfile() {
                   )}
                 </div>
               ))}
+            </div>
+
+            {/* Scheduling model */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+              <h3 className="font-semibold text-gray-800">Scheduling Model</h3>
+              <p className="text-sm text-gray-500 mt-0.5 mb-4">
+                How your organisation plans work. This decides which features appear for
+                everyone — managers, staff and yourself.
+              </p>
+
+              <div className="grid sm:grid-cols-2 gap-3">
+                {ORG_TYPES.map((t) => {
+                  const selected = profile?.org_type === t.value;
+                  return (
+                    <button
+                      key={t.value}
+                      type="button"
+                      disabled={selected || switchingType}
+                      onClick={() => changeOrgType(t.value)}
+                      className={`text-left rounded-xl border p-4 transition-colors ${
+                        selected
+                          ? 'border-primary-500 bg-primary-50 cursor-default'
+                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 disabled:opacity-60'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-sm text-gray-800">
+                          <span aria-hidden="true" className="mr-1.5">{t.icon}</span>{t.label}
+                        </span>
+                        {selected && (
+                          <span className="text-[10px] font-semibold text-primary-700 bg-primary-100 px-2 py-0.5 rounded-full">
+                            CURRENT
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 leading-relaxed">{t.blurb}</p>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <p className="text-xs text-gray-400 mt-3">
+                Switching is blocked while data only the current model can hold still exists —
+                delete your projects, or clear the roster, first.
+              </p>
             </div>
 
             {/* Editable fields */}

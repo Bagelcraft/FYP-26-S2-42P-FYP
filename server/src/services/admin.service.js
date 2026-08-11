@@ -1,8 +1,6 @@
 const prisma = require('../config/prisma');
 const { sendRegistrationApprovedEmail } = require('./email.service');
-const { clearOrgTypeCache } = require('../middleware/orgType.middleware');
-
-const ORG_TYPES = ['PROJECT', 'NON_PROJECT'];
+const { clearOrgActiveCache } = require('../middleware/orgActive.middleware');
 
 function makeError(message, statusCode) {
   const err = new Error(message);
@@ -130,46 +128,13 @@ async function createOrganisation(data) {
 async function setOrganisationActive(organisationId, isActive) {
   const org = await prisma.organisation.findUnique({ where: { organisation_id: organisationId } });
   if (!org) throw makeError('Organisation not found', 404);
-  return prisma.organisation.update({
+  const updated = await prisma.organisation.update({
     where: { organisation_id: organisationId },
     data:  { isActive },
   });
-}
-
-// Correct an organisation's scheduling model — the escape hatch for a wrong
-// choice at registration. Switching away from PROJECT is refused while projects
-// exist, since those become unreachable under shift-based rules.
-async function setOrganisationType(organisationId, orgType) {
-  if (!ORG_TYPES.includes(orgType)) {
-    throw makeError(`org_type must be one of: ${ORG_TYPES.join(', ')}`, 422);
-  }
-  const org = await prisma.organisation.findUnique({ where: { organisation_id: organisationId } });
-  if (!org) throw makeError('Organisation not found', 404);
-  if (org.org_type === orgType) return org;
-
-  if (org.org_type === 'PROJECT') {
-    const projectCount = await prisma.project.count({ where: { organisation_id: organisationId } });
-    if (projectCount > 0) {
-      throw makeError(
-        `This organisation has ${projectCount} project(s). Delete them before switching to shift-based scheduling.`,
-        409,
-      );
-    }
-  } else {
-    const rosterCount = await prisma.shiftAssignment.count({ where: { organisation_id: organisationId } });
-    if (rosterCount > 0) {
-      throw makeError(
-        `This organisation has ${rosterCount} rostered shift(s). Clear the roster before switching to project-based scheduling.`,
-        409,
-      );
-    }
-  }
-
-  const updated = await prisma.organisation.update({
-    where: { organisation_id: organisationId },
-    data:  { org_type: orgType },
-  });
-  clearOrgTypeCache(organisationId);
+  // Drop the cached flag so the change takes effect on the very next request
+  // rather than whenever this process happens to restart.
+  clearOrgActiveCache(organisationId);
   return updated;
 }
 
@@ -180,5 +145,4 @@ module.exports = {
   listOrganisations,
   createOrganisation,
   setOrganisationActive,
-  setOrganisationType,
 };

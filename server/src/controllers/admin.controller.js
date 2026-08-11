@@ -1,3 +1,4 @@
+const settingsService = require('../services/settings.service');
 const svc = require('../services/admin.service');
 
 function ok(res, data, status = 200) {
@@ -35,11 +36,17 @@ async function reactivateOrganisation(req, res, next) {
 }
 
 // PATCH /admin/organisations/:id/type — fix a wrong choice made at registration.
-async function setOrganisationType(req, res, next) {
-  try { ok(res, await svc.setOrganisationType(id(req), req.body.org_type)); } catch (e) { next(e); }
+async function getSettings(req, res, next) {
+  try { ok(res, await settingsService.getSettings()); } catch (e) { next(e); }
+}
+
+async function updateSettings(req, res, next) {
+  try { ok(res, await settingsService.updateSettings(req.body)); } catch (e) { next(e); }
 }
 
 module.exports = {
+  getSettings,
+  updateSettings,
   listRegistrations,
   approveRegistration,
   rejectRegistration,
@@ -47,5 +54,4 @@ module.exports = {
   createOrganisation,
   suspendOrganisation,
   reactivateOrganisation,
-  setOrganisationType,
 };

@@ -27,6 +27,9 @@ export default function Login() {
       login(data.user, data.token);
       navigate(roleRedirects[data.user.user_type] ?? '/');
     } catch (err) {
+      // A suspended organisation gets a dedicated page — the reason and what to
+      // do about it do not fit in an inline form error.
+      if (err.response?.data?.code === 'ORG_SUSPENDED') return navigate('/suspended');
       setError(err.response?.data?.message ?? 'Login failed. Please try again.');
     } finally {
       setLoading(false);

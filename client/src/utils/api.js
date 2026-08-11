@@ -22,6 +22,13 @@ api.interceptors.response.use(
       localStorage.removeItem('token');
       window.location.href = '/login';
     }
+    // The organisation was suspended while this session was open. Every
+    // tenant-scoped route now 403s, so stop and explain rather than letting the
+    // user click through a UI that can no longer load anything.
+    if (error.response?.status === 403 && error.response?.data?.code === 'ORG_SUSPENDED'
+        && window.location.pathname !== '/suspended') {
+      window.location.href = '/suspended';
+    }
     return Promise.reject(error);
   }
 );

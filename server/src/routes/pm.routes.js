@@ -4,6 +4,7 @@ const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
 const { requireFeature } = require('../middleware/feature.middleware');
 const { requireOrgType, attachOrgType } = require('../middleware/orgType.middleware');
+const { requireActiveOrganisation } = require('../middleware/orgActive.middleware');
 const taskController = require('../controllers/task.controller');
 const allocationController = require('../controllers/allocation.controller');
 const managerController = require('../controllers/manager.controller');
@@ -12,7 +13,7 @@ const updateRequestController = require('../controllers/task-update-request.cont
 
 const router = express.Router();
 
-router.use(verifyToken, requireRole(['PROJECT_MANAGER']), attachOrgType);
+router.use(verifyToken, requireRole(['PROJECT_MANAGER']), requireActiveOrganisation, attachOrgType);
 
 // ─── Validation rules ─────────────────────────────────────────────────────
 
@@ -153,6 +154,16 @@ router.get('/availability', managerController.getAvailability);
 // Lookups for Create/Edit Task dropdowns (manager-accessible, read-only)
 router.get('/org-info',        managerController.getOrgInfo);
 router.get('/shift-templates', managerController.getShiftTemplates);
+
+// ─── Roster — shift-based organisations only ──────────────────
+// A project-based company has no roster, so these are gated the same way the
+// Org Admin roster endpoints are.
+const shiftOrgOnly = requireOrgType('NON_PROJECT');
+
+router.get('/shift-assignments',         shiftOrgOnly, managerController.listRoster);
+router.post('/shift-assignments',        shiftOrgOnly, managerController.rosterAssignRules, managerController.createRosterEntry);
+router.post('/shift-assignments/bulk',   shiftOrgOnly, managerController.rosterBulkRules,   managerController.bulkRoster);
+router.delete('/shift-assignments/:id',  shiftOrgOnly, managerController.deleteRosterEntry);
 router.get('/departments',     managerController.getDepartments);
 router.get('/skills',          managerController.getSkills);
 

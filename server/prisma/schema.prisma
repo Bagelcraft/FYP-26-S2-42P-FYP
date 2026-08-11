@@ -182,21 +182,25 @@ model RoleSkill {
 // ─── Users ───────────────────────────────────────────────────
 
 model User {
-  userId         Int       @id @default(autoincrement())
-  organisationId Int?
-  role_id        Int?
-  full_name      String    @db.VarChar(100)
-  email          String    @unique @db.VarChar(150)
-  password_hash  String    @db.VarChar(255)
-  user_type      UserType
-  is_active      Boolean   @default(true)
+  userId               Int       @id @default(autoincrement())
+  organisationId       Int?
+  role_id              Int?
+  full_name            String    @db.VarChar(100)
+  email                String    @unique @db.VarChar(150)
+  password_hash        String    @db.VarChar(255)
+  user_type            UserType
+  is_active            Boolean   @default(true)
   // Accounts created by an org admin are trusted on creation; self-registered org
   // admins are only flipped to true once they click the emailed verification link.
   // Login is refused while this is false.
-  email_verified Boolean   @default(true)
-  join_date      DateTime? @db.Date
-  createdAt      DateTime  @default(now())
-  lastLogin      DateTime?
+  email_verified       Boolean   @default(true)
+  // Only populated when the system admin requires staff to verify their address;
+  // consumed by POST /public/verify-email, same link the applicant flow uses.
+  verification_token   String?   @unique @db.VarChar(255)
+  verification_expires DateTime?
+  join_date            DateTime? @db.Date
+  createdAt            DateTime  @default(now())
+  lastLogin            DateTime?
 
   organisation          Organisation?          @relation(fields: [organisationId], references: [organisation_id])
   staffRole             StaffRole?             @relation(fields: [role_id], references: [role_id])
@@ -614,4 +618,23 @@ model PlanFeature {
   feature_name String @db.VarChar(200)
 
   plan SubscriptionPlan @relation(fields: [plan_id], references: [plan_id])
+}
+
+// ─── System Settings ─────────────────────────────────────────
+
+// Singleton row (like LandingContent) holding platform-wide switches the system
+// admin controls. Defaults reproduce the behaviour that existed before the
+// switches were introduced, so an un-seeded install behaves identically.
+model SystemSettings {
+  id Int @id @default(autoincrement())
+
+  // Public organisation registration: applicant must click an emailed link
+  // before a system admin is allowed to approve them.
+  require_registration_verification Boolean @default(true)
+
+  // Staff created by an org admin: employee must verify before they can sign in.
+  // Off by default — the org admin vouches for addresses they enter themselves.
+  require_staff_verification Boolean @default(false)
+
+  updated_at DateTime @default(now()) @updatedAt
 }

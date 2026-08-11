@@ -2,6 +2,7 @@ const express = require('express');
 const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
 const { requireOrgType, attachOrgType } = require('../middleware/orgType.middleware');
+const { requireActiveOrganisation } = require('../middleware/orgActive.middleware');
 const workerController = require('../controllers/worker.controller');
 const updateRequestController = require('../controllers/task-update-request.controller');
 const profileChangeController = require('../controllers/profileChangeRequest.controller');
@@ -9,7 +10,7 @@ const shiftChangeController = require('../controllers/shiftChangeRequest.control
 
 const router = express.Router();
 
-router.use(verifyToken, requireRole(['TEMPORARY_WORKER']), attachOrgType);
+router.use(verifyToken, requireRole(['TEMPORARY_WORKER']), requireActiveOrganisation, attachOrgType);
 
 // In a project-based organisation a temporary worker carries no shifts at all —
 // they stay dormant until a task is assigned, so there is nothing to swap.

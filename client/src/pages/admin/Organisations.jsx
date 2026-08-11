@@ -6,8 +6,8 @@ import api from '../../utils/api';
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : '—');
 
-// Scheduling model. Shown on both tables so the admin can see what the applicant
-// asked for and correct it after approval if it was the wrong choice.
+// Scheduling model, shown read-only. Each organisation sets its own model from
+// its Organisation Profile page — they know how the business runs.
 const ORG_TYPE_LABEL = { PROJECT: 'Project-based', NON_PROJECT: 'Shift-based' };
 
 function OrgTypeChip({ type }) {
@@ -87,25 +87,6 @@ export default function Organisations() {
       );
     } catch (err) {
       setError(err.response?.data?.message ?? `Failed to ${action} organisation.`);
-    } finally {
-      setActingId(null);
-    }
-  };
-
-  // Switching is refused (409) while the organisation holds projects or a roster
-  // that the other model cannot represent — the message says which.
-  const switchType = async (org) => {
-    const next = org.org_type === 'PROJECT' ? 'NON_PROJECT' : 'PROJECT';
-    if (!window.confirm(`Change "${org.name}" to ${ORG_TYPE_LABEL[next]} scheduling?`)) return;
-    setActingId(org.organisation_id);
-    setError('');
-    try {
-      await api.patch(`/admin/organisations/${org.organisation_id}/type`, { org_type: next });
-      setOrgs((prev) =>
-        prev.map((o) => (o.organisation_id === org.organisation_id ? { ...o, org_type: next } : o))
-      );
-    } catch (err) {
-      setError(err.response?.data?.message ?? 'Failed to change the organisation type.');
     } finally {
       setActingId(null);
     }
@@ -287,14 +268,6 @@ export default function Organisations() {
                         className={`text-xs font-medium hover:underline disabled:opacity-50 ${org.isActive ? 'text-red-500' : 'text-green-600'}`}
                       >
                         {actingId === org.organisation_id ? '…' : org.isActive ? 'Suspend' : 'Reactivate'}
-                      </button>
-                      <button
-                        onClick={() => switchType(org)}
-                        disabled={actingId === org.organisation_id}
-                        title={`Switch to ${ORG_TYPE_LABEL[org.org_type === 'PROJECT' ? 'NON_PROJECT' : 'PROJECT']} scheduling`}
-                        className="text-xs font-medium text-gray-500 hover:underline disabled:opacity-50"
-                      >
-                        Change type
                       </button>
                     </div>
                   </td>

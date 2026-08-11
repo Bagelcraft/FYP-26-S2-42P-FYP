@@ -98,7 +98,13 @@ async function getProject(projectId, organisationId) {
   return shaped;
 }
 
-async function createProject(organisationId, createdBy, { name, description, start_date, end_date, status, manager_id }) {
+// Creating a project can also onboard its people and lay down its first tasks in
+// one go, because that is how a project actually starts — a name and two dates on
+// their own are not yet a plan.
+//
+// All three happen in a single transaction: a project that half-exists (created,
+// but with the resources or tasks silently dropped) is worse than a clean failure.
+async function createProject(organisationId, createdBy, { name, description, start_date, end_date, status, manager_id, resource_ids, tasks }) {
   if (!name || !name.trim()) throw makeError('Project name is required', 422);
 
   const start = toDateOnly(start_date, 'start_date');
@@ -112,18 +118,78 @@ async function createProject(organisationId, createdBy, { name, description, sta
     if (!mgr) throw makeError('manager_id must be a manager in your organisation', 422);
   }
 
-  const created = await prisma.project.create({
-    data: {
-      organisation_id: organisationId,
-      manager_id:      manager_id != null ? Number(manager_id) : createdBy,
-      name:            name.trim(),
-      description:     description?.trim() || null,
-      status:          status ?? 'PLANNING',
-      start_date:      start,
-      end_date:        end,
-    },
-    include: PROJECT_INCLUDE,
+  // ── Who is onboarded ──
+  const resourceIds = [...new Set((Array.isArray(resource_ids) ? resource_ids : []).map(Number))]
+    .filter((n) => Number.isInteger(n) && n > 0);
+  if (resourceIds.length) {
+    const valid = await prisma.user.count({
+      where: { userId: { in: resourceIds }, organisationId, is_active: true, user_type: { in: ['PERMANENT_WORKER', 'TEMPORARY_WORKER'] } },
+    });
+    if (valid !== resourceIds.length) {
+      throw makeError('One or more selected people are not active workers in your organisation', 422);
+    }
+  }
+
+  // ── Initial tasks ──
+  // Validated up-front so a bad row fails before anything is written, and held to
+  // the same rule the Tasks page enforces: a task lives inside its project window.
+  const taskRows = (Array.isArray(tasks) ? tasks : [])
+    .filter((t) => t && String(t.title ?? '').trim())
+    .map((t, i) => {
+      const label = `Task ${i + 1}`;
+      const title = String(t.title).trim();
+      if (title.length > 200) throw makeError(`${label}: name must be 200 characters or fewer`, 422);
+
+      const taskStart = t.start_date ? toDateOnly(t.start_date, `${label} start date`) : start;
+      const taskEnd   = t.end_date   ? toDateOnly(t.end_date,   `${label} deadline`)   : taskStart;
+      if (taskEnd < taskStart) throw makeError(`${label}: deadline must be on or after its start date`, 422);
+      if (taskStart < start || taskEnd > end) {
+        throw makeError(`${label} ("${title}") falls outside the project duration`, 422);
+      }
+
+      // Anchor to the same 09:00–18:00 working day the Tasks page uses. Dates
+      // alone would make a single-day task start and end at the same instant,
+      // which is a zero-length task the allocation engine cannot schedule.
+      return {
+        organisation_id: organisationId,
+        created_by:      createdBy,
+        title,
+        description:     t.description?.trim() || null,
+        status:          'PENDING',
+        start_datetime:  new Date(taskStart.getTime() + 9 * 60 * 60 * 1000),
+        end_datetime:    new Date(taskEnd.getTime() + 18 * 60 * 60 * 1000),
+      };
+    });
+
+  const created = await prisma.$transaction(async (tx) => {
+    const project = await tx.project.create({
+      data: {
+        organisation_id: organisationId,
+        manager_id:      manager_id != null ? Number(manager_id) : createdBy,
+        name:            name.trim(),
+        description:     description?.trim() || null,
+        status:          status ?? 'PLANNING',
+        start_date:      start,
+        end_date:        end,
+      },
+    });
+
+    if (resourceIds.length) {
+      await tx.projectResource.createMany({
+        data: resourceIds.map((user_id) => ({ project_id: project.project_id, user_id })),
+        skipDuplicates: true,
+      });
+    }
+
+    if (taskRows.length) {
+      await tx.task.createMany({
+        data: taskRows.map((t) => ({ ...t, project_id: project.project_id })),
+      });
+    }
+
+    return tx.project.findUnique({ where: { project_id: project.project_id }, include: PROJECT_INCLUDE });
   });
+
   return shapeProject(created);
 }
 

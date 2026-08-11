@@ -2,13 +2,14 @@ const express = require('express');
 const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
 const { requireOrgType, attachOrgType } = require('../middleware/orgType.middleware');
+const { requireActiveOrganisation } = require('../middleware/orgActive.middleware');
 const c = require('../controllers/org-admin.controller');
 const pcr = require('../controllers/profileChangeRequest.controller');
 const scr = require('../controllers/shiftChangeRequest.controller');
 
 const router = express.Router();
 
-router.use(verifyToken, requireRole(['ORG_ADMIN']), attachOrgType);
+router.use(verifyToken, requireRole(['ORG_ADMIN']), requireActiveOrganisation, attachOrgType);
 
 // Shift work belongs to shift-based organisations. A project-based organisation
 // has no roster at all — its temporary workers stay free of shifts until a task
@@ -18,6 +19,8 @@ const shiftOrgOnly = requireOrgType('NON_PROJECT');
 // ─── Organisation Profile ─────────────────────────────────────
 
 router.get('/profile',    c.getProfile);
+// The organisation sets its own scheduling model (project vs shift based).
+router.patch('/org-type', c.setOrgType);
 router.patch('/profile',  c.profileUpdateRules, c.validate, c.updateProfile);
 
 // ─── Departments ──────────────────────────────────────────────
@@ -58,10 +61,9 @@ router.patch('/shifts/:id',  shiftOrgOnly, c.shiftUpdateRules, c.validate, c.upd
 router.delete('/shifts/:id', shiftOrgOnly, c.deleteShift);
 
 // ─── Shift Assignments (roster) ───────────────────────────────
-router.get('/shift-assignments',        shiftOrgOnly, c.listShiftAssignments);
-router.post('/shift-assignments',       shiftOrgOnly, c.shiftAssignRules, c.validate, c.createShiftAssignment);
-router.post('/shift-assignments/bulk',  shiftOrgOnly, c.shiftBulkAssignRules, c.validate, c.bulkCreateShiftAssignments);
-router.delete('/shift-assignments/:id', shiftOrgOnly, c.deleteShiftAssignment);
+// NOTE: the roster (which person works which shift, on which date) is owned by
+// the manager, not the org admin — see /pm/shift-assignments in pm.routes.js.
+// The org admin defines the shift templates above; the manager allocates them.
 
 // ─── Shift-change requests (review) ───────────────────────────
 // ─── Audit logs (this organisation only) ──────────────────────

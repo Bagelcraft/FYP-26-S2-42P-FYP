@@ -27,7 +27,11 @@ router.get('/organisations',                 adminController.listOrganisations);
 router.post('/organisations',                adminController.createOrganisation);
 router.put('/organisations/:id/suspend',     adminController.suspendOrganisation);
 router.put('/organisations/:id/reactivate',  adminController.reactivateOrganisation);
-router.patch('/organisations/:id/type',      adminController.setOrganisationType);
+
+// ─── Platform settings ────────────────────────────────────────
+
+router.get('/settings',   adminController.getSettings);
+router.patch('/settings', adminController.updateSettings);
 
 // ─── Enquiries ────────────────────────────────────────────────
 

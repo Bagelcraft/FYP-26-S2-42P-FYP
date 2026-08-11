@@ -202,33 +202,9 @@ async function removeSkill(req, res, next) {
   } catch (e) { next(e); }
 }
 
-// ─── Shift Assignments (roster) ───────────────────────────────
-const shiftAssignRules = [
-  body('user_id').isInt({ min: 1 }).withMessage('user_id is required'),
-  body('shift_id').isInt({ min: 1 }).withMessage('shift_id is required'),
-  body('date').isISO8601().withMessage('date must be a valid date'),
-];
-async function listShiftAssignments(req, res, next) {
-  try { ok(res, await svc.listShiftAssignments(orgId(req))); } catch (e) { next(e); }
-}
-async function createShiftAssignment(req, res, next) {
-  try { ok(res, await svc.createShiftAssignment(orgId(req), req.body), 201); } catch (e) { next(e); }
-}
-const shiftBulkAssignRules = [
-  body('user_ids').isArray({ min: 1 }).withMessage('Select at least one employee'),
-  body('user_ids.*').isInt({ min: 1 }),
-  body('shift_id').isInt({ min: 1 }).withMessage('shift_id is required'),
-  body('weekdays').isArray({ min: 1 }).withMessage('Select at least one working day'),
-  body('weekdays.*').isInt({ min: 0, max: 6 }),
-  body('from').isISO8601().withMessage('from must be a valid date'),
-  body('to').isISO8601().withMessage('to must be a valid date'),
-];
-async function bulkCreateShiftAssignments(req, res, next) {
-  try { ok(res, await svc.bulkCreateShiftAssignments(orgId(req), req.body), 201); } catch (e) { next(e); }
-}
-async function deleteShiftAssignment(req, res, next) {
-  try { await svc.deleteShiftAssignment(orgId(req), id(req)); res.status(204).end(); } catch (e) { next(e); }
-}
+// NOTE: roster handlers used to live here. Allocating staff onto shifts is the
+// manager's job, so they now sit in manager.controller.js behind /pm/shift-*.
+// The org admin still owns the shift templates above.
 
 // ─── Subscription & Billing ───────────────────────────────────
 async function getSubscription(req, res, next) {
@@ -260,8 +236,13 @@ async function getAuditLogs(req, res, next) {
   } catch (e) { next(e); }
 }
 
+async function setOrgType(req, res, next) {
+  try { ok(res, await svc.setOrgType(orgId(req), req.body.org_type)); } catch (e) { next(e); }
+}
+
 module.exports = {
   validate,
+  setOrgType,
   getAuditLogs,
   getProfile, profileUpdateRules, updateProfile,
   getSubscription, listBilling, renewSubscription, cancelSubscription, listPlans, changePlan,
@@ -269,8 +250,6 @@ module.exports = {
   roleRules, roleUpdateRules, listRoles, createRole, updateRole, deleteRole,
   skillRules, skillUpdateRules, listSkills, createSkill, updateSkill, deleteSkill,
   shiftRules, shiftUpdateRules, listShifts, createShift, updateShift, deleteShift,
-  shiftAssignRules, listShiftAssignments, createShiftAssignment, deleteShiftAssignment,
-  shiftBulkAssignRules, bulkCreateShiftAssignments,
   staffRules, staffQueryRules, staffUpdateRules, listStaff, registerStaff, updateStaff, deactivateStaff, reactivateStaff,
   assignSkillRules, assignSkill, removeSkill,
 };

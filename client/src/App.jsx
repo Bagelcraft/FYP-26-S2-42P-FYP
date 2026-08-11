@@ -8,6 +8,7 @@ import Unauthorized from './pages/Unauthorized';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import VerifyEmail from './pages/VerifyEmail';
+import Suspended from './pages/Suspended';
 import NotFound from './pages/NotFound';
 
 // Admin
@@ -15,6 +16,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import Organisations from './pages/admin/Organisations';
 import AdminEnquiries from './pages/admin/AdminEnquiries';
 import AdminLandingContent from './pages/admin/AdminLandingContent';
+import AdminSettings from './pages/admin/Settings';
 
 // Org Admin
 import OrgAdminDashboard from './pages/org-admin/OrgAdminDashboard';
@@ -33,6 +35,7 @@ import AuditLogs from './pages/org-admin/AuditLogs';
 import PMDashboard from './pages/pm/PMDashboard';
 import Projects from './pages/pm/Projects';
 import Tasks from './pages/pm/Tasks';
+import Roster from './pages/pm/Roster';
 import Team from './pages/pm/Team';
 import Allocate from './pages/pm/Allocate';
 import PMCalendar from './pages/pm/Calendar';
@@ -69,12 +72,14 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/suspended" element={<Suspended />} />
 
           {/* System Admin */}
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/organisations" element={<Organisations />} />
           <Route path="/admin/enquiries" element={<AdminEnquiries />} />
           <Route path="/admin/landing-content" element={<AdminLandingContent />} />
+          <Route path="/admin/settings" element={<AdminSettings />} />
 
           {/* Organisation Admin */}
           <Route path="/org-admin" element={<OrgAdminDashboard />} />
@@ -93,6 +98,7 @@ export default function App() {
           <Route path="/pm" element={<PMDashboard />} />
           <Route path="/pm/projects" element={<Projects />} />
           <Route path="/pm/tasks" element={<Tasks />} />
+          <Route path="/pm/roster" element={<Roster />} />
           <Route path="/pm/team" element={<Team />} />
           <Route path="/pm/allocate" element={<Allocate />} />
           <Route path="/pm/calendar" element={<PMCalendar />} />

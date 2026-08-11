@@ -8,6 +8,7 @@ const enquiryController = require('../controllers/enquiryController');
 const { checkEmailDeliverable, normaliseEmail } = require('../utils/emailValidator');
 const { validateUEN } = require('../utils/uen');
 const { sendVerificationEmail } = require('../services/email.service');
+const { getSettings } = require('../services/settings.service');
 
 const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -86,7 +87,14 @@ router.post('/organisations/register', async (req, res) => {
     }
 
     const password_hash = await bcrypt.hash(password, 10);
-    const { token, expires } = newVerificationToken();
+
+    // The system admin can turn the emailed-link step off entirely. With it off the
+    // applicant is treated as verified straight away and drops into the approval
+    // queue — the admin still has to approve them, so nothing is auto-granted.
+    const { require_registration_verification: requireVerification } = await getSettings();
+    const { token, expires } = requireVerification
+      ? newVerificationToken()
+      : { token: null, expires: null };
 
     await prisma.unregisteredUser.create({
       data: {
@@ -98,11 +106,19 @@ router.post('/organisations/register', async (req, res) => {
         org_type: org_type ?? 'NON_PROJECT',
         position: position || null,
         role: 'ORG_ADMIN',
-        email_verified: false,
+        email_verified: !requireVerification,
         verification_token: token,
         verification_expires: expires,
       },
     });
+
+    if (!requireVerification) {
+      return res.status(201).json({
+        message: 'Registration submitted. Our team will review your organisation and activate your account.',
+        email: normalisedEmail,
+        verificationRequired: false,
+      });
+    }
 
     // The request is already persisted, so a mail failure (bad API key, unverified
     // sender, SendGrid outage) must not fail the registration — that would leave an
@@ -122,6 +138,7 @@ router.post('/organisations/register', async (req, res) => {
         : 'Registration submitted, but we could not send the verification email. Please use the resend option.',
       email: normalisedEmail,
       emailSent,
+      verificationRequired: true,
     });
   } catch (err) {
     console.error('Registration error:', err);
@@ -136,8 +153,28 @@ router.post('/verify-email', async (req, res) => {
 
   try {
     const pending = await prisma.unregisteredUser.findUnique({ where: { verification_token: token } });
+
+    // The same link format is issued to staff accounts when the system admin
+    // requires employees to verify, so fall through to User before giving up.
     if (!pending) {
-      return res.status(400).json({ message: 'This verification link is invalid or has already been used.' });
+      const staff = await prisma.user.findUnique({ where: { verification_token: token } });
+      if (!staff) {
+        return res.status(400).json({ message: 'This verification link is invalid or has already been used.' });
+      }
+      if (staff.email_verified) {
+        return res.json({ message: 'Your email is already verified. You can sign in now.' });
+      }
+      if (staff.verification_expires && staff.verification_expires < new Date()) {
+        return res.status(400).json({
+          message: 'This verification link has expired. Ask your organisation admin to resend it.',
+          expired: true,
+        });
+      }
+      await prisma.user.update({
+        where: { userId: staff.userId },
+        data:  { email_verified: true, verification_token: null, verification_expires: null },
+      });
+      return res.json({ message: 'Email verified. You can now sign in to SmartTask.' });
     }
     if (pending.email_verified) {
       return res.json({ message: 'Your email is already verified. Our team is reviewing your registration.' });

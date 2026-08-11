@@ -322,12 +322,12 @@ function TaskModal({ task, depts, skills, shifts, projects = [], isProjectOrg, o
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
-      <form onSubmit={submit} className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <form onSubmit={submit} className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
           <h2 className="font-semibold text-gray-800">{editing ? 'Edit Task' : 'Create Task'}</h2>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
         </div>
-        <div className="px-6 py-5 space-y-4">
+        <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
           {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-600">{error}</div>}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Task Name *</label>
@@ -432,10 +432,10 @@ function TaskModal({ task, depts, skills, shifts, projects = [], isProjectOrg, o
             <textarea rows={2} value={form.description} onChange={set('description')} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
           </div>
           {!editing && <p className="text-xs text-gray-400">New tasks start as <span className="font-medium text-gray-600">Pending</span> and appear in the Allocate queue.</p>}
-          <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
-            <button type="submit" disabled={saving} className="px-5 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">{saving ? 'Saving…' : editing ? 'Save Changes' : 'Create Task'}</button>
-          </div>
+        </div>
+        <div className="px-6 py-4 flex justify-end gap-3 border-t border-gray-100 flex-shrink-0">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
+          <button type="submit" disabled={saving} className="px-5 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">{saving ? 'Saving…' : editing ? 'Save Changes' : 'Create Task'}</button>
         </div>
       </form>
     </div>

@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/prisma');
 const { sendMail } = require('./email.service');
+const { SUSPENDED_MESSAGE } = require('../middleware/orgActive.middleware');
 
 function makeError(message, statusCode) {
   const err = new Error(message);
@@ -27,7 +28,7 @@ async function login(email, password) {
     where: { email },
     // org_type travels with the session so the client knows, before its first
     // data fetch, whether to render the project portal or the shift portal.
-    include: { organisation: { select: { name: true, org_type: true } } },
+    include: { organisation: { select: { name: true, org_type: true, isActive: true } } },
   });
   if (!user || !user.is_active) {
     throw makeError('Invalid email or password', 401);
@@ -40,6 +41,14 @@ async function login(email, password) {
   // be used to probe which addresses are registered.
   if (!user.email_verified) {
     throw makeError('Please verify your email address before signing in. Check your inbox for the verification link.', 403);
+  }
+
+  // A suspended organisation locks out all of its staff. Same reasoning as above:
+  // only revealed once the password is known to be correct.
+  if (user.organisation && user.organisation.isActive === false) {
+    const err = makeError(SUSPENDED_MESSAGE, 403);
+    err.code = 'ORG_SUSPENDED';
+    throw err;
   }
 
   await prisma.user.update({

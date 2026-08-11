@@ -2,6 +2,7 @@ const express = require('express');
 const { verifyToken } = require('../middleware/auth.middleware');
 const { requireRole } = require('../middleware/rbac.middleware');
 const { requireOrgType, attachOrgType } = require('../middleware/orgType.middleware');
+const { requireActiveOrganisation } = require('../middleware/orgActive.middleware');
 const workerController = require('../controllers/worker.controller');
 const updateRequestController = require('../controllers/task-update-request.controller');
 const attendanceController = require('../controllers/attendance.controller');
@@ -10,7 +11,7 @@ const shiftChangeController = require('../controllers/shiftChangeRequest.control
 
 const router = express.Router();
 
-router.use(verifyToken, requireRole(['PERMANENT_WORKER']), attachOrgType);
+router.use(verifyToken, requireRole(['PERMANENT_WORKER']), requireActiveOrganisation, attachOrgType);
 
 // A project-based organisation runs no roster, so there is no shift to view or
 // swap — work reaches these staff as tasks instead.

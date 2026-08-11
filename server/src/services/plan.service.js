@@ -27,7 +27,17 @@ async function getPlan(planId) {
   return plan;
 }
 
+// The product sells one plan. Feature gating resolves an organisation's plan by
+// matching its subscription amount to a plan price, so a second active plan at a
+// different price would silently split the customer base into haves and have-nots.
+// Editing the existing plan is the supported way to change what is on offer.
 async function createPlan(data) {
+  const active = await prisma.subscriptionPlan.count({ where: { is_active: true } });
+  if (active > 0) {
+    const err = new Error('SmartTask offers a single subscription tier. Edit the existing plan instead of creating another.');
+    err.statusCode = 409;
+    throw err;
+  }
   return prisma.subscriptionPlan.create({
     data: {
       name:          data.name,

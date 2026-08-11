@@ -1,5 +1,8 @@
-const { validationResult } = require('express-validator');
+const { body, validationResult } = require('express-validator');
 const managerService = require('../services/manager.service');
+// The roster belongs to the organisation, not to the admin portal — these are the
+// same org-scoped functions the Org Admin uses, reached by a different role.
+const rosterService = require('../services/org-admin.service');
 
 function sendValidationError(req, res) {
   const errors = validationResult(req);
@@ -161,7 +164,59 @@ const deleteTestimonial = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// ─── Roster (shift-based organisations) ───────────────────────
+// Managers own the week-to-week roster: which people work which shift, on which
+// days. Shift *templates* stay with the Org Admin — a manager schedules against
+// them rather than inventing new ones.
+
+const rosterAssignRules = [
+  body('user_id').isInt({ min: 1 }).withMessage('user_id is required'),
+  body('shift_id').isInt({ min: 1 }).withMessage('shift_id is required'),
+  body('date').isISO8601().withMessage('date must be a valid date'),
+];
+
+const rosterBulkRules = [
+  body('user_ids').isArray({ min: 1 }).withMessage('Select at least one employee'),
+  body('user_ids.*').isInt({ min: 1 }),
+  body('shift_id').isInt({ min: 1 }).withMessage('shift_id is required'),
+  body('weekdays').isArray({ min: 1 }).withMessage('Select at least one working day'),
+  body('weekdays.*').isInt({ min: 0, max: 6 }),
+  body('from').isISO8601().withMessage('from must be a valid date'),
+  body('to').isISO8601().withMessage('to must be a valid date'),
+];
+
+const listRoster = async (req, res, next) => {
+  try {
+    res.json({ success: true, data: await rosterService.listShiftAssignments(req.user.organisationId) });
+  } catch (err) { next(err); }
+};
+
+const createRosterEntry = async (req, res, next) => {
+  if (sendValidationError(req, res)) return;
+  try {
+    const data = await rosterService.createShiftAssignment(req.user.organisationId, req.body);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
+const bulkRoster = async (req, res, next) => {
+  if (sendValidationError(req, res)) return;
+  try {
+    const data = await rosterService.bulkCreateShiftAssignments(req.user.organisationId, req.body);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
+const deleteRosterEntry = async (req, res, next) => {
+  try {
+    const data = await rosterService.deleteShiftAssignment(req.user.organisationId, parseInt(req.params.id, 10));
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
 module.exports = {
+  rosterAssignRules, rosterBulkRules,
+  listRoster, createRosterEntry, bulkRoster, deleteRosterEntry,
   getTeam, listLeave, decideLeave, listLeaveBalances, updateLeaveBalance, getReports, getCalendar, getAvailability,
   getOrgInfo, getShiftTemplates, getDepartments, getSkills,
   listTestimonials, createTestimonial, updateTestimonial, deleteTestimonial,
