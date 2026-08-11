@@ -32,6 +32,33 @@ const getOrSeedFeatures = async ({ activeOnly }) => {
   });
 };
 
+// The public pricing card has to agree with what organisations are actually
+// billed. LandingContent.plan_* is copy the admin may override, but when it is
+// blank the card falls back to the cheapest active SubscriptionPlan — the same
+// row Subscription.amount and feature gating resolve against — so the marketing
+// price and the billed price cannot silently drift apart.
+const money = (value) => {
+  const n = Number(value);
+  return Number.isInteger(n) ? `$${n}` : `$${n.toFixed(2)}`;
+};
+
+const pricingFromPlan = async (content) => {
+  const plan = await prisma.subscriptionPlan.findFirst({
+    where: { is_active: true },
+    orderBy: { price_monthly: "asc" },
+    include: { features: { select: { feature_name: true } } },
+  });
+  if (!plan) return {};
+
+  return {
+    plan_name: content.plan_name || plan.name,
+    plan_price: content.plan_price || money(plan.price_monthly),
+    plan_description: content.plan_description || plan.description,
+    // What the tier actually includes, rather than a list hardcoded in the page.
+    plan_features: plan.features.map((f) => f.feature_name),
+  };
+};
+
 exports.getContent = async (req, res) => {
   try {
     const content = await getOrCreateContent();
@@ -43,7 +70,9 @@ exports.getContent = async (req, res) => {
       orderBy: [{ auto_score: "desc" }, { created_at: "desc" }],
     });
 
-    res.json({ content, features, testimonials });
+    const pricing = await pricingFromPlan(content);
+
+    res.json({ content: { ...content, ...pricing }, features, testimonials });
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch content", error: error.message });
   }

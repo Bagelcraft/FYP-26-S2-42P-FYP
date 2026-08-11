@@ -158,8 +158,13 @@ export default function Home() {
   const video_title   = content?.video_title   || 'Meet SmartTask — your all-in-one task management solution';
   const video_subtitle = content?.video_subtitle || 'How SmartTask helps organisations manage staff, automate task allocation, and track real-time progress — all from one unified platform.';
   const plan_name     = content?.plan_name     || 'Standard Plan';
+  // The API resolves these from the active SubscriptionPlan when the admin has
+  // not overridden the copy — these literals only show if it is unreachable.
   const plan_price    = content?.plan_price    || '$9';
   const plan_desc     = content?.plan_description || 'Perfect for small teams and growing organisations.';
+  const plan_features = content?.plan_features?.length
+    ? content.plan_features
+    : ['Task Management', 'Workforce Scheduling', 'Auto Allocation', 'Basic Reports'];
 
   const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
@@ -398,7 +403,7 @@ export default function Home() {
               <p className="text-slate-400 text-sm mt-1">{plan_desc}</p>
             </div>
             <div className="flex-1 space-y-2">
-              {['Up to 50 Users', 'Task Management', 'Workforce Scheduling', 'Real-time Monitoring', 'Reports & Analytics', 'Priority Support'].map((f) => (
+              {plan_features.map((f) => (
                 <div key={f} className="flex items-center gap-2.5 text-sm text-slate-300">
                   <span className="text-green-400 font-bold">✓</span> {f}
                 </div>

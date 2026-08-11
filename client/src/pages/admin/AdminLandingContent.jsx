@@ -237,7 +237,11 @@ export default function AdminLandingContent() {
                 <div>
                   <label className={labelCls}>Price</label>
                   <input className={inputCls} value={pricing.plan_price} onChange={(e) => setPricing((p) => ({ ...p, plan_price: e.target.value }))} maxLength={50} placeholder="$9" />
-                  <p className="text-xs text-gray-400 mt-1">Just the number/amount — "/month" is appended automatically.</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Just the number/amount — "/month" is appended automatically. Leave blank to track
+                    the active subscription plan, so the advertised price always matches what
+                    organisations are billed.
+                  </p>
                 </div>
                 <div>
                   <label className={labelCls}>Plan Description</label>
