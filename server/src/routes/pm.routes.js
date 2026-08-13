@@ -165,6 +165,7 @@ const shiftOrgOnly = requireOrgType('NON_PROJECT');
 router.get('/shift-assignments',         shiftOrgOnly, managerController.listRoster);
 router.post('/shift-assignments',        shiftOrgOnly, managerController.rosterAssignRules, managerController.createRosterEntry);
 router.post('/shift-assignments/bulk',   shiftOrgOnly, managerController.rosterBulkRules,   managerController.bulkRoster);
+router.delete('/shift-assignments/clear', shiftOrgOnly, managerController.clearRoster);
 router.delete('/shift-assignments/:id',  shiftOrgOnly, managerController.deleteRosterEntry);
 router.get('/departments',     managerController.getDepartments);
 router.get('/skills',          managerController.getSkills);

@@ -40,10 +40,23 @@ export default function Skills() {
   }
 
   async function removeSkill(skill) {
-    if (!confirm(`Remove skill "${skill.skill_name}"?`)) return;
+    // Deleting a skill in use detaches it from whoever holds it, so say so up
+    // front rather than letting the admin discover it afterwards.
+    const inUse = (skill._count?.userSkills ?? 0) + (skill._count?.tasks ?? 0);
+    const warning = inUse
+      ? `
+
+It is currently assigned to ${skill._count?.userSkills ?? 0} employee(s) and required by ${skill._count?.tasks ?? 0} task(s). Deleting removes it from all of them.`
+      : '';
+    if (!confirm(`Remove skill "${skill.skill_name}"?${warning}`)) return;
     try {
-      await api.delete(`/org-admin/skills/${skill.skill_id}`);
+      const r = await api.delete(`/org-admin/skills/${skill.skill_id}`);
       setSkills((prev) => prev.filter((s) => s.skill_id !== skill.skill_id));
+      const d = r.data.data?.detached;
+      if (d && (d.workers || d.roles || d.tasks)) {
+        // Roles are worth calling out: the skill silently stops being required.
+        alert(`"${skill.skill_name}" deleted. Removed from ${d.workers} employee(s), ${d.roles} role(s) and ${d.tasks} task(s).`);
+      }
     } catch (e) {
       alert(e.response?.data?.message || e.message);
     }

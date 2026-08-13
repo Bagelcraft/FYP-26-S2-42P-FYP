@@ -74,24 +74,43 @@ export default function OrgProfile() {
   // Changing the scheduling model reshapes every portal, so it is deliberately a
   // separate, confirmed action rather than part of the general "save details" form.
   // The server refuses (409) if existing projects or a roster would be orphaned.
+  // Switching model deletes whatever the old model owned, so the confirmation
+  // names the exact counts first. The server refuses without confirm: true, which
+  // means a mis-click can never destroy anything on its own.
   const changeOrgType = async (next) => {
     const target = ORG_TYPES.find((t) => t.value === next);
-    if (!window.confirm(
-      `Switch your organisation to ${target.label} scheduling?
-
-`
-      + 'This changes which features every member of your organisation sees.',
-    )) return;
-
     setSwitchingType(true);
     try {
+      const preview = await fetch(`${API_BASE}/org-admin/org-type/preview`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then((r) => r.json()).catch(() => null);
+
+      const removal = preview?.data;
+      const losses = [];
+      if (removal?.projects) losses.push(`${removal.projects} project(s) and their resource pools`);
+      if (removal?.rosteredShifts) losses.push(`${removal.rosteredShifts} rostered shift(s)`);
+      if (removal?.shiftTemplates) losses.push(`${removal.shiftTemplates} shift template(s)`);
+
+      const warning = losses.length
+        ? `\n\nThis will permanently delete:\n  • ${losses.join('\n  • ')}\n\nTasks are kept, but any that belonged to a project become standalone.`
+        : '';
+
+      if (!window.confirm(
+        `Switch your organisation to ${target.label} scheduling?${warning}\n\n`
+        + 'This changes which features every member of your organisation sees.',
+      )) {
+        setSwitchingType(false);
+        return;
+      }
+
       const res = await fetch(`${API_BASE}/org-admin/org-type`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ org_type: next }),
+        body: JSON.stringify({ org_type: next, confirm: true }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.message || 'Failed to change the scheduling model.');
+
       setProfile((prev) => ({ ...prev, org_type: next }));
       showToast(`Now using ${target.label} scheduling. Sign out and back in to refresh your menu.`);
     } catch (err) {

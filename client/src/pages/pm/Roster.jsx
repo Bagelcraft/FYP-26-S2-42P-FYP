@@ -26,6 +26,7 @@ export default function Roster() {
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
   const [saving, setSaving] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   const today = useMemo(() => new Date(), []);
   const inTwoWeeks = useMemo(() => { const d = new Date(); d.setDate(d.getDate() + 13); return d; }, []);
@@ -88,6 +89,33 @@ export default function Roster() {
       setError(err.response?.data?.message ?? err.response?.data?.errors?.[0]?.msg ?? 'Failed to roster those shifts.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  // Clearing week by week is unusable once a roster spans a month. Two scopes:
+  // from today onwards (the common case — replan the future, keep worked history)
+  // or genuinely everything.
+  async function clearAll(scope) {
+    const fromToday = scope === 'upcoming';
+    const count = fromToday ? upcoming.length : assignments.length;
+    if (!count) { note('Nothing to clear.'); return; }
+
+    if (!window.confirm(
+      fromToday
+        ? `Remove all ${count} upcoming shift(s) from today onwards?\n\nPast shifts are kept.`
+        : `Remove ALL ${count} shift(s), including past ones?\n\nThis cannot be undone.`,
+    )) return;
+
+    setClearing(true);
+    try {
+      const qs = fromToday ? `?from=${ymd(new Date())}` : '';
+      const r = await api.delete(`/pm/shift-assignments/clear${qs}`);
+      note(`${r.data.data?.deleted ?? 0} shift(s) removed.`);
+      load();
+    } catch (err) {
+      setError(err.response?.data?.message ?? 'Failed to clear the roster.');
+    } finally {
+      setClearing(false);
     }
   }
 
@@ -226,9 +254,30 @@ export default function Roster() {
 
             {/* Upcoming */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
-              <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-                <h3 className="font-semibold text-gray-800 text-sm">Upcoming shifts</h3>
-                <span className="text-xs text-gray-400">{upcoming.length} scheduled</span>
+              <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-gray-800 text-sm">Upcoming shifts</h3>
+                  <span className="text-xs text-gray-400">{upcoming.length} scheduled</span>
+                </div>
+                {assignments.length > 0 && (
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <button
+                      onClick={() => clearAll('upcoming')}
+                      disabled={clearing || upcoming.length === 0}
+                      className="text-xs font-medium text-red-600 hover:underline disabled:opacity-40 disabled:no-underline"
+                    >
+                      {clearing ? 'Clearing…' : 'Clear upcoming'}
+                    </button>
+                    <button
+                      onClick={() => clearAll('all')}
+                      disabled={clearing}
+                      title="Removes past shifts too"
+                      className="text-xs font-medium text-gray-500 hover:underline disabled:opacity-40"
+                    >
+                      Clear all
+                    </button>
+                  </div>
+                )}
               </div>
               {grouped.length === 0 ? (
                 <p className="px-5 py-10 text-center text-gray-400 text-sm">Nothing rostered yet.</p>

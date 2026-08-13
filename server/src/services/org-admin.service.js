@@ -204,10 +204,34 @@ async function updateSkill(organisationId, skillId, data) {
   });
 }
 
+// Deleting a skill used to fail with a foreign-key error the moment anything
+// referenced it. Only RoleSkill cascades in the schema; UserSkill, TaskSkill and
+// Task.required_skill_id do not, so a skill held by one worker was undeletable.
+//
+// The references are detached first, in a transaction, and the counts are
+// returned so the admin can be told exactly what the deletion touched.
 async function deleteSkill(organisationId, skillId) {
   const skill = await prisma.skill.findFirst({ where: { skill_id: skillId, organisation_id: organisationId } });
   if (!skill) throw makeError('Skill not found', 404);
-  await prisma.skill.delete({ where: { skill_id: skillId } });
+
+  return prisma.$transaction(async (tx) => {
+    const [workers, roles, tasks, requiredBy] = await Promise.all([
+      tx.userSkill.count({ where: { skill_id: skillId } }),
+      tx.roleSkill.count({ where: { skill_id: skillId } }),
+      tx.taskSkill.count({ where: { skill_id: skillId } }),
+      tx.task.count({ where: { required_skill_id: skillId } }),
+    ]);
+
+    await tx.userSkill.deleteMany({ where: { skill_id: skillId } });
+    await tx.roleSkill.deleteMany({ where: { skill_id: skillId } });
+    await tx.taskSkill.deleteMany({ where: { skill_id: skillId } });
+    // A task keeps existing; it simply no longer demands this skill.
+    await tx.task.updateMany({ where: { required_skill_id: skillId }, data: { required_skill_id: null } });
+
+    await tx.skill.delete({ where: { skill_id: skillId } });
+
+    return { skill_name: skill.skill_name, detached: { workers, roles, tasks: tasks + requiredBy } };
+  });
 }
 
 // ─── Shift Templates ─────────────────────────────────────────
@@ -586,6 +610,20 @@ async function createShiftAssignment(organisationId, data) {
   });
 }
 
+// Clearing a roster one row at a time is unusable once it spans a few weeks.
+// `from` limits it to a date onwards, so a manager can wipe the future without
+// destroying the attendance-relevant past.
+async function clearShiftAssignments(organisationId, { from } = {}) {
+  const where = { organisation_id: organisationId };
+  if (from) {
+    const start = new Date(from);
+    if (Number.isNaN(start.getTime())) throw makeError('from must be a valid date', 422);
+    where.date = { gte: start };
+  }
+  const { count } = await prisma.shiftAssignment.deleteMany({ where });
+  return { deleted: count };
+}
+
 async function deleteShiftAssignment(organisationId, assignmentId) {
   const a = await prisma.shiftAssignment.findFirst({ where: { assignment_id: assignmentId, organisation_id: organisationId } });
   if (!a) throw makeError('Shift assignment not found', 404);
@@ -784,7 +822,7 @@ async function getAuditLogs(organisationId, filters = {}) {
 //
 // Switching away from PROJECT is refused while projects exist, since those become
 // unreachable under shift-based rules; the reverse is refused while a roster exists.
-async function setOrgType(organisationId, orgType) {
+async function setOrgType(organisationId, orgType, { confirm = false } = {}) {
   if (!ORG_TYPES.includes(orgType)) {
     throw makeError(`org_type must be one of: ${ORG_TYPES.join(', ')}`, 422);
   }
@@ -792,30 +830,77 @@ async function setOrgType(organisationId, orgType) {
   if (!org) throw makeError('Organisation not found', 404);
   if (org.org_type === orgType) return org;
 
-  if (org.org_type === 'PROJECT') {
-    const projectCount = await prisma.project.count({ where: { organisation_id: organisationId } });
-    if (projectCount > 0) {
-      throw makeError(
-        `Your organisation has ${projectCount} project(s). Delete them before switching to shift-based scheduling.`,
-        409,
-      );
-    }
-  } else {
-    const rosterCount = await prisma.shiftAssignment.count({ where: { organisation_id: organisationId } });
-    if (rosterCount > 0) {
-      throw makeError(
-        `Your organisation has ${rosterCount} rostered shift(s). Clear the roster before switching to project-based scheduling.`,
-        409,
-      );
-    }
+  // Switching model discards whatever the old model owned, because it has no
+  // meaning under the new one — projects cannot be scheduled by shift, and a
+  // roster cannot be worked by project. Refusing the switch just left the admin
+  // deleting rows by hand with no way to finish.
+  //
+  // It is destructive, so the caller must pass confirm: true. Without it the
+  // counts come back as a 409 and the UI can say exactly what will be lost.
+  const removal = await previewOrgTypeSwitch(organisationId, org.org_type);
+  if (removal.total > 0 && !confirm) {
+    const err = makeError(
+      `Switching will permanently delete ${removal.summary}.`,
+      409,
+    );
+    err.code = 'ORG_TYPE_SWITCH_NEEDS_CONFIRM';
+    err.removal = removal;
+    throw err;
   }
 
-  const updated = await prisma.organisation.update({
-    where: { organisation_id: organisationId },
-    data:  { org_type: orgType },
+  const updated = await prisma.$transaction(async (tx) => {
+    if (org.org_type === 'PROJECT') {
+      // Tasks survive the switch; they just stop belonging to a project.
+      await tx.task.updateMany({ where: { organisation_id: organisationId }, data: { project_id: null } });
+      const projects = await tx.project.findMany({
+        where:  { organisation_id: organisationId },
+        select: { project_id: true },
+      });
+      const ids = projects.map((p) => p.project_id);
+      if (ids.length) {
+        await tx.projectResource.deleteMany({ where: { project_id: { in: ids } } });
+        await tx.project.deleteMany({ where: { project_id: { in: ids } } });
+      }
+    } else {
+      // The roster goes, and so do the templates it was built from.
+      await tx.shiftAssignment.deleteMany({ where: { organisation_id: organisationId } });
+      await tx.shiftTemplate.deleteMany({ where: { organisation_id: organisationId } });
+    }
+
+    return tx.organisation.update({
+      where: { organisation_id: organisationId },
+      data:  { org_type: orgType },
+    });
   });
+
   clearOrgTypeCache(organisationId);
-  return updated;
+  return { ...updated, removed: removal };
+}
+
+// What a switch away from `currentType` would destroy.
+async function previewOrgTypeSwitch(organisationId, currentType) {
+  if (currentType === 'PROJECT') {
+    const projects = await prisma.project.count({ where: { organisation_id: organisationId } });
+    return {
+      projects,
+      shiftTemplates: 0,
+      rosteredShifts: 0,
+      total: projects,
+      summary: `${projects} project(s) and their resource pools`,
+    };
+  }
+
+  const [shiftTemplates, rosteredShifts] = await Promise.all([
+    prisma.shiftTemplate.count({ where: { organisation_id: organisationId } }),
+    prisma.shiftAssignment.count({ where: { organisation_id: organisationId } }),
+  ]);
+  return {
+    projects: 0,
+    shiftTemplates,
+    rosteredShifts,
+    total: shiftTemplates + rosteredShifts,
+    summary: `${rosteredShifts} rostered shift(s) and ${shiftTemplates} shift template(s)`,
+  };
 }
 
 module.exports = {
@@ -827,6 +912,7 @@ module.exports = {
   listSkills, createSkill, updateSkill, deleteSkill,
   listShiftTemplates, createShiftTemplate, updateShiftTemplate, deleteShiftTemplate,
   listShiftAssignments, createShiftAssignment, bulkCreateShiftAssignments, deleteShiftAssignment,
+  clearShiftAssignments, previewOrgTypeSwitch,
   listStaff, registerStaff, updateStaff, deactivateStaff, reactivateStaff,
   assignSkillToStaff, removeSkillFromStaff,
   getSubscription, listBilling, renewSubscription, cancelSubscription,

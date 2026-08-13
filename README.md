@@ -64,14 +64,42 @@ DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/smart_task_allo
 
 Then apply the schema and seed the database:
 ```powershell
-npx prisma db push
-npx prisma db seed
+npx prisma migrate deploy
+npx prisma generate
+node scripts/reset-hosted.js --yes
 npm run dev
 ```
 
-> **Use `npx prisma db push` — not `prisma migrate`.** This project syncs the schema
-> directly with `db push` and does not keep a migration history. After pulling any
-> change to `schema.prisma`, run `npx prisma db push` again to stay in sync.
+> **Use `npx prisma migrate deploy`.** The project keeps a migration history under
+> `prisma/migrations/`, so this recreates the schema exactly. After pulling a change
+> to `schema.prisma`, run `npx prisma migrate deploy && npx prisma generate` again.
+
+`scripts/reset-hosted.js` loads two fully populated demo organisations — one
+project-based, one shift-based — so every feature has data to show.
+
+### Demo Accounts
+
+All demo accounts use the password **`SmartTask#2026`**.
+
+| Role | Email | Organisation |
+|---|---|---|
+| System Admin | `sysadmin@smarttask.app` | — |
+| Organisation Admin | `admin@meridian.app` | Meridian Projects (project-based) |
+| Project Manager | `pm@meridian.app` | Meridian Projects |
+| Permanent Worker | `alex@meridian.app` | Meridian Projects |
+| Temporary Worker | `casey@meridian.app` | Meridian Projects |
+| Organisation Admin | `admin@northgate.app` | Northgate Retail (shift-based) |
+| Project Manager | `pm@northgate.app` | Northgate Retail |
+| Permanent Worker | `sam@northgate.app` | Northgate Retail |
+| Temporary Worker | `morgan@northgate.app` | Northgate Retail |
+
+The two organisations differ deliberately: **Meridian** is project-based (projects,
+resource pools, task allocation) and **Northgate** is shift-based (shift templates
+and a roster). The portals change to match, so sign in to both to see each half.
+
+> Email sending is optional. With `SENDGRID_API_KEY` blank, verification and
+> password-reset links are printed to the server console instead of being sent —
+> `npm run verify:links` reprints any pending one.
 
 ### Frontend Setup
 

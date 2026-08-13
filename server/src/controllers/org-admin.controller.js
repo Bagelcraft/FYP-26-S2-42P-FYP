@@ -106,7 +106,9 @@ async function updateSkill(req, res, next) {
   try { ok(res, await svc.updateSkill(orgId(req), id(req), req.body)); } catch (e) { next(e); }
 }
 async function deleteSkill(req, res, next) {
-  try { await svc.deleteSkill(orgId(req), id(req)); res.status(204).end(); } catch (e) { next(e); }
+  // Returns what the deletion detached (employees, roles, tasks) so the UI can
+  // report it — a bare 204 would hide the side effects.
+  try { ok(res, await svc.deleteSkill(orgId(req), id(req))); } catch (e) { next(e); }
 }
 
 // ─── Shift Templates ─────────────────────────────────────────
@@ -237,12 +239,23 @@ async function getAuditLogs(req, res, next) {
 }
 
 async function setOrgType(req, res, next) {
-  try { ok(res, await svc.setOrgType(orgId(req), req.body.org_type)); } catch (e) { next(e); }
+  try {
+    ok(res, await svc.setOrgType(orgId(req), req.body.org_type, { confirm: req.body.confirm === true }));
+  } catch (e) { next(e); }
+}
+
+// What a switch would delete, so the UI can warn before asking to confirm.
+async function previewOrgTypeSwitch(req, res, next) {
+  try {
+    const org = await svc.getOrgProfile(orgId(req));
+    ok(res, await svc.previewOrgTypeSwitch(orgId(req), org.org_type));
+  } catch (e) { next(e); }
 }
 
 module.exports = {
   validate,
   setOrgType,
+  previewOrgTypeSwitch,
   getAuditLogs,
   getProfile, profileUpdateRules, updateProfile,
   getSubscription, listBilling, renewSubscription, cancelSubscription, listPlans, changePlan,

@@ -23,6 +23,9 @@ const errorMiddleware = (err, req, res, next) => {
     // Machine-readable discriminator for failures the client must handle
     // specially rather than just display (e.g. ORG_SUSPENDED -> redirect).
     ...(isOperational && err.code ? { code: err.code } : {}),
+    // Extra context a client needs to act on the failure (e.g. what a
+    // confirmed-destructive action would remove).
+    ...(isOperational && err.removal ? { removal: err.removal } : {}),
   });
 };
 

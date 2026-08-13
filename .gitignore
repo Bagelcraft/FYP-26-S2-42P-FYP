@@ -6,5 +6,3 @@ build/
 *.log
 coverage/
 .vite/
-.agents/
-skills-lock.json

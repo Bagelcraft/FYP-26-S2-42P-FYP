@@ -446,8 +446,9 @@ async function main() {
   console.log('  PASSWORDS');
   console.log(`    ${SYSADMIN_EMAIL.padEnd(24)} ${SYSADMIN_PASSWORD}`);
   console.log(`    ${'all company accounts'.padEnd(24)} ${STAFF_PASSWORD}`);
-  console.log(`\n  ${meridian.org.name} is PROJECT-BASED (Pro plan) · ${northgate.org.name} is SHIFT-BASED (Basic plan)`);
-  console.log('  The other three are freshly-approved tenants: org admin only, no subscription, no data.\n');
+  console.log(`\n  ${meridian.org.name} is PROJECT-BASED, ${northgate.org.name} is SHIFT-BASED`);
+  console.log('  The other three are freshly-approved tenants: org admin only, no data.');
+  console.log('  Every organisation is on the single Standard tier with an active subscription.\n');
 }
 
 main()

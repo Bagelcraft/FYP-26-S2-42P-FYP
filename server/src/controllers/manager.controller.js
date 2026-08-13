@@ -207,6 +207,15 @@ const bulkRoster = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// Wipe the roster in one action. `from` (optional) keeps everything before that
+// date, so clearing the future does not erase worked history.
+const clearRoster = async (req, res, next) => {
+  try {
+    const data = await rosterService.clearShiftAssignments(req.user.organisationId, { from: req.query.from });
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
 const deleteRosterEntry = async (req, res, next) => {
   try {
     const data = await rosterService.deleteShiftAssignment(req.user.organisationId, parseInt(req.params.id, 10));
@@ -216,7 +225,7 @@ const deleteRosterEntry = async (req, res, next) => {
 
 module.exports = {
   rosterAssignRules, rosterBulkRules,
-  listRoster, createRosterEntry, bulkRoster, deleteRosterEntry,
+  listRoster, createRosterEntry, bulkRoster, deleteRosterEntry, clearRoster,
   getTeam, listLeave, decideLeave, listLeaveBalances, updateLeaveBalance, getReports, getCalendar, getAvailability,
   getOrgInfo, getShiftTemplates, getDepartments, getSkills,
   listTestimonials, createTestimonial, updateTestimonial, deleteTestimonial,

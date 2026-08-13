@@ -20,6 +20,7 @@ const shiftOrgOnly = requireOrgType('NON_PROJECT');
 
 router.get('/profile',    c.getProfile);
 // The organisation sets its own scheduling model (project vs shift based).
+router.get('/org-type/preview', c.previewOrgTypeSwitch);
 router.patch('/org-type', c.setOrgType);
 router.patch('/profile',  c.profileUpdateRules, c.validate, c.updateProfile);
 
