@@ -321,7 +321,7 @@ async function getReports(organisationId) {
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 async function getCalendar(organisationId, from, to) {
-  const [shiftRows, taskRows, unavailRows] = await Promise.all([
+  const [shiftRows, taskRows, unavailRows, leaveRows] = await Promise.all([
     prisma.shiftAssignment.findMany({
       where:   { organisation_id: organisationId, date: { gte: from, lte: to } },
       include: { user: { select: { userId: true, full_name: true, user_type: true } }, shift: { select: { name: true, start_time: true, end_time: true } } },
@@ -336,12 +336,27 @@ async function getCalendar(organisationId, from, to) {
       where:   { status: { in: ['UNAVAILABLE', 'ON_LEAVE'] }, start_datetime: { lte: to }, end_datetime: { gte: from }, user: { organisationId } },
       include: { user: { select: { userId: true, full_name: true } } },
     }),
+    // Approved leave was missing from the calendar entirely. The allocation
+    // engine already treats it as a blocker (allocation.service collectBlockers),
+    // so a manager could be shown someone as free on a day the system would
+    // refuse to schedule them. Leave lives in LeaveRequest, not Availability —
+    // approving a request never wrote an Availability row.
+    prisma.leaveRequest.findMany({
+      where:   { status: 'APPROVED', start_date: { lte: to }, end_date: { gte: from }, user: { organisationId } },
+      include: { user: { select: { userId: true, full_name: true } } },
+    }),
   ]);
   return {
     from: ymd(from), to: ymd(to),
     shifts:      shiftRows.map((s) => ({ date: ymd(new Date(s.date)), userId: s.user.userId, userName: s.user.full_name, userType: s.user.user_type, shiftName: s.shift.name, startTime: s.shift.start_time, endTime: s.shift.end_time })),
     tasks:       taskRows.map((t) => ({ task_id: t.task_id, title: t.title, status: t.status, start: ymd(new Date(t.start_datetime)), end: ymd(new Date(t.end_datetime)), department: t.department?.name ?? null, assignees: t.assignments.map((a) => a.assignedTo?.full_name).filter(Boolean) })),
-    unavailable: unavailRows.map((a) => ({ userId: a.user.userId, userName: a.user.full_name, status: a.status, start: ymd(new Date(a.start_datetime)), end: ymd(new Date(a.end_datetime)) })),
+    // Both feed the same channel: the calendar legend already reads
+    // "Unavailable / leave", and to a manager planning a week they mean the
+    // same thing — this person cannot be given work.
+    unavailable: [
+      ...unavailRows.map((a) => ({ userId: a.user.userId, userName: a.user.full_name, status: a.status, start: ymd(new Date(a.start_datetime)), end: ymd(new Date(a.end_datetime)) })),
+      ...leaveRows.map((l) => ({ userId: l.user.userId, userName: l.user.full_name, status: 'ON_LEAVE', leaveType: l.leave_type, start: ymd(new Date(l.start_date)), end: ymd(new Date(l.end_date)) })),
+    ],
   };
 }
 

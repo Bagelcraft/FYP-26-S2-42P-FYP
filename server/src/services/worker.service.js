@@ -89,7 +89,7 @@ const getMySchedule = async (userId) => {
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 const getMyCalendar = async (userId, organisationId, from, to) => {
-  const [shiftRows, taskRows, unavailRows] = await Promise.all([
+  const [shiftRows, taskRows, unavailRows, leaveRows] = await Promise.all([
     prisma.shiftAssignment.findMany({
       where:   { user_id: userId, date: { gte: from, lte: to } },
       include: { shift: { select: { name: true, start_time: true, end_time: true } } },
@@ -103,12 +103,20 @@ const getMyCalendar = async (userId, organisationId, from, to) => {
     prisma.availability.findMany({
       where:   { user_id: userId, status: { in: ['UNAVAILABLE', 'ON_LEAVE'] }, start_datetime: { lte: to }, end_datetime: { gte: from } },
     }),
+    // The employee's own approved leave — previously absent, so their calendar
+    // showed nothing on days they had booked off and had approved.
+    prisma.leaveRequest.findMany({
+      where: { user_id: userId, status: 'APPROVED', start_date: { lte: to }, end_date: { gte: from } },
+    }),
   ]);
   return {
     from: ymd(from), to: ymd(to),
     shifts:      shiftRows.map((s) => ({ date: ymd(new Date(s.date)), shiftName: s.shift.name, startTime: s.shift.start_time, endTime: s.shift.end_time })),
     tasks:       taskRows.map((t) => ({ task_id: t.task_id, title: t.title, status: t.status, start: ymd(new Date(t.start_datetime)), end: ymd(new Date(t.end_datetime)), department: t.department?.name ?? null })),
-    unavailable: unavailRows.map((a) => ({ status: a.status, start: ymd(new Date(a.start_datetime)), end: ymd(new Date(a.end_datetime)) })),
+    unavailable: [
+      ...unavailRows.map((a) => ({ status: a.status, start: ymd(new Date(a.start_datetime)), end: ymd(new Date(a.end_datetime)) })),
+      ...leaveRows.map((l) => ({ status: 'ON_LEAVE', leaveType: l.leave_type, start: ymd(new Date(l.start_date)), end: ymd(new Date(l.end_date)) })),
+    ],
   };
 };
 
