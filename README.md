@@ -66,7 +66,7 @@ Then apply the schema and seed the database:
 ```powershell
 npx prisma migrate deploy
 npx prisma generate
-node scripts/reset-hosted.js --yes
+node scripts/reset-hosted.js --confirm
 npm run dev
 ```
 

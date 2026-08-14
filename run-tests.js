@@ -7,7 +7,7 @@
  *   node run-tests.js --base-url http://localhost:5000/api/v1
  *
  * Prerequisites:
- *   1. MySQL running and DB seeded  (cd server && npx prisma db seed)
+ *   1. PostgreSQL running and DB seeded  (cd server && npx prisma db seed)
  *   2. Express server running       (cd server && npm start)
  */
 
