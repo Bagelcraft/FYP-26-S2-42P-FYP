@@ -2,10 +2,12 @@
  * Feature test runner — verifies the Phase 1–5 additions end-to-end over the live API.
  * Black-box (HTTP) assertions; Prisma is used only for setup/cleanup of test artifacts.
  *
- * Prereqs: API running (npm run dev) + App. A accounts (npm run seed:test).
+ * Prereqs: API running (npm run dev) and a seeded database
+ *          (node scripts/reset-hosted.js --confirm).
  * Usage:   npm run test:features   |   node scripts/test-features.js
  */
 const { PrismaClient } = require('@prisma/client');
+const { resolveFixtures } = require('./fixtures');
 const HOST = (process.env.API_URL || 'http://localhost:5000').replace(/\/$/, '');
 const BASE = HOST + '/api/v1';
 
@@ -13,6 +15,8 @@ const useColor = !process.env.NO_COLOR;
 const c = (n, s) => (useColor ? `\x1b[${n}m${s}\x1b[0m` : s);
 const green = (s) => c('32', s), red = (s) => c('31', s), dim = (s) => c('90', s), bold = (s) => c('1', s);
 const results = [];
+// Accounts this suite creates itself. `ft-` prefix is what clean() looks for.
+const FT_STAFF_EMAIL = 'ft-perm@fixture.test';
 const line = (l, v) => console.log('   ' + dim(String(l).padEnd(11)) + v);
 const verdict = (id, ok, note) => { console.log('   ' + (ok ? green(' PASS ') : red(' FAIL ')) + ' ' + note + '\n'); results.push({ id, ok }); };
 
@@ -23,7 +27,9 @@ async function call(method, path, { token, body } = {}) {
   let json = null; try { json = await res.json(); } catch {}
   return { s: res.status, d: json };
 }
-const login = async (email) => (await call('POST', '/auth/login', { body: { email, password: 'Passw0rd!' } })).d?.token;
+let FIXTURE_PASSWORD = 'SmartTask#2026';
+const login = async (email, password = FIXTURE_PASSWORD) =>
+  (await call('POST', '/auth/login', { body: { email, password } })).d?.token;
 
 async function main() {
   const p = new PrismaClient();
@@ -51,9 +57,21 @@ async function main() {
     try { await fetch(HOST + '/api/health'); } catch { console.log(red('API not reachable — run: cd server && npm run dev')); process.exit(1); }
 
     await clean();
-    const admin = await login('admin@acme.test');
-    const pm = await login('pm@acme.test');
-    if (!admin || !pm) { console.log(red('Cannot log in — run: npm run seed:test')); process.exit(1); }
+
+    // Accounts are resolved by role from whatever the database holds, so this
+    // survives reseeds instead of depending on one retired fixture set.
+    const fx = await resolveFixtures(p, { require: ['ORG_ADMIN', 'PROJECT_MANAGER', 'TEMPORARY_WORKER'] });
+    if (fx.error) { console.log(red(fx.error)); process.exit(1); }
+    FIXTURE_PASSWORD = fx.password;
+    console.log(dim(`   fixtures: ${fx.org.name} — ${fx.admin.email} / ${fx.pm.email} / ${fx.temporary.email}\n`));
+
+    const admin = await login(fx.admin.email);
+    const pm = await login(fx.pm.email);
+    if (!admin || !pm) {
+      console.log(red(`Cannot log in as ${fx.admin.email} / ${fx.pm.email}.`));
+      console.log(red('Check TEST_PASSWORD, or reseed: node scripts/reset-hosted.js --confirm'));
+      process.exit(1);
+    }
 
     // ── Phase 1: roles↔dept↔skills, registration auto-skills + leave balance ──
     console.log(bold('Phase 1  Org Admin: roles, skills, departments, registration'));
@@ -61,7 +79,7 @@ async function main() {
     const dept = (await call('POST', '/org-admin/departments', { token: admin, body: { name: 'FT-Ops' } })).d.data;
     const role = await call('POST', '/org-admin/roles', { token: admin, body: { role_name: 'FT-Tech', department_id: dept.department_id, skill_ids: [skill.skill_id] } });
     verdict('P1-role', role.s === 201 && role.d.data.department?.name === 'FT-Ops' && role.d.data.requiredSkills?.[0]?.skill.skill_name === 'FT-Welding', 'Role has a department + required skills');
-    const reg = await call('POST', '/org-admin/staff', { token: admin, body: { full_name: 'FT Perm', email: 'ft-perm@acme.test', user_type: 'PERMANENT_WORKER', password: 'Passw0rd!', role_id: role.d.data.role_id, skill_ids: [], annual_entitled: 12, medical_entitled: 8 } });
+    const reg = await call('POST', '/org-admin/staff', { token: admin, body: { full_name: 'FT Perm', email: FT_STAFF_EMAIL, user_type: 'PERMANENT_WORKER', password: 'Passw0rd!', role_id: role.d.data.role_id, skill_ids: [], annual_entitled: 12, medical_entitled: 8 } });
     const gotRoleSkill = (reg.d.data?.skills ?? []).some((s) => s.skill.skill_name === 'FT-Welding');
     verdict('P1-register', reg.s === 201 && gotRoleSkill, "Registering with a role auto-adds the role's skills");
     const depts = (await call('GET', '/org-admin/departments', { token: admin })).d.data;
@@ -69,7 +87,7 @@ async function main() {
 
     // ── Phase 2: worker leave balance ────────────────────────────────────────
     console.log(bold('Phase 2  Worker leave balance'));
-    const permTok = await login('ft-perm@acme.test');
+    const permTok = await login(FT_STAFF_EMAIL, 'Passw0rd!');
     const lb = await call('GET', '/worker/leave-balance', { token: permTok });
     line('GET', '/worker/leave-balance -> HTTP ' + lb.s);
     verdict('P2-balance', lb.s === 200 && lb.d.data.annual.entitled === 12 && lb.d.data.medical.entitled === 8, 'Worker sees the leave balance set at registration (12 / 8)');
@@ -91,12 +109,12 @@ async function main() {
 
     // ── Phase 5: freelancer temp-worker flow ─────────────────────────────────
     console.log(bold('Phase 5  Temporary worker = freelancer'));
-    const temp = await p.user.findUnique({ where: { email: 'temp@acme.test' }, select: { userId: true } });
-    const pmU = await p.user.findUnique({ where: { email: 'pm@acme.test' }, select: { userId: true } });
-    const org = await p.organisation.findFirst({ where: { name: 'Acme' }, select: { organisation_id: true } });
+    const temp = { userId: fx.temporary.userId };
+    const pmU = { userId: fx.pm.userId };
+    const org = { organisation_id: fx.org.organisation_id };
     const task = await p.task.create({ data: { organisation_id: org.organisation_id, created_by: pmU.userId, title: 'FT-FreelanceTask', status: 'ASSIGNED', start_datetime: new Date('2026-08-10T09:00:00'), end_datetime: new Date('2026-08-10T13:00:00') } });
     await p.taskAssignment.create({ data: { task_id: task.task_id, assigned_to: temp.userId, assigned_by: pmU.userId, assignment_type: 'MANUAL' } });
-    const tempTok = await login('temp@acme.test');
+    const tempTok = await login(fx.temporary.email);
     const acc = await call('PATCH', `/temp-worker/tasks/${task.task_id}/acknowledge`, { token: tempTok });
     const blocked = await call('PATCH', `/temp-worker/tasks/${task.task_id}/progress`, { token: tempTok, body: { status: 'COMPLETED' } });
     const sub = await call('PATCH', `/temp-worker/tasks/${task.task_id}/submit`, { token: tempTok });

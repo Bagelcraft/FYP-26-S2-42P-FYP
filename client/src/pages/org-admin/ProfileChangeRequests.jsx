@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
-import Badge from '../../components/Badge';
 import api from '../../utils/api';
 import { ORG_ADMIN_NAV } from './nav';
 

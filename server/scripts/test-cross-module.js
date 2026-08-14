@@ -5,10 +5,15 @@
  * Prerequisite: the API must be running (in another terminal):  npm run dev
  * Then run:                                                      npm run test:xm
  *
- * Uses the Acme/Globex seed accounts (password Passw0rd!).
+ * Accounts are resolved by role from whatever the database holds
+ * (seed with: node scripts/reset-hosted.js --confirm).
  */
+const { resolveFixtures } = require('./fixtures');
+
 const B = process.env.API_BASE || 'http://localhost:5000/api/v1';
-const PW = 'Passw0rd!';
+// Overwritten from the resolved fixtures at start-up.
+let PW = 'SmartTask#2026';
+let FX = null;
 const uniq = Date.now();
 
 async function call(method, path, token, body) {
@@ -48,6 +53,15 @@ async function verifyPendingEmail(email) {
 const hdr = (s) => { console.log('\n' + '='.repeat(72)); console.log(s); console.log('='.repeat(72)); };
 
 (async () => {
+  // Resolve the accounts this run will use. Doing it by role rather than by
+  // hardcoded email keeps the suite working across reseeds.
+  if (prisma) {
+    FX = await resolveFixtures(prisma, { require: ['ORG_ADMIN', 'PROJECT_MANAGER'] });
+    if (FX.error) { console.error('\n' + FX.error + '\n'); process.exit(1); }
+    PW = FX.password;
+    if (!FX.sysadmin) { console.error('\nNo SYSTEM_ADMIN account found. Seed first.\n'); process.exit(1); }
+  }
+
   // Fail fast if the server isn't up.
   try { await fetch(B.replace(/\/api\/v1$/, '') + '/api/health'); }
   catch { console.error('\n❌ API not reachable at ' + B + '\n   Start it first:  npm run dev  (in another terminal)\n'); process.exit(1); }
@@ -58,7 +72,7 @@ const hdr = (s) => { console.log('\n' + '='.repeat(72)); console.log(s); console
   let r = await call('POST', '/public/organisations/register', null,
     { full_name: 'New Co Admin', email, password: PW, company_name: 'NewCo', uen: mkUen(uniq) });
   line(`[1] POST /public/organisations/register        -> ${r.status}  ${short(r.text)}`);
-  const sa = tok(await login('sysadmin@sta.test'));
+  const sa = tok(await login(FX.sysadmin.email));
   r = await call('GET', '/admin/registrations', sa);
   const reg = (r.json.data || []).find((x) => x.email === email);
   line(`[2] GET  /admin/registrations (SYSTEM_ADMIN)   -> ${r.status}  found pending id=${reg && reg.marketing_user_id}, uen=${reg && reg.uen}, email_verified=${reg && reg.email_verified}`);
@@ -73,7 +87,7 @@ const hdr = (s) => { console.log('\n' + '='.repeat(72)); console.log(s); console
 
   // ---------------------------------------------------------------- TCXM002
   hdr('TCXM002  E2E: PM creates task -> auto-allocate -> worker acknowledges');
-  const pm = tok(await login('pm@acme.test'));
+  const pm = tok(await login(FX.pm.email));
   const skills = (await call('GET', '/pm/skills', pm)).json.data;
   const js = skills.find((s) => s.skill_name === 'JavaScript') || skills[0];
   // Task window must overlap a seeded AVAILABLE slot (seed: today+1..+5, 09:00-18:00 local).
@@ -97,32 +111,31 @@ const hdr = (s) => { console.log('\n' + '='.repeat(72)); console.log(s); console
   line('COMMENT: PASS if task ends IN_PROGRESS for the PM. Note: eligibility requires a seeded availability slot (Availability UI was removed).');
 
   // ---------------------------------------------------------------- TCXM003
-  hdr('TCXM003  Subscription feature gating enforced ("Advanced Reports" gates GET /pm/reports)');
-  const oa = tok(await login('admin@acme.test'));
-  const pmAcme = tok(await login('pm@acme.test'));
+  hdr('TCXM003  Single subscription tier — every organisation gets the full feature set');
+  const oa = tok(await login(FX.admin.email));
+  const pmTok = tok(await login(FX.pm.email));
   const plans = (await call('GET', '/org-admin/plans', oa)).json.data;
-  const basic = plans.find((p) => p.name === 'Basic');
-  const pro = plans.find((p) => p.name === 'Pro');
-  line(`    plans available: ${plans.map((p) => p.name + ' ($' + p.price_monthly + ')').join(', ')}`);
-  // 1. downgrade to Basic (no Advanced Reports) to establish the blocked state
-  r = await call('POST', '/org-admin/subscription/change-plan', oa, { plan_id: basic.plan_id });
-  line(`[1] OA change-plan -> Basic (lacks Advanced Reports)  -> ${r.status}`);
-  r = await call('GET', '/pm/reports', pmAcme);
-  line(`[2] PM GET /pm/reports on Basic (feature not in plan)  -> ${r.status}  ${short(r.text)}`);
-  const blocked = r.status === 403;
-  // 3. upgrade to Pro (has Advanced Reports)
-  r = await call('POST', '/org-admin/subscription/change-plan', oa, { plan_id: pro.plan_id });
-  line(`[3] OA change-plan -> Pro (includes Advanced Reports) -> ${r.status}`);
-  r = await call('GET', '/pm/reports', pmAcme);
-  line(`[4] PM GET /pm/reports after upgrade                   -> ${r.status}`);
-  const allowed = r.status === 200;
-  line(`COMMENT: ${blocked && allowed ? 'PASS' : 'CHECK'} — blocked (403) on Basic, allowed (200) after upgrade. Gating is enforced, not just stored.`);
+  line(`[1] GET  /org-admin/plans                       -> ${plans.length} active plan(s): ${plans.map((p) => p.name + ' ($' + p.price_monthly + ')').join(', ')}`);
+  const singleTier = plans.length === 1;
+
+  const sub = await call('GET', '/org-admin/subscription', oa);
+  const amount = sub.json?.data?.amount ?? sub.json?.data?.activeSubscription?.amount;
+  line(`[2] GET  /org-admin/subscription                -> ${sub.status}  amount=$${amount}`);
+  const subscribed = sub.status === 200 && amount != null;
+
+  // Reports used to sit behind an "Advanced Reports" plan feature. With one tier
+  // there is no upgrade to sell, so the gate was removed — every manager gets it.
+  r = await call('GET', '/pm/reports', pmTok);
+  line(`[3] GET  /pm/reports (previously plan-gated)    -> ${r.status}`);
+  const reportsOpen = r.status === 200;
+
+  line(`COMMENT: ${singleTier && subscribed && reportsOpen ? 'PASS' : 'CHECK'} — one tier offered, organisation subscribed to it, and the formerly gated report is reachable.`);
 
   // ---------------------------------------------------------------- TCXM004
   hdr('TCXM004  NFR - auth/session security');
   r = await call('GET', '/pm/tasks', null);
   line(`[1] GET /pm/tasks  (NO token)                  -> ${r.status}  body=${r.text}`);
-  r = await login('sysadmin@sta.test');
+  r = await login(FX.sysadmin.email);
   line(`[2] login response user keys                   -> ${Object.keys(r.json.user || {}).join(', ')}`);
   line(`    password / password_hash present in body?  -> ${/password/i.test(r.text)}`);
   line('COMMENT: PASS — 401 with body {message:"Not authenticated"} and no password/hash returned.');

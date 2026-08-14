@@ -7,8 +7,6 @@ import { PM_NAV, PM_SECONDARY } from './nav';
 import api from '../../utils/api';
 
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const fmtDate = (d) => new Date(d).toLocaleDateString('en-SG', { day: '2-digit', month: 'short' });
-const isOverdue = (t) => t.status !== 'COMPLETED' && t.status !== 'CANCELLED' && new Date(t.end_datetime) < new Date();
 const cap = (s) => (s ? s.charAt(0) + s.slice(1).toLowerCase() : '');
 
 export default function PMDashboard() {

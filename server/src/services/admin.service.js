@@ -9,7 +9,10 @@ function makeError(message, statusCode) {
 }
 
 function sanitizeUser(user) {
-  const { password_hash, ...safe } = user;
+  // Strips every server-side secret, not just the password. verification_token is
+  // a live credential — anyone holding it can mark that address verified — so it
+  // must never travel in a login or approval response.
+  const { password_hash, verification_token, verification_expires, ...safe } = user;
   return safe;
 }
 

@@ -200,16 +200,30 @@ async function loadTask(taskId, organisationId) {
   return task;
 }
 
-// Eligibility, ranked. Rules differ by organisation type:
+// Eligibility, ranked.
 //
-//   PROJECT      Candidates come from the project's resource pool (or the whole
-//                org when the pool is empty). Everyone is available unless a
-//                blocker says otherwise, so temporary workers surface without
-//                needing any roster. Permanent staff rank first and only give
-//                way to a temp on the days they are actually blocked.
+// Two tiers, deliberately:
 //
-//   NON_PROJECT  Candidates must be rostered on a shift covering the task
-//                window — the roster is the source of truth for who is working.
+//   HARD BLOCKERS make someone unassignable, because they are facts rather than
+//   preferences — approved leave, an explicit unavailable slot, an already
+//   committed overlapping task, or being outside the project's resource pool.
+//   These set eligible: false.
+//
+//   SOFT WARNINGS rank someone lower but keep them on the list: missing some of
+//   the required skills, a partial (or absent) roster for the window, or being at
+//   the weekly hour cap. A manager can see the trade-off and decide.
+//
+// The distinction matters because the old rules hid anyone imperfect. Requiring
+// all skills as a SQL condition meant a worker short one skill did not appear at
+// all, and in a shift-based org anything less than 100% roster coverage was a
+// refusal — so a task could easily have zero assignable staff and no explanation.
+//
+// `idealMatch` is the no-compromise subset; auto-allocate prefers it and only
+// falls back to a warned candidate when nobody is a clean fit.
+//
+// Organisation type still changes what is measured: PROJECT orgs draw from the
+// resource pool and have no roster to check, NON_PROJECT orgs score roster
+// coverage as a warning.
 async function getEligibleStaff(taskId, organisationId, { statusCheck = true } = {}) {
   const task = await loadTask(taskId, organisationId);
   if (statusCheck && !['PENDING', 'ASSIGNED'].includes(task.status)) {
@@ -223,9 +237,12 @@ async function getEligibleStaff(taskId, organisationId, { statusCheck = true } =
   const taskEnd = new Date(task.end_datetime);
 
   const reqSkillIds = (task.requiredSkills ?? []).map((ts) => ts.skill_id);
-  const skillFilter = reqSkillIds.length
-    ? { AND: reqSkillIds.map((id) => ({ skills: { some: { skill_id: id } } })) }
-    : {};
+  const reqSkillNames = new Map((task.requiredSkills ?? []).map((ts) => [ts.skill_id, ts.skill?.skill_name ?? `#${ts.skill_id}`]));
+  // Deliberately NOT filtered in SQL any more. Requiring every skill as a query
+  // condition meant a worker missing one of three simply did not exist as far as
+  // the manager could see — no name, no reason, nothing to override. A partial
+  // match is now a ranked candidate carrying a "missing X" warning, which is a
+  // decision the manager can actually make.
 
   // Resource pool: an empty pool means the project has not narrowed the field yet.
   const poolIds = (task.project?.resources ?? []).map((r) => r.user_id);
@@ -238,7 +255,6 @@ async function getEligibleStaff(taskId, organisationId, { statusCheck = true } =
       organisationId,
       is_active: true,
       user_type: { in: ['PERMANENT_WORKER', 'TEMPORARY_WORKER'] },
-      ...skillFilter,
       ...poolFilter,
     },
     include: {
@@ -278,14 +294,13 @@ async function getEligibleStaff(taskId, organisationId, { statusCheck = true } =
     // and no commitments until a task activates them.
     const isDormant = u.user_type === 'TEMPORARY_WORKER' && u.assignedTasks.length === 0;
 
-    let isAvailable;
-    let coverage = null;
-    if (isProjectOrg) {
-      isAvailable = blockers.length === 0;
-    } else {
-      coverage = shiftCoverage(u, taskStart, taskEnd);
-      isAvailable = coverage.fullyCovered && blockers.length === 0;
-    }
+    // A blocker is a hard fact: the person is on leave, marked unavailable, or
+    // already committed elsewhere for this window. Those genuinely prevent the
+    // assignment. Everything else — a missing skill, a partial roster, being near
+    // the hour cap — is a judgement call that belongs to the manager, not the
+    // query. Those became `warnings` so the candidate still shows up.
+    const isAvailable = blockers.length === 0;
+    const coverage = isProjectOrg ? null : shiftCoverage(u, taskStart, taskEnd);
 
     const attendanceHours = u.attendance.reduce((sum, a) => sum + Number(a.working_hours ?? 0), 0);
     const committedHours = u.assignedTasks.reduce((sum, ta) => {
@@ -302,14 +317,39 @@ async function getEligibleStaff(taskId, organisationId, { statusCheck = true } =
 
     const inResourcePool = !poolIds.length || poolIds.includes(u.userId);
 
-    let ineligibleReason = null;
-    if (!withinHours && !isAvailable) ineligibleReason = 'Unavailable for the task window and weekly hours limit reached';
-    else if (!isAvailable) {
-      if (isProjectOrg) ineligibleReason = blockers.map((b) => b.detail).join('; ');
-      else if (blockers.length && coverage.fullyCovered) ineligibleReason = blockers.map((b) => b.detail).join('; ');
-      else if (coverage.coveredMs > 0) ineligibleReason = `Only rostered for ${coverage.coveragePct}% of the task window`;
-      else ineligibleReason = 'Not rostered on a shift covering the task window';
-    } else if (!withinHours) ineligibleReason = 'Weekly working hours limit reached';
+    // ── Skill match ──
+    const heldSkillIds = new Set(u.skills.map((us) => us.skill_id));
+    const missingSkills = reqSkillIds.filter((id) => !heldSkillIds.has(id)).map((id) => reqSkillNames.get(id));
+    const matchedSkillCount = reqSkillIds.length - missingSkills.length;
+    const skillMatchPct = reqSkillIds.length ? Math.round((matchedSkillCount / reqSkillIds.length) * 100) : 100;
+
+    // ── Soft warnings: reasons to prefer someone else, not reasons to refuse ──
+    const warnings = [];
+    if (missingSkills.length) {
+      warnings.push({
+        kind: 'SKILLS',
+        detail: `Missing ${missingSkills.length} of ${reqSkillIds.length} required skill(s): ${missingSkills.join(', ')}`,
+      });
+    }
+    if (!isProjectOrg && !coverage.fullyCovered) {
+      warnings.push({
+        kind: 'ROSTER',
+        detail: coverage.coveredMs > 0
+          ? `Only rostered for ${coverage.coveragePct}% of the task window`
+          : 'Not rostered on a shift covering the task window',
+      });
+    }
+    if (!withinHours) {
+      warnings.push({
+        kind: 'HOURS',
+        detail: maxHours !== null
+          ? `At or over the ${maxHours}h weekly limit (${Math.round(weeklyHours * 10) / 10}h committed)`
+          : 'Weekly working hours limit reached',
+      });
+    }
+
+    // Kept for older callers: the single line explaining a hard refusal.
+    const ineligibleReason = isAvailable ? null : blockers.map((b) => b.detail).join('; ');
 
     return {
       userId:    u.userId,
@@ -329,7 +369,14 @@ async function getEligibleStaff(taskId, organisationId, { statusCheck = true } =
       blockedDays,
       rosteredDays:    coverage?.rosteredDays ?? null,
       rosterCoverage:  coverage?.coveragePct ?? null,
-      eligible: isAvailable && withinHours,
+      missingSkills,
+      skillMatchPct,
+      warnings,
+      // Assignable at all. Soft warnings do not remove the option — they rank it
+      // lower and explain themselves.
+      eligible: isAvailable,
+      // The subset a manager can take without thinking twice.
+      idealMatch: isAvailable && warnings.length === 0,
       ineligibleReason,
     };
   });
@@ -338,6 +385,10 @@ async function getEligibleStaff(taskId, organisationId, { statusCheck = true } =
   // for a window where no permanent worker is free.
   result.sort((a, b) => {
     if (a.eligible !== b.eligible) return b.eligible - a.eligible;
+    // Fewer compromises first, so the obvious choice stays at the top even now
+    // that imperfect candidates are listed alongside it.
+    if (a.warnings.length !== b.warnings.length) return a.warnings.length - b.warnings.length;
+    if (a.skillMatchPct !== b.skillMatchPct) return b.skillMatchPct - a.skillMatchPct;
     if (a.user_type !== b.user_type) return a.user_type === 'PERMANENT_WORKER' ? -1 : 1;
     const aRem = a.remainingHours ?? Infinity;
     const bRem = b.remainingHours ?? Infinity;
@@ -345,6 +396,7 @@ async function getEligibleStaff(taskId, organisationId, { statusCheck = true } =
   });
 
   const eligible = result.filter((c) => c.eligible);
+  const ideal = result.filter((c) => c.idealMatch);
   return {
     task,
     orgType,
@@ -355,12 +407,109 @@ async function getEligibleStaff(taskId, organisationId, { statusCheck = true } =
     summary: {
       total:            result.length,
       eligible:         eligible.length,
+      idealMatches:     ideal.length,
+      // Assignable, but only with a compromise the manager should see.
+      withWarnings:     eligible.length - ideal.length,
       eligiblePermanent: eligible.filter((c) => c.user_type === 'PERMANENT_WORKER').length,
       eligibleTemporary: eligible.filter((c) => c.user_type === 'TEMPORARY_WORKER').length,
       // True when every permanent worker is blocked and the work has to fall to a temp.
       fallbackToTemporary: eligible.length > 0 && eligible.every((c) => c.user_type === 'TEMPORARY_WORKER'),
     },
   };
+}
+
+// ─── Auto-rostering ───────────────────────────────────────────
+
+// Pick the shift template that best fits a stretch of work on one day:
+// first choice is a shift that fully contains it, otherwise the one that
+// overlaps it most, and failing that the earliest-starting shift.
+function bestTemplateFor(templates, dayKey, from, to) {
+  let best = null;
+  for (const t of templates) {
+    const { start, end } = shiftWindow(dayKey, t.start_time, t.end_time);
+    const contains = start <= from && end >= to;
+    const overlapMs = Math.max(0, Math.min(end, to) - Math.max(start, from));
+    const score = { template: t, contains, overlapMs, start };
+    if (!best) { best = score; continue; }
+    if (score.contains !== best.contains) { if (score.contains) best = score; continue; }
+    if (score.overlapMs !== best.overlapMs) { if (score.overlapMs > best.overlapMs) best = score; continue; }
+    if (score.start < best.start) best = score;
+  }
+  return best;
+}
+
+/**
+ * Make sure a worker is actually rostered for the days a task runs.
+ *
+ * Roster coverage is a warning rather than a hard blocker, so a manager can
+ * assign someone who is not scheduled that day. Left alone that produces a
+ * contradiction: the worker owns the task but the roster says they are not
+ * working, so it never appears on their schedule and the hours never count.
+ *
+ * This closes that gap by rostering them onto the shift that best fits the work.
+ * Days they are already covered for are left untouched.
+ *
+ * Shift-based organisations only — a project-based org has no roster at all.
+ */
+async function ensureRostered(tx, { organisationId, userId, taskStart, taskEnd }) {
+  const templates = await tx.shiftTemplate.findMany({ where: { organisation_id: organisationId } });
+  if (!templates.length) {
+    return { created: [], skipped: 'no shift templates defined for this organisation' };
+  }
+
+  const days = daysInWindow(taskStart, taskEnd);
+
+  // One query for the whole span, widened by a day so a shift that started the
+  // previous evening and runs past midnight is still considered.
+  const existing = await tx.shiftAssignment.findMany({
+    where: {
+      user_id: userId,
+      date: {
+        gte: new Date(taskStart.getFullYear(), taskStart.getMonth(), taskStart.getDate() - 1),
+        lte: new Date(taskEnd.getFullYear(), taskEnd.getMonth(), taskEnd.getDate() + 1),
+      },
+    },
+    include: { shift: { select: { start_time: true, end_time: true } } },
+  });
+
+  const created = [];
+  for (const dayKey of days) {
+    // The portion of the task that falls on this particular day.
+    const [y, m, d] = dayKey.split('-').map(Number);
+    const dayStart = new Date(y, m - 1, d, 0, 0, 0);
+    const dayEnd = new Date(y, m - 1, d, 23, 59, 59);
+    const from = new Date(Math.max(taskStart, dayStart));
+    const to = new Date(Math.min(taskEnd, dayEnd));
+
+    const alreadyCovered = existing.some((sa) => {
+      const { start, end } = shiftWindow(sa.date, sa.shift.start_time, sa.shift.end_time);
+      return overlaps(start, end, from, to);
+    });
+    if (alreadyCovered) continue;
+
+    const choice = bestTemplateFor(templates, dayKey, from, to);
+    if (!choice) continue;
+
+    const row = await tx.shiftAssignment.create({
+      data: {
+        organisation_id: organisationId,
+        user_id:         userId,
+        shift_id:        choice.template.shift_id,
+        date:            new Date(Date.UTC(y, m - 1, d)),
+      },
+    });
+    existing.push({ date: row.date, shift: { start_time: choice.template.start_time, end_time: choice.template.end_time } });
+    created.push({
+      date:      dayKey,
+      shiftName: choice.template.name,
+      startTime: choice.template.start_time,
+      endTime:   choice.template.end_time,
+      // False means no shift actually spans the work — the closest one was used.
+      fullyCovers: choice.contains,
+    });
+  }
+
+  return { created, skipped: null };
 }
 
 // ─── Assignment ───────────────────────────────────────────────
@@ -393,6 +542,8 @@ async function assignTask(taskId, organisationId, assignedTo, assignedBy, type =
   }
 
   const isReallocation = task.assignments.length > 0;
+  const orgType = (await getOrgType(organisationId)) ?? 'NON_PROJECT';
+  let rostered = { created: [], skipped: null };
 
   await prisma.$transaction(async (tx) => {
     // Remove existing assignments and log each as UNASSIGNED
@@ -418,9 +569,20 @@ async function assignTask(taskId, organisationId, assignedTo, assignedBy, type =
     });
 
     await tx.task.update({ where: { task_id: taskId }, data: { status: 'ASSIGNED' } });
+
+    // Shift-based organisations only. Done inside the transaction so a task is
+    // never assigned without the roster that makes it workable.
+    if (orgType === 'NON_PROJECT') {
+      rostered = await ensureRostered(tx, {
+        organisationId,
+        userId:    assignedTo,
+        taskStart: new Date(task.start_datetime),
+        taskEnd:   new Date(task.end_datetime),
+      });
+    }
   });
 
-  return prisma.task.findFirst({
+  const updated = await prisma.task.findFirst({
     where:   { task_id: taskId },
     include: {
       department:     { select: { name: true } },
@@ -430,6 +592,10 @@ async function assignTask(taskId, organisationId, assignedTo, assignedBy, type =
       assignments:    { include: { assignedTo: { select: { full_name: true, email: true, user_type: true } } } },
     },
   });
+
+  // Surfaced so the UI can say "also rostered them onto Morning on 12 Aug"
+  // rather than silently changing the roster underneath the manager.
+  return { ...updated, autoRostered: rostered };
 }
 
 // ─── Auto-allocate ────────────────────────────────────────────
@@ -438,18 +604,32 @@ async function assignTask(taskId, organisationId, assignedTo, assignedBy, type =
 
 async function autoAllocate(taskId, organisationId, allocatedBy) {
   const { candidates, summary } = await getEligibleStaff(taskId, organisationId);
-  const top = candidates.find((c) => c.eligible);
+
+  // Prefer someone with no compromises at all. Only when nobody is a clean fit
+  // does it fall through to the best-ranked candidate carrying warnings —
+  // previously this refused outright, which left the manager with a task that
+  // could not be auto-allocated and no indication of who was closest.
+  const top = candidates.find((c) => c.idealMatch) ?? candidates.find((c) => c.eligible);
+
   if (!top) {
     const blocked = candidates.filter((c) => !c.isAvailable).length;
     throw makeError(
       candidates.length
-        ? `No eligible staff for this window — ${blocked} of ${candidates.length} candidate(s) are unavailable.`
-        : 'No staff match this task\'s required skills or resource pool.',
+        ? `No one is free for this window — all ${blocked} candidate(s) are on leave, marked unavailable, or already committed.`
+        : 'No staff are available in this organisation or resource pool.',
       422,
     );
   }
+
   const task = await assignTask(taskId, organisationId, top.userId, allocatedBy, 'AUTO');
-  return { ...task, allocatedTo: top, fallbackToTemporary: summary.fallbackToTemporary };
+  return {
+    ...task,
+    allocatedTo: top,
+    fallbackToTemporary: summary.fallbackToTemporary,
+    // True when nobody was a clean fit — the UI should say what was compromised.
+    compromised: !top.idealMatch,
+    warnings: top.warnings,
+  };
 }
 
 // --- Allocation history for a task -------------------------------------------

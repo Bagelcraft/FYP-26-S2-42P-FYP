@@ -111,7 +111,7 @@ if (process.env.NODE_ENV !== 'production') {
       { expiresIn: '8h' },
     );
 
-    const { password_hash, ...safeUser } = user;
+    const { password_hash, verification_token, verification_expires, ...safeUser } = user;
     res.json({ token, user: safeUser });
   });
 }

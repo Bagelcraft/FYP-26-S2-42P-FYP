@@ -2,36 +2,123 @@ name: CI — Run Tests
 
 on:
   push:
-    branches: [dev, main]
+    branches: [dev, main, Postgres]
   pull_request:
-    branches: [dev]
+    branches: [dev, main]
 
 jobs:
+  # ── Backend ────────────────────────────────────────────────────────────────
+  # Runs against a throwaway Postgres service container rather than a shared
+  # TEST_DATABASE_URL secret. The old workflow supplied a connection string but
+  # never created the schema or seeded it, so `npm test` could only ever fail:
+  # the suite needs an organisation with a manager and workers to exist.
   test-backend:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-      - name: Install dependencies
-        run: cd server && npm install
-      - name: Run tests
-        run: cd server && npm test
-        env:
-          DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
-          JWT_SECRET: test_secret_key
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: smarttask_test
+        ports:
+          - 5432:5432
+        # Give Postgres time to accept connections before the steps run.
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/smarttask_test
+      JWT_SECRET: ci_test_secret_key
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Apply migrations
+        working-directory: server
+        run: npx prisma migrate deploy
+
+      - name: Generate Prisma client
+        working-directory: server
+        run: npx prisma generate
+
+      - name: Seed fixtures
+        working-directory: server
+        run: npm run seed
+
+      - name: Lint
+        working-directory: server
+        run: npm run lint
+
+      - name: Run Jest suite
+        working-directory: server
+        run: npm test
+
+      # The script suites drive the live API, so the server has to be up. It is
+      # backgrounded and polled rather than slept on, so a slow boot does not
+      # produce a flaky failure.
+      - name: Start API
+        working-directory: server
+        run: |
+          npm start &
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:5000/api/health > /dev/null; then
+              echo "API up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "API failed to start"; exit 1
+
+      - name: Feature suite
+        working-directory: server
+        run: npm run test:features
+        env:
+          API_URL: http://localhost:5000
+
+      - name: Cross-module suite
+        working-directory: server
+        run: npm run test:xm
+        env:
+          API_BASE: http://localhost:5000/api/v1
+
+  # ── Frontend ───────────────────────────────────────────────────────────────
   lint-frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
       - name: Install dependencies
-        run: cd client && npm install
-      - name: Run lint
-        run: cd client && npm run lint
+        working-directory: client
+        run: npm ci
+
+      - name: Lint
+        working-directory: client
+        run: npm run lint
+
+      # A build failure is a real breakage the linter cannot see.
+      - name: Build
+        working-directory: client
+        run: npm run build

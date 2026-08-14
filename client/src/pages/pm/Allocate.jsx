@@ -88,9 +88,19 @@ export default function Allocate() {
     setBusy(true);
     try {
       const url = auto ? `/pm/tasks/${sel}/auto-allocate` : `/pm/tasks/${sel}/assign`;
-      await api.post(url, auto ? {} : { assigned_to: userId });
+      const res = await api.post(url, auto ? {} : { assigned_to: userId });
       const name = candidates.find((c) => c.userId === userId)?.full_name ?? 'staff';
-      showToast(`${auto ? 'Auto-allocated' : 'Assigned'} “${task.title}” → ${auto ? (suggestion?.full_name ?? name) : name} · working hours updated`);
+
+      // A shift-based assignment can add roster entries so the worker is
+      // actually scheduled for the work. Say so — changing someone's roster
+      // without telling the manager would be a surprise.
+      const rostered = res.data?.data?.autoRostered?.created ?? [];
+      const rosterNote = rostered.length
+        ? ` · also rostered onto ${rostered[0].shiftName} on ${rostered.length === 1
+            ? new Date(rostered[0].date + 'T00:00:00').toLocaleDateString('en-SG', { day: '2-digit', month: 'short' })
+            : `${rostered.length} day(s)`}`
+        : '';
+      showToast(`${auto ? 'Auto-allocated' : 'Assigned'} “${task.title}” → ${auto ? (suggestion?.full_name ?? name) : name}${rosterNote}`);
       // Remove the now-assigned task from the queue and advance selection.
       setPending((prev) => {
         const next = prev.filter((t) => t.task_id !== sel);
@@ -190,7 +200,9 @@ export default function Allocate() {
                   <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
                     <h4 className="font-semibold text-gray-800 text-sm">Ranked Candidates</h4>
                     <span className="text-xs text-gray-400">
-                      {summary ? `${summary.eligible} of ${summary.total} eligible · ${summary.eligiblePermanent} permanent, ${summary.eligibleTemporary} temporary` : `${candidates.filter((c) => c.eligible).length} of ${candidates.length} eligible`}
+                      {summary
+                        ? `${summary.idealMatches ?? summary.eligible} ideal · ${summary.withWarnings ?? 0} with caveats · ${summary.total - summary.eligible} unavailable`
+                        : `${candidates.filter((c) => c.eligible).length} of ${candidates.length} assignable`}
                     </span>
                   </div>
                   <div className="divide-y divide-gray-50">
@@ -214,9 +226,27 @@ export default function Allocate() {
                               <p className="text-xs text-gray-400">{typeLabel(c.user_type)}{c.staffRole ? ` · ${c.staffRole}` : ''}</p>
                             </div>
                           </div>
-                          <button disabled={!c.eligible || busy} onClick={() => assign(c.userId, false)}
-                            className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${c.eligible ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}>
-                            {c.eligible ? 'Assign' : 'Skip'}
+                          <button
+                            disabled={!c.eligible || busy}
+                            onClick={() => {
+                              // Warned candidates are assignable, but the manager
+                              // confirms the trade-off rather than tripping over it.
+                              const w = c.warnings ?? [];
+                              if (w.length && !window.confirm(
+                                `Assign ${c.full_name} anyway?\n\n${w.map((x) => `• ${x.detail}`).join('\n')}`,
+                              )) return;
+                              assign(c.userId, false);
+                            }}
+                            title={!c.eligible ? (c.ineligibleReason ?? 'Unavailable for this window') : undefined}
+                            className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                              !c.eligible
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                : (c.warnings?.length ?? 0) > 0
+                                  ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                                  : 'bg-green-500 hover:bg-green-600 text-white'
+                            }`}
+                          >
+                            {!c.eligible ? 'Unavailable' : (c.warnings?.length ?? 0) > 0 ? 'Assign anyway' : 'Assign'}
                           </button>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 mt-2 pl-11">
@@ -233,6 +263,13 @@ export default function Allocate() {
                           <HoursBar c={c} />
                         </div>
                         {!c.eligible && c.ineligibleReason && <p className="text-xs text-red-500 mt-1 pl-11">{c.ineligibleReason}</p>}
+                        {c.eligible && (c.warnings?.length ?? 0) > 0 && (
+                          <ul className="mt-1 pl-11 space-y-0.5">
+                            {c.warnings.map((w, wi) => (
+                              <li key={wi} className="text-xs text-amber-600">⚠ {w.detail}</li>
+                            ))}
+                          </ul>
+                        )}
                         {/* Exactly which days are lost, so a partial clash is obvious. */}
                         {c.blockedDays?.length > 0 && (
                           <p className="text-xs text-gray-400 mt-0.5 pl-11">

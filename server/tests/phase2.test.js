@@ -35,14 +35,41 @@ let testTask2Id;  // second task for reallocation test
 // ─── Setup ───────────────────────────────────────────────────────────────────
 
 beforeAll(async () => {
-  // Load seed users
-  pm = await prisma.user.findFirst({ where: { email: 'pm@techcorp.com' } });
-  worker = await prisma.user.findFirst({ where: { email: 'worker@techcorp.com' } });
-  tempWorker = await prisma.user.findFirst({ where: { email: 'tempworker@techcorp.com' } });
-  org = await prisma.organisation.findFirst({ where: { name: 'TechCorp Pte Ltd' } });
+  // Fixtures are looked up by ROLE, not by a hardcoded email. The suite used to
+  // name specific accounts from a seed that no longer exists, so it failed for
+  // everyone the moment the demo data changed. Any organisation with a manager
+  // and a worker will do, which keeps this working across reseeds.
+  org = await prisma.organisation.findFirst({
+    where: {
+      name: process.env.TEST_ORG_NAME || undefined,
+      isActive: true,
+      users: { some: { user_type: 'PROJECT_MANAGER', is_active: true } },
+      AND: [{ users: { some: { user_type: 'PERMANENT_WORKER', is_active: true } } }],
+    },
+    orderBy: { organisation_id: 'asc' },
+  });
 
-  if (!pm || !worker || !org) {
-    throw new Error('Seed data not found. Run: npx prisma db seed');
+  if (!org) {
+    throw new Error(
+      'No suitable organisation found. Seed the database first:\n'
+      + '  node scripts/reset-hosted.js --confirm',
+    );
+  }
+
+  const inOrg = (type) => prisma.user.findFirst({
+    where:   { organisationId: org.organisation_id, user_type: type, is_active: true },
+    orderBy: { userId: 'asc' },
+  });
+
+  pm = await inOrg('PROJECT_MANAGER');
+  worker = await inOrg('PERMANENT_WORKER');
+  tempWorker = await inOrg('TEMPORARY_WORKER');
+
+  if (!pm || !worker) {
+    throw new Error(
+      `Organisation "${org.name}" has no manager or permanent worker. Reseed with:\n`
+      + '  node scripts/reset-hosted.js --confirm',
+    );
   }
 
   pmToken     = makeToken(pm);
