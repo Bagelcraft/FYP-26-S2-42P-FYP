@@ -35,8 +35,12 @@ const KIND = {
  *   data                    — { shifts, tasks, unavailable } from /pm|worker/calendar
  *   onPrev, onNext, onToday — month navigation
  *   scope                   — 'manager' | 'worker' (controls whether names are shown)
+ *   showShifts              — false in a project-based organisation, which runs no
+ *                             roster. Without it the legend advertises an "On shift"
+ *                             category that can never appear, and the empty-day copy
+ *                             promises shifts that do not exist.
  */
-export default function CalendarMonth({ year, month, data, onPrev, onNext, onToday, scope = 'manager' }) {
+export default function CalendarMonth({ year, month, data, onPrev, onNext, onToday, scope = 'manager', showShifts = true }) {
   const [openDay, setOpenDay] = useState(null);
   const isManager = scope === 'manager';
 
@@ -114,7 +118,7 @@ export default function CalendarMonth({ year, month, data, onPrev, onNext, onTod
         <div className="px-5 py-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 border-b border-gray-50">
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-green-500" />Task start</span>
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-red-500" />Deadline</span>
-          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-blue-500" />On shift</span>
+          {showShifts && <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-blue-500" />On shift</span>}
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-amber-400" />Unavailable / leave</span>
           <span className="ml-auto text-gray-400">Click any day for its full schedule</span>
         </div>
@@ -193,7 +197,9 @@ export default function CalendarMonth({ year, month, data, onPrev, onNext, onTod
             <div className="px-6 py-4 overflow-y-auto flex-1">
               {openEntries.length === 0 ? (
                 <p className="text-sm text-gray-400 text-center py-8">
-                  No shifts, tasks or absences on this day.
+                  {showShifts
+                    ? 'No shifts, tasks or absences on this day.'
+                    : 'No tasks or absences on this day.'}
                 </p>
               ) : (
                 <div className="space-y-2">

@@ -50,7 +50,11 @@ router.get('/skills', workerController.listOrgSkills);
 router.get('/shift-templates', workerController.listOrgShifts);
 
 // ─── Schedule (assigned shifts) ───────────────────────────────
-router.get('/schedule', workerController.getMySchedule);
+// A schedule is a list of rostered shifts, so it only exists where there is a
+// roster. Left ungated it returned an empty list to project-based staff, which
+// reads as "you have no shifts this week" rather than "your company does not
+// work in shifts" — the same misleading answer the roster routes already refuse.
+router.get('/schedule', shiftOrgOnly, workerController.getMySchedule);
 
 // ─── Shift-change requests ────────────────────────────────────
 router.get('/shift-change-requests', shiftOrgOnly, shiftChangeController.listMine);
@@ -63,8 +67,17 @@ router.get('/leave-balance', workerController.getMyLeaveBalance);
 router.post('/leave', workerController.leaveRules, workerController.applyLeave);
 router.delete('/leave/:id', workerController.cancelLeave);
 
-router.post('/attendance/clock-in', attendanceController.clockIn);
-router.put('/attendance/clock-out', attendanceController.clockOut);
-router.get('/attendance', attendanceController.getAttendance);
+// ─── Timesheet ────────────────────────────────────────────────
+//
+// Clocking in is shift work. A project-based organisation runs no roster for its
+// permanent staff to clock against — their work is measured by the tasks they
+// complete — so the clock endpoints are gated to shift-based organisations the
+// same way the roster is. /timesheet serves both models and shapes itself to
+// whichever applies.
+router.get('/timesheet', attendanceController.getTimesheet);
+
+router.post('/attendance/clock-in', shiftOrgOnly, attendanceController.clockIn);
+router.put('/attendance/clock-out', shiftOrgOnly, attendanceController.clockOut);
+router.get('/attendance', shiftOrgOnly, attendanceController.getAttendance);
 
 module.exports = router;

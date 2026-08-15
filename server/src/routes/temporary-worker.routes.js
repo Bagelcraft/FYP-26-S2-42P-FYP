@@ -5,8 +5,8 @@ const { requireOrgType, attachOrgType } = require('../middleware/orgType.middlew
 const { requireActiveOrganisation } = require('../middleware/orgActive.middleware');
 const workerController = require('../controllers/worker.controller');
 const updateRequestController = require('../controllers/task-update-request.controller');
+const attendanceController = require('../controllers/attendance.controller');
 const profileChangeController = require('../controllers/profileChangeRequest.controller');
-const shiftChangeController = require('../controllers/shiftChangeRequest.controller');
 
 const router = express.Router();
 
@@ -62,13 +62,39 @@ router.get('/shift-templates', workerController.listOrgShifts);
 // Freelancer hours — approved (completed) work + total hours (replaces clock in/out)
 router.get('/hours', workerController.getMyHours);
 
-// ─── Schedule (assigned shifts) ───────────────────────────────
-router.get('/schedule', workerController.getMySchedule);
+// Timesheet — the same monthly sheet the permanent staff get, and the same one on
+// both sides: hours plus completed tasks in a shift-based organisation, completed
+// tasks alone in a project-based one. What it measures follows the organisation,
+// not the contract type, so a temporary worker rostered alongside a permanent one
+// sees their work counted the same way.
+router.get('/timesheet', attendanceController.getTimesheet);
 
-// ─── Shift-change requests ────────────────────────────────────
-router.get('/shift-change-requests', shiftOrgOnly, shiftChangeController.listMine);
-router.post('/shift-change-request', shiftOrgOnly, shiftChangeController.submitRules, shiftChangeController.submitRequest);
+// Clocking in follows the roster, so it is available wherever there is one. A
+// temporary worker in a shift-based organisation is rostered onto shifts like
+// anyone else and needs to record the hours they were present; in a project-based
+// organisation there is no roster to clock against.
+router.post('/attendance/clock-in', shiftOrgOnly, attendanceController.clockIn);
+router.put('/attendance/clock-out', shiftOrgOnly, attendanceController.clockOut);
+router.get('/attendance', shiftOrgOnly, attendanceController.getAttendance);
+
+// ─── Schedule (assigned shifts) ───────────────────────────────
+// A temporary worker in a project-based organisation carries no shifts at all,
+// so there is no schedule to return there.
+router.get('/schedule', shiftOrgOnly, workerController.getMySchedule);
+
+// ─── Calendar ─────────────────────────────────────────────────
+// Ungated, unlike /schedule: a calendar is task deadlines and unavailability as
+// well as shifts, and a temporary worker has tasks under either scheduling model.
+// In a project-based organisation it simply comes back with no shifts in it.
+router.get('/calendar', workerController.getMyCalendar);
 
 // Note: temporary workers (freelancers) have no leave entitlement — no leave routes.
+//
+// They have no shift-change requests either. A shift change is a swap between two
+// rostered employees, negotiated against a roster the worker is committed to. A
+// temporary worker is engaged per task and is not held to a roster in that way —
+// where they are rostered at all it is because a task activated them, so the thing
+// to change is the task assignment, not the shift. Those routes are deliberately
+// absent rather than gated.
 
 module.exports = router;

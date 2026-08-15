@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 
 import Home from './pages/public/Home';
@@ -47,7 +47,6 @@ import Reports from './pages/pm/Reports';
 // Permanent Worker
 import WorkerDashboard from './pages/worker/WorkerDashboard';
 import WorkerMyTasks from './pages/worker/MyTasks';
-import WorkerSchedule from './pages/worker/Schedule';
 import WorkerCalendar from './pages/worker/Calendar';
 import Leave from './pages/worker/Leave';
 import WorkerAttendance from './pages/worker/Attendance';
@@ -56,8 +55,11 @@ import WorkerProfile from './pages/worker/Profile';
 // Temporary Worker
 import TempWorkerDashboard from './pages/temp-worker/TempWorkerDashboard';
 import TempMyTasks from './pages/temp-worker/MyTasks';
-import TempSchedule from './pages/temp-worker/Schedule';
+import TempCalendar from './pages/temp-worker/Calendar';
+import TempTimesheet from './pages/temp-worker/Timesheet';
 import TempProfile from './pages/temp-worker/Profile';
+
+import RequireOrgType from './components/RequireOrgType';
 
 export default function App() {
   return (
@@ -87,18 +89,18 @@ export default function App() {
           <Route path="/org-admin/departments" element={<Departments />} />
           <Route path="/org-admin/skills" element={<Skills />} />
           <Route path="/org-admin/roles" element={<StaffRoles />} />
-          <Route path="/org-admin/shifts" element={<Shifts />} />
+          <Route path="/org-admin/shifts" element={<RequireOrgType allow={['NON_PROJECT']}><Shifts /></RequireOrgType>} />
           <Route path="/org-admin/subscription" element={<OrgSubscription />} />
           <Route path="/org-admin/profile" element={<OrgProfile />} />
           <Route path="/org-admin/profile-change-requests" element={<ProfileChangeRequests />} />
-          <Route path="/org-admin/shift-change-requests" element={<ShiftChangeRequests />} />
+          <Route path="/org-admin/shift-change-requests" element={<RequireOrgType allow={['NON_PROJECT']}><ShiftChangeRequests /></RequireOrgType>} />
           <Route path="/org-admin/audit-logs" element={<AuditLogs />} />
 
           {/* Manager */}
           <Route path="/pm" element={<PMDashboard />} />
-          <Route path="/pm/projects" element={<Projects />} />
+          <Route path="/pm/projects" element={<RequireOrgType allow={['PROJECT']}><Projects /></RequireOrgType>} />
           <Route path="/pm/tasks" element={<Tasks />} />
-          <Route path="/pm/roster" element={<Roster />} />
+          <Route path="/pm/roster" element={<RequireOrgType allow={['NON_PROJECT']}><Roster /></RequireOrgType>} />
           <Route path="/pm/team" element={<Team />} />
           <Route path="/pm/allocate" element={<Allocate />} />
           <Route path="/pm/calendar" element={<PMCalendar />} />
@@ -110,7 +112,8 @@ export default function App() {
           {/* Permanent Worker */}
           <Route path="/worker" element={<WorkerDashboard />} />
           <Route path="/worker/tasks" element={<WorkerMyTasks />} />
-          <Route path="/worker/schedule" element={<WorkerSchedule />} />
+          {/* The roster merged into Calendar; keep the old path working. */}
+          <Route path="/worker/schedule" element={<Navigate to="/worker/calendar" replace />} />
           <Route path="/worker/calendar" element={<WorkerCalendar />} />
           <Route path="/worker/leave" element={<Leave />} />
           <Route path="/worker/attendance" element={<WorkerAttendance />} />
@@ -119,7 +122,10 @@ export default function App() {
           {/* Temporary Worker */}
           <Route path="/temp-worker" element={<TempWorkerDashboard />} />
           <Route path="/temp-worker/tasks" element={<TempMyTasks />} />
-          <Route path="/temp-worker/schedule" element={<TempSchedule />} />
+          {/* The roster merged into Calendar; keep the old path working. */}
+          <Route path="/temp-worker/schedule" element={<Navigate to="/temp-worker/calendar" replace />} />
+          <Route path="/temp-worker/calendar" element={<TempCalendar />} />
+          <Route path="/temp-worker/timesheet" element={<TempTimesheet />} />
           <Route path="/temp-worker/profile" element={<TempProfile />} />
 
           {/* Catch-all: an unmatched path must never render a blank page. */}

@@ -1,15 +1,24 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import CalendarMonth from '../../components/CalendarMonth';
+import ScheduleList from '../../components/ScheduleList';
 import api from '../../utils/api';
-import { PM_NAV, PM_SECONDARY } from './nav';
 import { useAuth } from '../../context/AuthContext';
+import { TEMP_NAV } from './nav';
 
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-export default function PMCalendar() {
+export default function TempCalendar() {
   const { user } = useAuth();
-  // A project-based organisation has no roster, so promising shifts is misleading.
+  // Same shape as the permanent worker's calendar, with one deliberate omission:
+  // no shift-change panel. A shift change is a swap negotiated against a roster
+  // the employee is committed to, and a temporary worker is engaged per task
+  // rather than held to a roster — so there is nothing for them to swap.
+  //
+  // The month grid answers "what am I on?" under either scheduling model. In a
+  // shift-based organisation the agenda of rostered shifts belongs underneath it;
+  // a project-based organisation runs no roster, so the grid is tasks and
+  // unavailability alone.
   const isProjectOrg = user?.org_type === 'PROJECT';
   const [view, setView] = useState(() => { const n = new Date(); return { year: n.getFullYear(), month: n.getMonth() }; });
   const [data, setData] = useState(null);
@@ -18,7 +27,7 @@ export default function PMCalendar() {
   useEffect(() => {
     const from = ymd(new Date(view.year, view.month, 1));
     const to = ymd(new Date(view.year, view.month + 1, 0));
-    api.get(`/pm/calendar?from=${from}&to=${to}`)
+    api.get(`/temp-worker/calendar?from=${from}&to=${to}`)
       .then((r) => setData(r.data.data))
       .catch((e) => setError(e.response?.data?.message || 'Failed to load calendar.'));
   }, [view]);
@@ -28,18 +37,19 @@ export default function PMCalendar() {
   const today = () => { const n = new Date(); setView({ year: n.getFullYear(), month: n.getMonth() }); };
 
   return (
-    <DashboardLayout navItems={PM_NAV} secondaryNav={PM_SECONDARY} roleLabel="Manager">
+    <DashboardLayout navItems={TEMP_NAV} roleLabel="Temporary Employee">
       <div className="space-y-6">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">Calendar</h2>
+          <h2 className="text-xl font-bold text-gray-800">{isProjectOrg ? 'Calendar' : 'Schedule & Calendar'}</h2>
           <p className="text-gray-500 text-sm mt-0.5">
             {isProjectOrg
-              ? 'Task start / deadline dates, approved leave and unavailability across your team.'
-              : 'Shifts, approved leave, unavailability and task start / deadline dates across your team.'}
+              ? 'Your task deadlines and unavailability at a glance.'
+              : 'Your shifts, task deadlines and unavailability at a glance.'}
           </p>
         </div>
         {error && <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">{error}</div>}
-        <CalendarMonth year={view.year} month={view.month} data={data} onPrev={prev} onNext={next} onToday={today} scope="manager" showShifts={!isProjectOrg} />
+        <CalendarMonth year={view.year} month={view.month} data={data} onPrev={prev} onNext={next} onToday={today} scope="worker" showShifts={!isProjectOrg} />
+        {!isProjectOrg && <ScheduleList endpoint="/temp-worker/schedule" />}
       </div>
     </DashboardLayout>
   );

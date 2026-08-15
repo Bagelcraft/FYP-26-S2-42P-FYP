@@ -1,12 +1,22 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/DashboardLayout';
 import CalendarMonth from '../../components/CalendarMonth';
+import ScheduleList from '../../components/ScheduleList';
+import ShiftChangePanel from '../../components/ShiftChangePanel';
 import api from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
 import { WORKER_NAV } from './nav';
 
 const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 export default function WorkerCalendar() {
+  const { user } = useAuth();
+  // No roster in a project-based organisation, so the calendar is tasks and leave.
+  // In a shift-based one the roster belongs here too — the month grid answers
+  // "when am I on?", and the agenda and shift-change panel below it are the two
+  // things a worker reaches for straight after, so they live on the same page
+  // rather than behind a separate Schedule tab.
+  const isProjectOrg = user?.org_type === 'PROJECT';
   const [view, setView] = useState(() => { const n = new Date(); return { year: n.getFullYear(), month: n.getMonth() }; });
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -27,11 +37,21 @@ export default function WorkerCalendar() {
     <DashboardLayout navItems={WORKER_NAV} roleLabel="Permanent Employee">
       <div className="space-y-6">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">Calendar</h2>
-          <p className="text-gray-500 text-sm mt-0.5">Your shifts, task deadlines and leave at a glance.</p>
+          <h2 className="text-xl font-bold text-gray-800">{isProjectOrg ? 'Calendar' : 'Schedule & Calendar'}</h2>
+          <p className="text-gray-500 text-sm mt-0.5">
+            {isProjectOrg
+              ? 'Your task deadlines and leave at a glance.'
+              : 'Your shifts, task deadlines and leave at a glance.'}
+          </p>
         </div>
         {error && <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">{error}</div>}
-        <CalendarMonth year={view.year} month={view.month} data={data} onPrev={prev} onNext={next} onToday={today} scope="worker" />
+        <CalendarMonth year={view.year} month={view.month} data={data} onPrev={prev} onNext={next} onToday={today} scope="worker" showShifts={!isProjectOrg} />
+        {!isProjectOrg && (
+          <>
+            <ScheduleList endpoint="/worker/schedule" />
+            <ShiftChangePanel base="/worker" />
+          </>
+        )}
       </div>
     </DashboardLayout>
   );

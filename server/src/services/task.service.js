@@ -305,20 +305,26 @@ async function rejectTaskCompletion(taskId, organisationId) {
   return getTask(taskId, organisationId);
 }
 
-// A worker's approved (COMPLETED) work + total hours, derived from task durations.
+// A worker's approved (COMPLETED) work.
+//
+// Counts tasks, not hours. This used to total the wall-clock gap between each
+// task's start and end, which is the size of the scheduling window rather than
+// time worked — a task scheduled across three days reported 72 hours. A task
+// records no time worked, so there is no honest hours figure to report here;
+// the same reasoning governs the task-based timesheet in attendance.service.js.
 async function getWorkerHours(userId, organisationId) {
   const tasks = await prisma.task.findMany({
     where:   { organisation_id: organisationId, status: 'COMPLETED', assignments: { some: { assigned_to: userId } } },
     select:  { task_id: true, title: true, start_datetime: true, end_datetime: true },
     orderBy: { end_datetime: 'desc' },
   });
-  let totalHours = 0;
-  const items = tasks.map((t) => {
-    const hours = Math.max((new Date(t.end_datetime) - new Date(t.start_datetime)) / 3600000, 0);
-    totalHours += hours;
-    return { task_id: t.task_id, title: t.title, start: t.start_datetime, end: t.end_datetime, hours: Math.round(hours * 100) / 100 };
-  });
-  return { totalHours: Math.round(totalHours * 100) / 100, count: items.length, tasks: items };
+  const items = tasks.map((t) => ({
+    task_id: t.task_id,
+    title:   t.title,
+    start:   t.start_datetime,
+    end:     t.end_datetime,
+  }));
+  return { count: items.length, tasks: items };
 }
 
 // Tasks that are PENDING and whose required skills the worker FULLY satisfies.

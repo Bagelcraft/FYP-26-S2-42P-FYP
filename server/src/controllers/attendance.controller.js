@@ -27,4 +27,23 @@ const getAttendance = async (req, res, next) => {
   }
 };
 
-module.exports = { clockIn, clockOut, getAttendance };
+// GET /worker|temp-worker/timesheet?month=YYYY-MM
+//
+// One endpoint for both roles and both organisation types — the service decides
+// whether the sheet is clock-based or task-based and says so in `mode`, so the
+// client renders from the response instead of guessing from the user's role.
+const getTimesheet = async (req, res, next) => {
+  try {
+    const data = await attendanceService.getTimesheet(
+      req.user.userId,
+      req.user.organisationId,
+      req.user.role,
+      req.query.month,
+    );
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { clockIn, clockOut, getAttendance, getTimesheet };

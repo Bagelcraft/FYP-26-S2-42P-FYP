@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import DashboardLayout from '../../components/DashboardLayout';
 import Badge from '../../components/Badge';
 import CalendarMonth from '../../components/CalendarMonth';
+import { useAuth } from '../../context/AuthContext';
 import { PM_NAV, PM_SECONDARY } from './nav';
 import api from '../../utils/api';
 
@@ -10,6 +11,12 @@ const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0
 const cap = (s) => (s ? s.charAt(0) + s.slice(1).toLowerCase() : '');
 
 export default function PMDashboard() {
+  const { user } = useAuth();
+  // A project-based organisation runs no roster, so "who is on shift today" has
+  // no answer to give — the panel could only ever say "no one is rostered", which
+  // reads as a gap in the roster rather than the absence of one.
+  const isProjectOrg = user?.org_type === 'PROJECT';
+
   const [tasks, setTasks] = useState([]);
   const [leave, setLeave] = useState([]);
   const [cal, setCal] = useState(null);
@@ -83,20 +90,22 @@ export default function PMDashboard() {
               <p className="text-xs text-gray-400 mt-0.5">{new Date().toLocaleDateString('en-SG', { weekday: 'long', day: '2-digit', month: 'long' })}</p>
             </div>
             <div className="p-5 space-y-5">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">On shift today</p>
-                {onShiftToday.length === 0 ? (
-                  <p className="text-sm text-gray-400">No one is rostered today.</p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {onShiftToday.map((s, i) => (
-                      <span key={i} className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-xs font-medium px-3 py-1.5 rounded-full">
-                        🕘 {s.userName} <span className="text-blue-400">· {s.startTime}–{s.endTime}</span>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {!isProjectOrg && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">On shift today</p>
+                  {onShiftToday.length === 0 ? (
+                    <p className="text-sm text-gray-400">No one is rostered today.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {onShiftToday.map((s, i) => (
+                        <span key={i} className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-xs font-medium px-3 py-1.5 rounded-full">
+                          🕘 {s.userName} <span className="text-blue-400">· {s.startTime}–{s.endTime}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Active tasks today</p>
                 {activeToday.length === 0 ? (
@@ -141,7 +150,7 @@ export default function PMDashboard() {
         </div>
 
         {/* Calendar */}
-        <CalendarMonth year={view.year} month={view.month} data={cal} onPrev={prev} onNext={next} onToday={toToday} scope="manager" />
+        <CalendarMonth year={view.year} month={view.month} data={cal} onPrev={prev} onNext={next} onToday={toToday} scope="manager" showShifts={!isProjectOrg} />
       </div>
     </DashboardLayout>
   );
