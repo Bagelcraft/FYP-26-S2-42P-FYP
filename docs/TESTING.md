@@ -18,17 +18,17 @@ a live server, which is why they are scripts rather than Jest suites.
 This document reproduces the full source of every file involved, generated from the working tree so it
 matches the code exactly.
 
-**Total: 1131 lines across 6 files.**
+**Total: 1,185 lines across 6 files.**
 
 ## Inventory
 
 | # | File | Lines |
 |---|---|---|
-| 1 | `server/tests/phase2.test.js` | 368 |
-| 2 | `run-tests.js` | 370 |
-| 3 | `server/scripts/test-features.js` | 123 |
-| 4 | `server/scripts/test-cross-module.js` | 158 |
-| 5 | `server/scripts/test-email.js` | 49 |
+| 1 | `server/tests/phase2.test.js` | 395 |
+| 2 | `run-tests.js` | 369 |
+| 3 | `server/scripts/test-features.js` | 140 |
+| 4 | `server/scripts/test-cross-module.js` | 170 |
+| 5 | `server/scripts/test-email.js` | 48 |
 | 6 | `server/scripts/gen-token.js` | 63 |
 
 ### Not reproduced here
@@ -44,7 +44,7 @@ matches the code exactly.
 Uses supertest against the Express app directly, so no server has to be running. This is what `npm test` and the CI workflow execute.
 
 ### `server/tests/phase2.test.js`
-*368 lines*
+*395 lines*
 
 Covers the Manager task and allocation API: auth (401) and RBAC (403), task creation and its validation failures, list filters, 404 on unknown ids, the `eligible-staff` payload shape, auto-allocate, manual assign, and reallocation to a temporary worker.
 
@@ -86,14 +86,41 @@ let testTask2Id;  // second task for reallocation test
 // ─── Setup ───────────────────────────────────────────────────────────────────
 
 beforeAll(async () => {
-  // Load seed users
-  pm = await prisma.user.findFirst({ where: { email: 'pm@techcorp.com' } });
-  worker = await prisma.user.findFirst({ where: { email: 'worker@techcorp.com' } });
-  tempWorker = await prisma.user.findFirst({ where: { email: 'tempworker@techcorp.com' } });
-  org = await prisma.organisation.findFirst({ where: { name: 'TechCorp Pte Ltd' } });
+  // Fixtures are looked up by ROLE, not by a hardcoded email. The suite used to
+  // name specific accounts from a seed that no longer exists, so it failed for
+  // everyone the moment the demo data changed. Any organisation with a manager
+  // and a worker will do, which keeps this working across reseeds.
+  org = await prisma.organisation.findFirst({
+    where: {
+      name: process.env.TEST_ORG_NAME || undefined,
+      isActive: true,
+      users: { some: { user_type: 'PROJECT_MANAGER', is_active: true } },
+      AND: [{ users: { some: { user_type: 'PERMANENT_WORKER', is_active: true } } }],
+    },
+    orderBy: { organisation_id: 'asc' },
+  });
 
-  if (!pm || !worker || !org) {
-    throw new Error('Seed data not found. Run: npx prisma db seed');
+  if (!org) {
+    throw new Error(
+      'No suitable organisation found. Seed the database first:\n'
+      + '  node scripts/reset-hosted.js --confirm',
+    );
+  }
+
+  const inOrg = (type) => prisma.user.findFirst({
+    where:   { organisationId: org.organisation_id, user_type: type, is_active: true },
+    orderBy: { userId: 'asc' },
+  });
+
+  pm = await inOrg('PROJECT_MANAGER');
+  worker = await inOrg('PERMANENT_WORKER');
+  tempWorker = await inOrg('TEMPORARY_WORKER');
+
+  if (!pm || !worker) {
+    throw new Error(
+      `Organisation "${org.name}" has no manager or permanent worker. Reseed with:\n`
+      + '  node scripts/reset-hosted.js --confirm',
+    );
   }
 
   pmToken     = makeToken(pm);
@@ -426,7 +453,7 @@ describe('5 Worker task view', () => {
 Walks the API as each role in turn and prints a formatted pass/fail table with the response evidence beside each assertion — built to be screenshotted for the report rather than to gate a merge.
 
 ### `run-tests.js`
-*370 lines*
+*369 lines*
 
 Run with `node run-tests.js`, optionally `--base-url`. Requires a seeded database and a running server. Logs in through `/auth/dev-login`.
 
@@ -809,7 +836,7 @@ main().catch(err => {
 Targeted end-to-end checks over HTTP, each printing a verdict line per feature.
 
 ### `server/scripts/test-features.js`
-*123 lines*
+*140 lines*
 
 `npm run test:features` — calendar over a date range, `/pm/reports` reachability, the completion-approval flow, and an assertion that `/pm/subscription` is gone (404) now that subscriptions belong to the Org Admin.
 
@@ -818,10 +845,12 @@ Targeted end-to-end checks over HTTP, each printing a verdict line per feature.
  * Feature test runner — verifies the Phase 1–5 additions end-to-end over the live API.
  * Black-box (HTTP) assertions; Prisma is used only for setup/cleanup of test artifacts.
  *
- * Prereqs: API running (npm run dev) + App. A accounts (npm run seed:test).
+ * Prereqs: API running (npm run dev) and a seeded database
+ *          (node scripts/reset-hosted.js --confirm).
  * Usage:   npm run test:features   |   node scripts/test-features.js
  */
 const { PrismaClient } = require('@prisma/client');
+const { resolveFixtures } = require('./fixtures');
 const HOST = (process.env.API_URL || 'http://localhost:5000').replace(/\/$/, '');
 const BASE = HOST + '/api/v1';
 
@@ -829,6 +858,8 @@ const useColor = !process.env.NO_COLOR;
 const c = (n, s) => (useColor ? `\x1b[${n}m${s}\x1b[0m` : s);
 const green = (s) => c('32', s), red = (s) => c('31', s), dim = (s) => c('90', s), bold = (s) => c('1', s);
 const results = [];
+// Accounts this suite creates itself. `ft-` prefix is what clean() looks for.
+const FT_STAFF_EMAIL = 'ft-perm@fixture.test';
 const line = (l, v) => console.log('   ' + dim(String(l).padEnd(11)) + v);
 const verdict = (id, ok, note) => { console.log('   ' + (ok ? green(' PASS ') : red(' FAIL ')) + ' ' + note + '\n'); results.push({ id, ok }); };
 
@@ -839,7 +870,9 @@ async function call(method, path, { token, body } = {}) {
   let json = null; try { json = await res.json(); } catch {}
   return { s: res.status, d: json };
 }
-const login = async (email) => (await call('POST', '/auth/login', { body: { email, password: 'Passw0rd!' } })).d?.token;
+let FIXTURE_PASSWORD = 'SmartTask#2026';
+const login = async (email, password = FIXTURE_PASSWORD) =>
+  (await call('POST', '/auth/login', { body: { email, password } })).d?.token;
 
 async function main() {
   const p = new PrismaClient();
@@ -867,9 +900,21 @@ async function main() {
     try { await fetch(HOST + '/api/health'); } catch { console.log(red('API not reachable — run: cd server && npm run dev')); process.exit(1); }
 
     await clean();
-    const admin = await login('admin@acme.test');
-    const pm = await login('pm@acme.test');
-    if (!admin || !pm) { console.log(red('Cannot log in — run: npm run seed:test')); process.exit(1); }
+
+    // Accounts are resolved by role from whatever the database holds, so this
+    // survives reseeds instead of depending on one retired fixture set.
+    const fx = await resolveFixtures(p, { require: ['ORG_ADMIN', 'PROJECT_MANAGER', 'TEMPORARY_WORKER'] });
+    if (fx.error) { console.log(red(fx.error)); process.exit(1); }
+    FIXTURE_PASSWORD = fx.password;
+    console.log(dim(`   fixtures: ${fx.org.name} — ${fx.admin.email} / ${fx.pm.email} / ${fx.temporary.email}\n`));
+
+    const admin = await login(fx.admin.email);
+    const pm = await login(fx.pm.email);
+    if (!admin || !pm) {
+      console.log(red(`Cannot log in as ${fx.admin.email} / ${fx.pm.email}.`));
+      console.log(red('Check TEST_PASSWORD, or reseed: node scripts/reset-hosted.js --confirm'));
+      process.exit(1);
+    }
 
     // ── Phase 1: roles↔dept↔skills, registration auto-skills + leave balance ──
     console.log(bold('Phase 1  Org Admin: roles, skills, departments, registration'));
@@ -877,7 +922,7 @@ async function main() {
     const dept = (await call('POST', '/org-admin/departments', { token: admin, body: { name: 'FT-Ops' } })).d.data;
     const role = await call('POST', '/org-admin/roles', { token: admin, body: { role_name: 'FT-Tech', department_id: dept.department_id, skill_ids: [skill.skill_id] } });
     verdict('P1-role', role.s === 201 && role.d.data.department?.name === 'FT-Ops' && role.d.data.requiredSkills?.[0]?.skill.skill_name === 'FT-Welding', 'Role has a department + required skills');
-    const reg = await call('POST', '/org-admin/staff', { token: admin, body: { full_name: 'FT Perm', email: 'ft-perm@acme.test', user_type: 'PERMANENT_WORKER', password: 'Passw0rd!', role_id: role.d.data.role_id, skill_ids: [], annual_entitled: 12, medical_entitled: 8 } });
+    const reg = await call('POST', '/org-admin/staff', { token: admin, body: { full_name: 'FT Perm', email: FT_STAFF_EMAIL, user_type: 'PERMANENT_WORKER', password: 'Passw0rd!', role_id: role.d.data.role_id, skill_ids: [], annual_entitled: 12, medical_entitled: 8 } });
     const gotRoleSkill = (reg.d.data?.skills ?? []).some((s) => s.skill.skill_name === 'FT-Welding');
     verdict('P1-register', reg.s === 201 && gotRoleSkill, "Registering with a role auto-adds the role's skills");
     const depts = (await call('GET', '/org-admin/departments', { token: admin })).d.data;
@@ -885,7 +930,7 @@ async function main() {
 
     // ── Phase 2: worker leave balance ────────────────────────────────────────
     console.log(bold('Phase 2  Worker leave balance'));
-    const permTok = await login('ft-perm@acme.test');
+    const permTok = await login(FT_STAFF_EMAIL, 'Passw0rd!');
     const lb = await call('GET', '/worker/leave-balance', { token: permTok });
     line('GET', '/worker/leave-balance -> HTTP ' + lb.s);
     verdict('P2-balance', lb.s === 200 && lb.d.data.annual.entitled === 12 && lb.d.data.medical.entitled === 8, 'Worker sees the leave balance set at registration (12 / 8)');
@@ -907,12 +952,12 @@ async function main() {
 
     // ── Phase 5: freelancer temp-worker flow ─────────────────────────────────
     console.log(bold('Phase 5  Temporary worker = freelancer'));
-    const temp = await p.user.findUnique({ where: { email: 'temp@acme.test' }, select: { userId: true } });
-    const pmU = await p.user.findUnique({ where: { email: 'pm@acme.test' }, select: { userId: true } });
-    const org = await p.organisation.findFirst({ where: { name: 'Acme' }, select: { organisation_id: true } });
+    const temp = { userId: fx.temporary.userId };
+    const pmU = { userId: fx.pm.userId };
+    const org = { organisation_id: fx.org.organisation_id };
     const task = await p.task.create({ data: { organisation_id: org.organisation_id, created_by: pmU.userId, title: 'FT-FreelanceTask', status: 'ASSIGNED', start_datetime: new Date('2026-08-10T09:00:00'), end_datetime: new Date('2026-08-10T13:00:00') } });
     await p.taskAssignment.create({ data: { task_id: task.task_id, assigned_to: temp.userId, assigned_by: pmU.userId, assignment_type: 'MANUAL' } });
-    const tempTok = await login('temp@acme.test');
+    const tempTok = await login(fx.temporary.email);
     const acc = await call('PATCH', `/temp-worker/tasks/${task.task_id}/acknowledge`, { token: tempTok });
     const blocked = await call('PATCH', `/temp-worker/tasks/${task.task_id}/progress`, { token: tempTok, body: { status: 'COMPLETED' } });
     const sub = await call('PATCH', `/temp-worker/tasks/${task.task_id}/submit`, { token: tempTok });
@@ -939,7 +984,7 @@ main();
 ```
 
 ### `server/scripts/test-cross-module.js`
-*158 lines*
+*170 lines*
 
 `npm run test:xm` — the full chain: create a task with a required skill, auto-allocate it, confirm the worker sees it, confirm the status reflects back to the manager. Also exercises the auth matrix across `/pm/tasks`, `/pm/reports`, `/pm/team` and `/admin/organisations`.
 
@@ -951,10 +996,15 @@ main();
  * Prerequisite: the API must be running (in another terminal):  npm run dev
  * Then run:                                                      npm run test:xm
  *
- * Uses the Acme/Globex seed accounts (password Passw0rd!).
+ * Accounts are resolved by role from whatever the database holds
+ * (seed with: node scripts/reset-hosted.js --confirm).
  */
+const { resolveFixtures } = require('./fixtures');
+
 const B = process.env.API_BASE || 'http://localhost:5000/api/v1';
-const PW = 'Passw0rd!';
+// Overwritten from the resolved fixtures at start-up.
+let PW = 'SmartTask#2026';
+let FX = null;
 const uniq = Date.now();
 
 async function call(method, path, token, body) {
@@ -994,6 +1044,15 @@ async function verifyPendingEmail(email) {
 const hdr = (s) => { console.log('\n' + '='.repeat(72)); console.log(s); console.log('='.repeat(72)); };
 
 (async () => {
+  // Resolve the accounts this run will use. Doing it by role rather than by
+  // hardcoded email keeps the suite working across reseeds.
+  if (prisma) {
+    FX = await resolveFixtures(prisma, { require: ['ORG_ADMIN', 'PROJECT_MANAGER'] });
+    if (FX.error) { console.error('\n' + FX.error + '\n'); process.exit(1); }
+    PW = FX.password;
+    if (!FX.sysadmin) { console.error('\nNo SYSTEM_ADMIN account found. Seed first.\n'); process.exit(1); }
+  }
+
   // Fail fast if the server isn't up.
   try { await fetch(B.replace(/\/api\/v1$/, '') + '/api/health'); }
   catch { console.error('\n❌ API not reachable at ' + B + '\n   Start it first:  npm run dev  (in another terminal)\n'); process.exit(1); }
@@ -1004,7 +1063,7 @@ const hdr = (s) => { console.log('\n' + '='.repeat(72)); console.log(s); console
   let r = await call('POST', '/public/organisations/register', null,
     { full_name: 'New Co Admin', email, password: PW, company_name: 'NewCo', uen: mkUen(uniq) });
   line(`[1] POST /public/organisations/register        -> ${r.status}  ${short(r.text)}`);
-  const sa = tok(await login('sysadmin@sta.test'));
+  const sa = tok(await login(FX.sysadmin.email));
   r = await call('GET', '/admin/registrations', sa);
   const reg = (r.json.data || []).find((x) => x.email === email);
   line(`[2] GET  /admin/registrations (SYSTEM_ADMIN)   -> ${r.status}  found pending id=${reg && reg.marketing_user_id}, uen=${reg && reg.uen}, email_verified=${reg && reg.email_verified}`);
@@ -1019,7 +1078,7 @@ const hdr = (s) => { console.log('\n' + '='.repeat(72)); console.log(s); console
 
   // ---------------------------------------------------------------- TCXM002
   hdr('TCXM002  E2E: PM creates task -> auto-allocate -> worker acknowledges');
-  const pm = tok(await login('pm@acme.test'));
+  const pm = tok(await login(FX.pm.email));
   const skills = (await call('GET', '/pm/skills', pm)).json.data;
   const js = skills.find((s) => s.skill_name === 'JavaScript') || skills[0];
   // Task window must overlap a seeded AVAILABLE slot (seed: today+1..+5, 09:00-18:00 local).
@@ -1043,32 +1102,31 @@ const hdr = (s) => { console.log('\n' + '='.repeat(72)); console.log(s); console
   line('COMMENT: PASS if task ends IN_PROGRESS for the PM. Note: eligibility requires a seeded availability slot (Availability UI was removed).');
 
   // ---------------------------------------------------------------- TCXM003
-  hdr('TCXM003  Subscription feature gating enforced ("Advanced Reports" gates GET /pm/reports)');
-  const oa = tok(await login('admin@acme.test'));
-  const pmAcme = tok(await login('pm@acme.test'));
+  hdr('TCXM003  Single subscription tier — every organisation gets the full feature set');
+  const oa = tok(await login(FX.admin.email));
+  const pmTok = tok(await login(FX.pm.email));
   const plans = (await call('GET', '/org-admin/plans', oa)).json.data;
-  const basic = plans.find((p) => p.name === 'Basic');
-  const pro = plans.find((p) => p.name === 'Pro');
-  line(`    plans available: ${plans.map((p) => p.name + ' ($' + p.price_monthly + ')').join(', ')}`);
-  // 1. downgrade to Basic (no Advanced Reports) to establish the blocked state
-  r = await call('POST', '/org-admin/subscription/change-plan', oa, { plan_id: basic.plan_id });
-  line(`[1] OA change-plan -> Basic (lacks Advanced Reports)  -> ${r.status}`);
-  r = await call('GET', '/pm/reports', pmAcme);
-  line(`[2] PM GET /pm/reports on Basic (feature not in plan)  -> ${r.status}  ${short(r.text)}`);
-  const blocked = r.status === 403;
-  // 3. upgrade to Pro (has Advanced Reports)
-  r = await call('POST', '/org-admin/subscription/change-plan', oa, { plan_id: pro.plan_id });
-  line(`[3] OA change-plan -> Pro (includes Advanced Reports) -> ${r.status}`);
-  r = await call('GET', '/pm/reports', pmAcme);
-  line(`[4] PM GET /pm/reports after upgrade                   -> ${r.status}`);
-  const allowed = r.status === 200;
-  line(`COMMENT: ${blocked && allowed ? 'PASS' : 'CHECK'} — blocked (403) on Basic, allowed (200) after upgrade. Gating is enforced, not just stored.`);
+  line(`[1] GET  /org-admin/plans                       -> ${plans.length} active plan(s): ${plans.map((p) => p.name + ' ($' + p.price_monthly + ')').join(', ')}`);
+  const singleTier = plans.length === 1;
+
+  const sub = await call('GET', '/org-admin/subscription', oa);
+  const amount = sub.json?.data?.amount ?? sub.json?.data?.activeSubscription?.amount;
+  line(`[2] GET  /org-admin/subscription                -> ${sub.status}  amount=$${amount}`);
+  const subscribed = sub.status === 200 && amount != null;
+
+  // Reports used to sit behind an "Advanced Reports" plan feature. With one tier
+  // there is no upgrade to sell, so the gate was removed — every manager gets it.
+  r = await call('GET', '/pm/reports', pmTok);
+  line(`[3] GET  /pm/reports (previously plan-gated)    -> ${r.status}`);
+  const reportsOpen = r.status === 200;
+
+  line(`COMMENT: ${singleTier && subscribed && reportsOpen ? 'PASS' : 'CHECK'} — one tier offered, organisation subscribed to it, and the formerly gated report is reachable.`);
 
   // ---------------------------------------------------------------- TCXM004
   hdr('TCXM004  NFR - auth/session security');
   r = await call('GET', '/pm/tasks', null);
   line(`[1] GET /pm/tasks  (NO token)                  -> ${r.status}  body=${r.text}`);
-  r = await login('sysadmin@sta.test');
+  r = await login(FX.sysadmin.email);
   line(`[2] login response user keys                   -> ${Object.keys(r.json.user || {}).join(', ')}`);
   line(`    password / password_hash present in body?  -> ${/password/i.test(r.text)}`);
   line('COMMENT: PASS — 401 with body {message:"Not authenticated"} and no password/hash returned.');
@@ -1104,7 +1162,7 @@ const hdr = (s) => { console.log('\n' + '='.repeat(72)); console.log(s); console
 ```
 
 ### `server/scripts/test-email.js`
-*49 lines*
+*48 lines*
 
 `npm run test:email` — verifies SendGrid credentials by sending one message.
 
@@ -1235,6 +1293,3 @@ async function main() {
 
 main().catch((err) => { console.error(err); process.exit(1); });
 ```
-
----
-

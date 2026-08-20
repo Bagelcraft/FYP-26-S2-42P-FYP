@@ -263,16 +263,47 @@ function TaskModal({ task, depts, skills, shifts, projects = [], isProjectOrg, o
   const [avail, setAvail] = useState({ days: [], total: 0 });
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
-  // Per-day availability of workers matching the selected required skills.
+  // A project's duration bounds its tasks, so the date pickers clamp to it and
+  // the server rejects anything that slips through anyway. Declared here rather
+  // than beside the other lookups because the availability effect below reads it
+  // in its dependency array, which is evaluated during render.
+  const selectedProject = projects.find((p) => String(p.project_id) === form.project_id);
+
+  // Per-day availability of workers matching the selected required skills, and —
+  // once a project is chosen — narrowed to that project's resource pool, since
+  // only those workers may take its tasks.
+  //
+  // The window follows the project too. A project running Sep→Oct told the manager
+  // nothing useful when the strip always started today, and the date inputs below
+  // are already clamped to the same bounds, so the two now agree.
   useEffect(() => {
     const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const from = new Date(); from.setHours(0, 0, 0, 0);
-    const to = new Date(from); to.setDate(to.getDate() + 20);
-    const skillParam = form.required_skill_ids.join(',');
-    api.get(`/pm/availability?from=${ymd(from)}&to=${ymd(to)}${skillParam ? `&skills=${skillParam}` : ''}`)
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+
+    let from = today;
+    if (selectedProject?.start_date) {
+      const projStart = new Date(selectedProject.start_date);
+      projStart.setHours(0, 0, 0, 0);
+      // A project already under way starts from today — past days cannot be picked.
+      if (projStart > today) from = projStart;
+    }
+
+    let to = new Date(from); to.setDate(to.getDate() + 20);
+    if (selectedProject?.end_date) {
+      const projEnd = new Date(selectedProject.end_date);
+      projEnd.setHours(0, 0, 0, 0);
+      if (projEnd < to) to = projEnd;
+    }
+    if (to < from) to = from; // project already finished — show the single day
+
+    const params = new URLSearchParams({ from: ymd(from), to: ymd(to) });
+    if (form.required_skill_ids.length) params.set('skills', form.required_skill_ids.join(','));
+    if (form.project_id) params.set('project', form.project_id);
+
+    api.get(`/pm/availability?${params}`)
       .then((r) => setAvail(r.data.data ?? { days: [], total: 0 }))
       .catch(() => setAvail({ days: [], total: 0 }));
-  }, [form.required_skill_ids]);
+  }, [form.required_skill_ids, form.project_id, selectedProject]);
   const toggleSkill = (id) => setForm((f) => {
     const s = String(id);
     const has = f.required_skill_ids.includes(s);
@@ -281,9 +312,6 @@ function TaskModal({ task, depts, skills, shifts, projects = [], isProjectOrg, o
 
   const selectedShift = shifts.find((s) => String(s.shift_id) === form.shift_id);
 
-  // A project's duration bounds its tasks, so the date pickers clamp to it and
-  // the server rejects anything that slips through anyway.
-  const selectedProject = projects.find((p) => String(p.project_id) === form.project_id);
   const projMin = selectedProject ? toDateInput(selectedProject.start_date) : undefined;
   const projMax = selectedProject ? toDateInput(selectedProject.end_date) : undefined;
 
@@ -378,8 +406,13 @@ function TaskModal({ task, depts, skills, shifts, projects = [], isProjectOrg, o
           </div>
           {avail.days.length > 0 && (
             <div>
+              {/* Name what was actually counted. "All workers" was a lie once a
+                  project narrowed the field to its resource pool. */}
               <label className="block text-xs font-medium text-gray-600 mb-1">
-                Availability {form.required_skill_ids.length ? '(workers with the required skills)' : '(all workers)'}
+                Availability ({[
+                  avail.scope === 'PROJECT_POOL' ? `${selectedProject?.name ?? 'project'} resources` : 'all workers',
+                  form.required_skill_ids.length ? 'with the required skills' : null,
+                ].filter(Boolean).join(', ')})
               </label>
               <div className="flex gap-1.5 overflow-x-auto pb-1">
                 {avail.days.map((d) => {
@@ -397,7 +430,21 @@ function TaskModal({ task, depts, skills, shifts, projects = [], isProjectOrg, o
                   );
                 })}
               </div>
-              <p className="text-xs text-gray-400 mt-1">Qualified workers available each day — click a day to set the start date.</p>
+              {/* A zero denominator is a different problem from a zero numerator:
+                  nobody *qualifies*, rather than nobody being free. Saying so
+                  points the manager at the fix instead of at the calendar. */}
+              {avail.total === 0 ? (
+                <p className="text-xs text-amber-600 mt-1">
+                  No one matches this task yet
+                  {avail.scope === 'PROJECT_POOL' ? ' in this project\'s resources' : ''}
+                  {form.required_skill_ids.length ? ' with all the required skills' : ''}.
+                  {avail.scope === 'PROJECT_POOL'
+                    ? ' Add resources to the project, or relax the required skills.'
+                    : ' Try relaxing the required skills.'}
+                </p>
+              ) : (
+                <p className="text-xs text-gray-400 mt-1">Qualified workers available each day — click a day to set the start date.</p>
+              )}
             </div>
           )}
           {/* Project-based companies run no roster, so there are no shift templates to pick. */}

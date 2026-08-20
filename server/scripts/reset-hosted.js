@@ -53,6 +53,27 @@ const dateOnly = (off) => {
   return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
 };
 
+// Offsets (relative to today) of the recent weekdays that fall inside the current
+// calendar month, most recent first.
+//
+// The timesheet opens on the current month, so attendance seeded into last month
+// would leave it looking empty on a demo run early in a month. Clamping to the
+// 1st keeps every generated record on the sheet the presenter actually opens.
+function recentWeekdayOffsets(count) {
+  const today = new Date();
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const offsets = [];
+  for (let back = 1; offsets.length < count && back <= 31; back += 1) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - back);
+    if (d < monthStart) break;
+    const dow = d.getDay();
+    if (dow === 0 || dow === 6) continue; // weekends
+    offsets.push(-back);
+  }
+  return offsets;
+}
+
 function isLocalDatabase() {
   const m = (process.env.DATABASE_URL || '').match(/@([^:/?]+)/);
   return ['localhost', '127.0.0.1', '::1', '0.0.0.0'].includes(m ? m[1] : '');
@@ -299,6 +320,23 @@ async function buildProjectOrg(hash) {
   await mkTask('Load calculations', eng.department_id, depot.project_id, [structural.skill_id], 'PENDING', 15, 16, null);
   await mkTask('Update subcontractor list', eng.department_id, null, [], 'PENDING', 2, 2, null);
 
+  // ── Delivered work, for the project-based timesheet ──
+  //
+  // A project org's timesheet counts completed tasks and groups them by project,
+  // so it needs work finished across *more than one* project to show a breakdown
+  // worth looking at — a single bar at 100% demonstrates nothing. One task is
+  // left deliberately project-less so the "Standalone" row appears too.
+  //
+  // Spread over the past fortnight because the sheet credits a task to the month
+  // it finished in, and the demo opens on the current month.
+  await mkTask('Bearing pad inspection', site.department_id, bridge.project_id, [], 'COMPLETED', -11, -11, alex.userId);
+  await mkTask('Drainage survey',        eng.department_id,  bridge.project_id, [], 'COMPLETED', -8,  -7,  jordan.userId);
+  await mkTask('Depot slab pour',        site.department_id, depot.project_id,  [], 'COMPLETED', -6,  -6,  alex.userId);
+  await mkTask('Depot fencing',          site.department_id, depot.project_id,  [], 'COMPLETED', -5,  -5,  jordan.userId);
+  await mkTask('Archive site photos',    eng.department_id,  null,              [], 'COMPLETED', -2,  -2,  alex.userId);
+  // Riley is the temporary worker — their timesheet needs its own delivered work.
+  await mkTask('Temporary fencing hire', site.department_id, depot.project_id,  [], 'COMPLETED', -4,  -4,  riley.userId);
+
   return { org, admin, pm, staff: [alex, jordan, casey, riley] };
 }
 
@@ -370,7 +408,56 @@ async function buildShiftOrg(hash) {
   await mkTask('Price label audit', [cashier.skill_id], 'IN_PROGRESS', day(0, 9), day(0, 17), sam.userId);
   await mkTask('Returns processing', [stock.skill_id], 'COMPLETED', day(-2, 9), day(-2, 17), taylor.userId);
 
+  // Completed work spread across the month so the SHIFT timesheet has a "Tasks
+  // Completed" list to show, not just hours. Credited by end date, which is what
+  // the timesheet groups on.
+  await mkTask('Weekly shelf audit',   [stock.skill_id],   'COMPLETED', day(-9, 9), day(-9, 17), sam.userId);
+  await mkTask('Cash drawer reconcile', [cashier.skill_id], 'COMPLETED', day(-6, 9), day(-6, 17), morgan.userId);
+  await mkTask('Backroom reorganise',  [stock.skill_id],   'COMPLETED', day(-4, 9), day(-4, 17), sam.userId);
+
   await prisma.leaveRequest.create({ data: { user_id: taylor.userId, leave_type: 'ANNUAL', start_date: dateOnly(12), end_date: dateOnly(14), status: 'PENDING' } });
+
+  // ── Blockers, so the Create Task availability strip is not uniformly green ──
+  //
+  // A shift-based organisation needs these as much as a project-based one: the
+  // strip counts free staff, and with nothing to block it every day reads the
+  // same and the feature demos as if it does nothing. Mirrors the three blocker
+  // kinds the allocation engine recognises — approved leave, a self-marked
+  // block, and a committed task.
+  await prisma.leaveRequest.create({ data: { user_id: morgan.userId, leave_type: 'ANNUAL', start_date: dateOnly(3), end_date: dateOnly(4), status: 'APPROVED', approved_by: pm.userId } });
+  await prisma.availability.create({ data: { user_id: sam.userId, start_datetime: day(5, 0), end_datetime: day(5, 23, 59), status: 'UNAVAILABLE' } });
+
+  // ── Attendance, so the shift timesheet shows real hours ──
+  //
+  // Clock-in/out is the half of the timesheet only a shift-based organisation
+  // has. Without seeded sessions the sheet opens on 0 days / 0h and the whole
+  // SHIFT mode looks unimplemented.
+  //
+  // Hours are computed the same way clockOut does it (difference in ms, 2dp) so
+  // seeded rows are indistinguishable from ones a worker created.
+  const clockedSession = async (user_id, off, startH, endH) => {
+    const clockIn = day(off, startH, 0);
+    const clockOut = day(off, endH, 0);
+    return prisma.attendance.create({
+      data: {
+        user_id,
+        clock_in: clockIn,
+        clock_out: clockOut,
+        working_hours: Math.round(((clockOut - clockIn) / 3600000) * 100) / 100,
+      },
+    });
+  };
+
+  const weekdays = recentWeekdayOffsets(10);
+  for (const off of weekdays) {
+    // Sam works Morning most days; a couple of short days keep the average honest.
+    await clockedSession(sam.userId, off, 9, off % 4 === 0 ? 13 : 17);
+    // Morgan is Evening, and only some days — a temp does not work a full week.
+    if (off % 2 === 0) await clockedSession(morgan.userId, off, 13, 21);
+  }
+  // Taylor is mid-shift right now: an open session, so the sheet shows "Clocked
+  // in at …" and the Clock Out button rather than only closed history.
+  await prisma.attendance.create({ data: { user_id: taylor.userId, clock_in: day(0, 9), clock_out: null, working_hours: null } });
 
   return { org, admin, pm, staff: [sam, taylor, morgan] };
 }

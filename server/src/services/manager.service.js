@@ -361,29 +361,107 @@ async function getCalendar(organisationId, from, to) {
 }
 
 // ─── GET /pm/availability?from=&to=&skills= ───────────────────
-// Per-day count of active workers who hold ALL the given skills and are
-// AVAILABLE (and not on leave/unavailable) — used by the Create Task date picker.
-async function getAvailabilityByDay(organisationId, from, to, skillIds = []) {
+// Per-day count of active workers who hold ALL the given skills and are free that
+// day — used by the Create Task date picker.
+//
+// "Free" means exactly what the allocation engine means by it (see
+// collectBlockers in allocation.service.js): a worker is free by default and only
+// ruled out on hard evidence — an explicit UNAVAILABLE / ON_LEAVE slot, an
+// approved leave request, or an already-committed task overlapping the day.
+//
+// This previously required an explicit AVAILABLE slot, which inverted the rule the
+// rest of the system runs on. Nothing in the product creates opt-in availability
+// rows — workers only ever record when they are *away* — so every day reported
+// 0 available while the Allocate screen went on to list those same workers as
+// eligible. The picker was telling the manager the opposite of the truth.
+//
+// Roster coverage is deliberately not consulted. The allocation engine treats a
+// thin roster as a soft warning rather than a blocker, so counting it here would
+// reintroduce the same disagreement in a shift-based organisation.
+const LIVE_TASK_STATUSES = ['ASSIGNED', 'IN_PROGRESS', 'SUBMITTED'];
+
+// Leave rows are date-only columns and come back from Postgres at UTC midnight.
+// Read their calendar parts in UTC and rebuild at local midnight, so the day they
+// represent is the one the rest of this function is reasoning about.
+function dbDateToLocalMidnight(value) {
+  const d = new Date(value);
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+const overlaps = (aStart, aEnd, bStart, bEnd) =>
+  new Date(aStart) <= bEnd && new Date(aEnd) >= bStart;
+
+async function getAvailabilityByDay(organisationId, from, to, skillIds = [], projectId = null) {
   const skillFilter = skillIds.length ? { AND: skillIds.map((id) => ({ skills: { some: { skill_id: id } } })) } : {};
+
+  // Resource pool. A task belonging to a project can only be taken by that
+  // project's resources, so counting the whole organisation would promise a
+  // manager staff the allocation engine will then refuse.
+  //
+  // Mirrors poolFilter in allocation.service.js, including its escape hatch: an
+  // empty pool means the project has not narrowed the field yet, so everyone
+  // still counts. Getting that wrong would swing the strip to 0/0 for every
+  // project that has not picked its team.
+  let poolFilter = {};
+  let scope = 'ORGANISATION';
+  if (projectId) {
+    const resources = await prisma.projectResource.findMany({
+      where:  { project_id: projectId, project: { organisation_id: organisationId } },
+      select: { user_id: true },
+    });
+    if (resources.length) {
+      poolFilter = { userId: { in: resources.map((r) => r.user_id) } };
+      scope = 'PROJECT_POOL';
+    }
+  }
+
   const workers = await prisma.user.findMany({
-    where:   { organisationId, is_active: true, user_type: { in: ['PERMANENT_WORKER', 'TEMPORARY_WORKER'] }, ...skillFilter },
-    include: { availability: { where: { start_datetime: { lte: to }, end_datetime: { gte: from } } } },
+    where: { organisationId, is_active: true, user_type: { in: ['PERMANENT_WORKER', 'TEMPORARY_WORKER'] }, ...skillFilter, ...poolFilter },
+    include: {
+      // Only the blocking statuses are loaded — an AVAILABLE row is not evidence
+      // of anything here, since absence of a blocker already means free.
+      availability: {
+        where:  { status: { in: ['UNAVAILABLE', 'ON_LEAVE'] }, start_datetime: { lte: to }, end_datetime: { gte: from } },
+        select: { start_datetime: true, end_datetime: true },
+      },
+      leaveRequests: {
+        where:  { status: 'APPROVED', start_date: { lte: to }, end_date: { gte: from } },
+        select: { start_date: true, end_date: true },
+      },
+      assignedTasks: {
+        where:  { task: { status: { in: LIVE_TASK_STATUSES }, start_datetime: { lte: to }, end_datetime: { gte: from } } },
+        select: { task: { select: { start_datetime: true, end_datetime: true } } },
+      },
+    },
   });
+
   const total = workers.length;
   const days = [];
+
   for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
     const s = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0);
-    const e = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59);
+    const e = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+
     let available = 0;
     for (const w of workers) {
-      const slots = w.availability.filter((a) => new Date(a.start_datetime) <= e && new Date(a.end_datetime) >= s);
-      const hasAvail = slots.some((a) => a.status === 'AVAILABLE');
-      const hasBlock = slots.some((a) => a.status === 'ON_LEAVE' || a.status === 'UNAVAILABLE');
-      if (hasAvail && !hasBlock) available++;
+      const blocked =
+        w.availability.some((a) => overlaps(a.start_datetime, a.end_datetime, s, e))
+        || w.leaveRequests.some((l) => {
+          const lStart = dbDateToLocalMidnight(l.start_date);
+          const lEnd = dbDateToLocalMidnight(l.end_date);
+          lEnd.setHours(23, 59, 59, 999); // date-only end date covers its whole day
+          return overlaps(lStart, lEnd, s, e);
+        })
+        || w.assignedTasks.some((t) => overlaps(t.task.start_datetime, t.task.end_datetime, s, e));
+
+      if (!blocked) available += 1;
     }
     days.push({ date: ymd(s), available, total });
   }
-  return { total, days };
+
+  // `scope` lets the UI say what it counted rather than claiming "all workers"
+  // when the number is actually pool-scoped.
+  return { total, days, scope };
 }
 
 module.exports = {

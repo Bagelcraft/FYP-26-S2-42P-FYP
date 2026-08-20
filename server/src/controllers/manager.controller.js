@@ -90,12 +90,17 @@ const getCalendar = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// GET /pm/availability?from=&to=&skills=1,2
+// GET /pm/availability?from=&to=&skills=1,2&project=3
+//
+// `project` narrows the count to that project's resource pool. Without it the
+// picker counts the whole organisation, which overstates availability for a task
+// that only pool members are allowed to take.
 const getAvailability = async (req, res, next) => {
   try {
     const { from, to } = monthRange(req.query.from, req.query.to);
     const skillIds = (req.query.skills ? String(req.query.skills).split(',') : []).map(Number).filter(Boolean);
-    const data = await managerService.getAvailabilityByDay(req.user.organisationId, from, to, skillIds);
+    const projectId = Number(req.query.project) || null;
+    const data = await managerService.getAvailabilityByDay(req.user.organisationId, from, to, skillIds, projectId);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 };
