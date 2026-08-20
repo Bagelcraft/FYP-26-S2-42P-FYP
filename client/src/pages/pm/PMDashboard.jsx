@@ -23,6 +23,7 @@ export default function PMDashboard() {
   const [view, setView] = useState(() => { const n = new Date(); return { year: n.getFullYear(), month: n.getMonth() }; });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(null);
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     api.get('/pm/tasks').then((r) => setTasks(r.data.data ?? [])).catch((e) => setError(e.response?.data?.message || 'Failed to load tasks.'));
@@ -48,8 +49,20 @@ export default function PMDashboard() {
   async function decideLeave(id, status) {
     setBusy(id);
     try {
-      await api.patch(`/pm/leave/${id}`, { status });
+      const res = await api.patch(`/pm/leave/${id}`, { status });
       setLeave((p) => p.map((l) => (l.id === id ? { ...l, status } : l)));
+
+      // Approving releases any shifts rostered inside the leave. Say so, and
+      // refetch the calendar below — it was showing the person on shift and on
+      // leave on the same day until the roster caught up.
+      const released = res.data.data?.releasedShifts ?? [];
+      if (released.length) {
+        setNotice(`${released.length} rostered shift${released.length === 1 ? '' : 's'} released for the approved leave.`);
+        setTimeout(() => setNotice(''), 5000);
+        const from = ymd(new Date(view.year, view.month, 1));
+        const to = ymd(new Date(view.year, view.month + 1, 0));
+        api.get(`/pm/calendar?from=${from}&to=${to}`).then((r) => setCal(r.data.data)).catch(() => {});
+      }
     } catch (e) { alert(e.response?.data?.message || 'Failed to update leave.'); }
     finally { setBusy(null); }
   }
@@ -66,6 +79,7 @@ export default function PMDashboard() {
         </div>
 
         {error && <div className="px-4 py-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg">{error}</div>}
+        {notice && <div className="px-4 py-3 bg-blue-50 border border-blue-200 text-blue-700 text-sm rounded-lg">{notice}</div>}
 
         {/* Task summary */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

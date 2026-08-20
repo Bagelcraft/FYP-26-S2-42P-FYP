@@ -62,11 +62,25 @@ export default function Leave() {
   const typeOf = (userType) => (userType === 'PERMANENT_WORKER' ? 'Permanent Employee' : userType === 'TEMPORARY_WORKER' ? 'Temporary Employee' : '');
 
   const pending = leave.filter((l) => l.status === 'PENDING');
-  function decide(id, status) {
-    api.patch(`/pm/leave/${id}`, { status }).catch(() => {});
+  // Approving also strips any shifts the person was rostered onto during the
+  // leave. That is a change to the roster the manager did not explicitly make, so
+  // the toast says how many went rather than letting them discover it later.
+  async function decide(id, status) {
     const row = leave.find((x) => x.id === id);
     setLeave((p) => p.map((l) => (l.id === id ? { ...l, status } : l)));
-    note(`Leave ${status.toLowerCase()} for ${nameOf(row.user, row.userName)}`);
+    const who = nameOf(row.user, row.userName);
+
+    try {
+      const res = await api.patch(`/pm/leave/${id}`, { status });
+      const released = res.data.data?.releasedShifts ?? [];
+      note(released.length
+        ? `Leave approved for ${who} — ${released.length} rostered shift${released.length === 1 ? '' : 's'} released`
+        : `Leave ${status.toLowerCase()} for ${who}`);
+    } catch (e) {
+      // Put the row back: the decision did not stick.
+      setLeave((p) => p.map((l) => (l.id === id ? { ...l, status: row.status } : l)));
+      note(e.response?.data?.message || 'Failed to update the leave request.');
+    }
   }
   function saveBalance(updated) {
     api.patch(`/pm/leave-balance/${updated.user}`, updated).catch(() => {});

@@ -16,6 +16,13 @@ function currentWeekBounds() {
   return { monday, sunday };
 }
 
+// A @db.Date column holds a bare calendar date at UTC midnight. Format it from
+// UTC parts, never local ones, or a server behind UTC reports the day before.
+const ymdUtc = (value) => {
+  const d = new Date(value);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+};
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const fmtShort = (d) => `${String(d.getDate()).padStart(2, '0')} ${MONTHS[d.getMonth()]}`;
 const fmtLong = (d) => `${fmtShort(d)} ${d.getFullYear()}`;
@@ -85,13 +92,68 @@ async function listLeave(organisationId) {
 }
 
 // ─── PATCH /pm/leave/:id ──────────────────────────────────────
+//
+// Approving leave also releases any shifts the person was rostered onto during
+// it. Leaving them rostered is a straight contradiction: the calendar shows the
+// same person on shift and on leave on the same day, the allocation engine counts
+// the leave as a hard blocker while the roster still claims coverage, and anyone
+// reading the roster staffs that day one person short. Clearing the shifts is
+// what approving the leave actually means.
+//
+// Done in one transaction so a failure cannot leave the request approved with the
+// roster still standing.
+//
+// Note the one-way door: rejecting a leave that was previously approved does not
+// restore the shifts, because they no longer exist to restore. A manager who
+// approves by mistake has to re-roster by hand — which is the same position they
+// would be in had they deleted the shifts themselves, and is why the released
+// shifts are returned rather than silently dropped.
 async function decideLeave(leaveId, organisationId, status, approverId) {
   if (!['APPROVED', 'REJECTED'].includes(status)) throw makeError('status must be APPROVED or REJECTED', 422);
   const leave = await prisma.leaveRequest.findFirst({ where: { leave_id: leaveId, user: { organisationId } } });
   if (!leave) throw makeError('Leave request not found', 404);
-  return prisma.leaveRequest.update({
-    where: { leave_id: leaveId },
-    data: { status, approved_by: approverId },
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.leaveRequest.update({
+      where: { leave_id: leaveId },
+      data:  { status, approved_by: approverId },
+    });
+
+    if (status !== 'APPROVED') return { ...updated, releasedShifts: [] };
+
+    // ShiftAssignment.date and LeaveRequest.start/end_date are both @db.Date, so
+    // they are stored at UTC midnight and the range compares directly — none of
+    // the local-midnight conversion the datetime columns need.
+    //
+    // Matched on the shift's date rather than its clock span: a Night shift that
+    // starts the evening before the leave begins belongs to that earlier day and
+    // is left alone, which is how the roster itself counts a shift.
+    const clashing = await tx.shiftAssignment.findMany({
+      where:   { user_id: leave.user_id, date: { gte: leave.start_date, lte: leave.end_date } },
+      include: { shift: { select: { name: true, start_time: true, end_time: true } } },
+      orderBy: { date: 'asc' },
+    });
+
+    if (clashing.length) {
+      await tx.shiftAssignment.deleteMany({
+        where: { assignment_id: { in: clashing.map((c) => c.assignment_id) } },
+      });
+    }
+
+    // Surfaced so the UI can say what it took off the roster instead of changing
+    // it under the manager.
+    return {
+      ...updated,
+      releasedShifts: clashing.map((c) => ({
+        // Read back in UTC: a @db.Date is a bare calendar date parked at UTC
+        // midnight, so formatting it in local time would slide it a day for any
+        // server running behind UTC.
+        date:      ymdUtc(c.date),
+        shiftName: c.shift.name,
+        startTime: c.shift.start_time,
+        endTime:   c.shift.end_time,
+      })),
+    };
   });
 }
 
